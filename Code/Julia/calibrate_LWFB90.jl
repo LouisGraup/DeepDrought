@@ -20,7 +20,7 @@ sort!(obs_swc, :date); # sort by date
 
 # objective function to compare model output to observed data
 function obj_fun(sim, obs)
-    
+
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
     obs_40cm = dropmissing(obs[!, [:date, :VWC_40cm]]);
@@ -38,7 +38,7 @@ function obj_fun(sim, obs)
         nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
         return nse
     end
-    
+
     function RMSE(sim, obs)
         # calculate Root Mean Square Error
         rmse = sqrt(sum((obs .- sim).^2) / length(obs))
@@ -77,7 +77,7 @@ end_date = Date(2020, 12, 31);
 
 ## define calibration parameter sets
 
-n = 100; # number of parameter sets
+n = 200; # number of parameter sets
 
 # define prior parameter ranges
 
@@ -148,14 +148,14 @@ soil0 = CSV.read(soil_file, DataFrame, skipto=3);
 function output_soil_file(df, out_dir)
     # necessary to insert units row into data frame
     units = ["-","m","m","volume fraction (-)","volume fraction (-)","perMeter","-","mm per day","-","volume fraction (-)"]
-    
+
     df = string.(df); # convert to string
     insert!(df, 1, units); # insert units row
-    
+
     # create output file name
     output_file = out_dir  * "_soil_horizons.csv";
     # write parameter file
-    CSV.write(output_file, soil);
+    CSV.write(output_file, df);
 end
 
 # create empty dict for root parameter indices
@@ -174,7 +174,7 @@ for i in 1:nsets
 
         if name == "ths"
             # apply multiplier to ths_volfrac for each soil horizon
-            soil_set.ths_volFrac = soil_set.ths_volfrac * value;
+            soil_set.ths_volFrac = soil_set.ths_volFrac * value;
 
         elseif name == "ksat"
             # apply additive factor to log10(ksat) for each soil horizon
@@ -237,7 +237,7 @@ for i in 1:nsets
         # retrieve root parameter values
         betaroot = param_sets[root_dict["BETAROOT"], i];
         maxroot= param_sets[root_dict["MAXROOTDEPTH"], i];
-        
+
         # run model with modified root distribution
         model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = true,
         Δz_thickness_m = "soil_discretization.csv",
@@ -255,7 +255,7 @@ for i in 1:nsets
     sim = setup(model, requested_tspan=(start_index, end_index));
     # error handling
     try
-        simulate!(sim); 
+        simulate!(sim);
     catch
         continue; # skip if simulation fails
     end
