@@ -229,8 +229,8 @@ metrics = DataFrame(
 ## run LWFBrook90 for each parameter set
 # using parallel processing
 
-#Threads.@threads for i in 1:nsets
-for i in 1:nsets
+Threads.@threads for i in 1:nsets
+#for i in 1:nsets
     cal_dir = output_path * subdir_name * string(i) * "/";
 
     if "BETAROOT" ∈ keys(root_dict) || "MAXROOTDEPTH" ∈ keys(root_dict)
@@ -266,7 +266,7 @@ for i in 1:nsets
     z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = 1:end_index);
 
     # add dates column
-    dates_to_read_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+    dates_to_read_out = LWFBrook90.RelativeDaysFloat2DateTime.(1:end_index,sim.parametrizedSPAC.reference_date);
     z.dates = Date.(dates_to_read_out);
 
     # calculate goodness of fit to observed data
