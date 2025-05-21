@@ -14,7 +14,7 @@ messvar.tbl <- db_tbl(con, schema = "ada", table = "v_messvar") %>%
 
 pfyndata.tbl = db_tbl(con, table="pfyn_messdat")
 
-# irrigation
+## irrigation amounts from database
 irr.df = messvar.tbl %>% inner_join(pfyndata.tbl, by = 'messvar_id') %>% 
   filter(variable_id %in% c(263), sensor_id != 1) %>% 
   select(installation_name, messtime, messval, messvar_name, messvar_id) %>% 
@@ -25,12 +25,14 @@ irr.df$dates = as.Date(irr.df$messtime)
 irr.df = irr.df %>% filter(messvar_id %in% 8099:8102) %>% 
   select(-c("messtime","messvar_id", "messvar_name")) %>% rename(irrig_mm = messval)
 
+# sum up multiple amounts on single days for each plot
 irr.df = irr.df %>% group_by(dates, installation_name) %>% summarize_at(vars(irrig_mm), list(sum))
 
+# average over treatment plots
 irr = irr.df %>% group_by(dates) %>% summarize_at(vars(irrig_mm), list(mean))
 
 
-# compare Sierre and Sion precipitation
+## compare Sierre and Sion precipitation from MeteoSwiss
 
 Sion = read.table("../../Data/MeteoSwiss/Sion/order_129912_data.txt", sep=";", header=T, skip=2)
 Sierre = read.table("../../Data/MeteoSwiss/Sierre/order_130615_data.txt", sep=";", header=T, skip=2)
@@ -43,26 +45,29 @@ Sierre = Sierre %>% rename(precip=rka150d0) %>% filter(precip != "-") %>%
   select(dates, precip, stn)
 Sierre$precip = as.numeric(Sierre$precip)
 
+# match time period
 Sion_comp = Sion %>%  filter(dates %in% Sierre$dates) %>% rename(precip=rka150d0) %>% 
   select(dates, precip, stn)
 
 meteo_comp = rbind(Sion_comp, Sierre)
 meteo_comp$year = year(meteo_comp$dates)
 
+# compare yearly sums
 meteo_yr = meteo_comp %>% group_by(year, stn) %>% summarize_at(vars(precip), list(sum))
 ggplot(meteo_yr, aes(year, precip, fill=stn))+geom_col(position="dodge")
 
 meteo_yr2 = meteo_yr %>% pivot_wider(names_from=stn, values_from=precip)
-t.test(meteo_yr2$SIO, meteo_yr2$VSSIE)
+t.test(meteo_yr2$SIO, meteo_yr2$VSSIE) # yearly means are similar
 
+# compare daily values
 meteo_wide = meteo_comp %>% pivot_wider(names_from=stn, values_from=precip)
 ggplot(meteo_wide, aes(VSSIE, SIO))+geom_point()
-t.test(meteo_wide$SIO, meteo_wide$VSSIE)
+t.test(meteo_wide$SIO, meteo_wide$VSSIE) # daily means are similar
 
 
 ## use Sion precip until 2014, then Sierre
 
-meteoLWF<-Sion %>%
+meteoLWF = Sion %>%
   mutate( tmin = tre200dn,
           tmax = tre200jx,
           tmean = tre200d0,
@@ -90,9 +95,10 @@ meteoLWF$precip_irrstp = if_else(meteoLWF$dates < "2014-01-01", meteoLWF$precip_
 
 #write_csv(meteoLWF, "../../Data/Pfyn/meteo_irr.csv")
 
-# plot irrigation amounts
+## plot irrigation amounts
 meteo_plot = meteoLWF %>% filter(dates >= "2003-01-01") %>% select(-c(2:9,11)) %>% pivot_longer(-dates, names_to="treatment", values_to="mm")
 
+# daily
 ggplot(meteo_plot, aes(dates, mm, color=treatment)) + geom_line() + facet_wrap(~treatment, ncol=1)
 
 meteo_plot$year = year(meteo_plot$dates)
@@ -101,8 +107,10 @@ meteo_plot2 = meteo_plot %>% group_by(year, month, treatment) %>% summarize_at(v
 meteo_plot2$treatment = factor(meteo_plot2$treatment, levels=c("precip_irr", "precip_irrstp", "precip_ctrl"))
 meteo_plot2$date = as.Date(paste(meteo_plot2$year, meteo_plot2$month, 1, sep="-"))
 
+# monthly
 ggplot(filter(meteo_plot2, treatment!="precip_irrstp"), aes(x=date, y=mm, fill=treatment))+geom_bar(position="stack", stat="identity")
 
+# yearly comparison
 meteo_yr = meteo_plot %>% group_by(year, treatment) %>% summarize_at(vars(mm), list(sum)) %>% 
   group_by(treatment) %>% summarize_at(vars(mm), list(mean))
 meteo_yr
