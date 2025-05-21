@@ -6,24 +6,21 @@ library(lubridate)
 library(plantecophys)
 
 # read in meteo data
+# data from MeteoSwiss stations Sion and Sierre (precip post-2013)
+# combined with irrigation data in Pfynwald
 
-meteoCH = read.table("../../Data/MeteoSwiss/order_129912_data.txt", sep=";", header=T, skip=2)
-# data frame for LWFBrook90R
-meteoLWF<-meteoCH%>%
-  mutate( dates = as.Date(as.character(time), format="%Y%m%d"),
-          tmin = tre200dn,
-          tmax = tre200jx,
-          tmean = tre200d0,
-          prec = rka150d0,
-          relhum = ure200d0,
-          globrad = ((24*60*60)/1000000)*gre000d0, # convert from W/m2 to MJ/day/m2
-          windspeed = fkl010d0,
-          vappres = RHtoVPD(relhum, tmean, Pa = 101)) %>%
+meteo = read.csv("../../Data/Pfyn/meteo_irr.csv")
+meteo$dates = as.Date(meteo$dates)
+
+meteo_cont = meteo %>% rename(prec = precip_ctrl) %>% 
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
-meteoLWF = filter(meteoLWF, dates<as.Date("2024-12-31"))
+meteo_irr = meteo %>% rename(prec = precip_irr) %>% 
+  select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
+meteo_irrstp = meteo %>% rename(prec = precip_irrstp) %>% 
+  select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
 # yearly sum of precip for lai comparison
-meteoy = mutate(meteoLWF, year=year(dates))
+meteoy = mutate(meteo_cont, year=year(dates))
 meteoy = meteoy %>% group_by(year) %>% summarize_at(vars(prec), list(sum))
 
 # look back at previous years
@@ -35,23 +32,29 @@ meteoy$prev2_prec[3:25] = meteoy$prec[1:23] + meteoy$prec[2:24]
 
 site_df = read.csv("../../Data/Pfyn/siteproperties.csv")
 ht_cont = mean(filter(site_df, BEZKM == "control")$height_m)
+ht_irr = mean(filter(site_df, BEZKM == "irrigation")$height_m)
+ht_stp = mean(filter(site_df, BEZKM == "stop")$height_m)
 
 # read in lai data
 
 lai_df = read.csv("../../Data/Pfyn/PFY_lai.csv")
 lai_cont = filter(lai_df, trt=="control") %>% group_by(year) %>% 
   summarize_at(vars(LAI), list(mean))
+lai_irr = filter(lai_df, trt=="irrig.") %>% group_by(year) %>% 
+  summarize_at(vars(LAI), list(mean))
 
-lai_lm = lm(LAI ~ poly(year, 2, raw=TRUE), lai_cont)
-lai_fit = predict(lai_lm)
-lai_cont$pred = lai_fit
+# control plots
+
+lai_lm_c = lm(LAI ~ poly(year, 2, raw=TRUE), lai_cont)
+lai_fit_c = predict(lai_lm_c)
+lai_cont$pred = lai_fit_c
 
 ggplot(lai_cont, aes(year, LAI))+geom_point()+
   geom_line(aes(year, pred), color="red")
 
 lai_ext <- data.frame(year=c(2000:2020))
-lai_ext$lai_pred<-predict(lai_lm, newdata=lai_ext,type="response")
-lai_ext$lai_pred[1:4] = lai_cont$LAI[1]
+lai_ext$lai_pred<-predict(lai_lm_c, newdata=lai_ext,type="response")
+lai_ext$lai_pred[1:5] = lai_cont$LAI[1]
 #lai_ext = left_join(lai_ext, lai_cont)
 #lai_ext$LAI[is.na(lai_ext$LAI)] = lai_ext$lai_pred
 
@@ -68,21 +71,60 @@ summary(lm(LAI ~ prec, lai_cont))
 summary(lm(LAI ~ prev_prec, lai_cont))
 summary(lm(LAI ~ prev2_prec, lai_cont))
 
+
+# irrigated plots
+
+lai_lm_i = lm(LAI ~ poly(year, 2, raw=TRUE), lai_irr)
+lai_fit_i = predict(lai_lm_i)
+lai_irr$pred = lai_fit_i
+
+ggplot(lai_irr, aes(year, LAI))+geom_point()+
+  geom_line(aes(year, pred), color="red")
+
+lai_ext_irr <- data.frame(year=c(2000:2020))
+lai_ext_irr$lai_pred<-predict(lai_lm_i, newdata=lai_ext_irr,type="response")
+lai_ext_irr$lai_pred[1:4] = lai_cont$LAI[1]
+lai_ext_irr = left_join(lai_ext_irr, lai_irr)
+lai_ext_irr$LAI[is.na(lai_ext_irr$LAI)] = lai_ext_irr$lai_pred[is.na(lai_ext_irr$LAI)]
+
+ggplot(lai_ext_irr, aes(year, LAI))+geom_point()
+
+
+# irrigation stop plots
+# use irrigated LAI until 2014, then average of irrigated and control
+
+lai_ext_irrstp = select(lai_ext_irr, year, LAI) %>% rename(LAI_irr=LAI)
+lai_ext_irrstp$LAI_irr_c_avg = (lai_ext_irrstp$LAI_irr + lai_ext$lai_pred) / 2
+lai_ext_irrstp$LAI_irrstp = with(lai_ext_irrstp, ifelse(year<2014, LAI_irr, LAI_irr_c_avg))
+
+
 # read in soil and root data
 
 soil_df = read.csv("../../Data/Pfyn/soil_hydraulic.csv")
 
 
 library(LWFBrook90R)
-source("~/Documents/WSL/Project/LWFBrook90.jl/src/generate_LWFBrook90jl_Input.R", echo=F)
+source("C:/Users/grauplou/Documents/LWFBrook90.jl/src/generate_LWFBrook90jl_Input_mod.R", echo=F)
 
-opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2020-12-31"), 
+opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-12-31"), 
                         root_method="soilvar", budburst_method="Menzel", 
                         leaffall_method="vonWilpert", lai_method="Coupmodel")
-par = set_paramLWFB90(maxlai=lai_ext$lai_pred, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
-                      coords_x=7.330278, coords_y=46.218611, budburst_species="Pinus sylvestris")
 
-generate_LWFBrook90jl_Input("LWFBinput","pfynwald",".", options_b90=opt, param_b90=par, climate=meteoLWF, soil=soil_df)
+# control scenario
+par_c = set_paramLWFB90(maxlai=lai_ext$lai_pred, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
+                      coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont, soil=soil_df)
+
+# irrigation scenario
+par_ir = set_paramLWFB90(maxlai=lai_ext_irr$LAI, winlaifrac=.6, height=ht_irr, height_ini=ht_irr, 
+                        coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_irrigation","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr, soil=soil_df)
+
+# irrigation stop scenario
+par_irst = set_paramLWFB90(maxlai=lai_ext_irrstp$LAI_irrstp, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
+                         coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_irr_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
+
 
 
 # test run Pfynwald in R

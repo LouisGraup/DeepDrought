@@ -5,7 +5,7 @@ library(plantecophys)
 
 ## retrieve in-situ data from Pfynwald
 
-con <- db_connect(username = "grauplou", password = "LGdrummer!94", db_host = "pgdblwf", db_name = "lwf")
+con <- db_connect(username = "grauplou", password = rstudioapi::askForPassword("enter password"), db_host = "pgdblwf", db_name = "lwf")
 
 # Information about measurements
 messvar.df <- db_tbl(con, schema = "ada", table = "v_messvar", retrieve = TRUE) %>%
@@ -58,7 +58,7 @@ meteo = data.frame(dates=dateseq) %>% left_join(meteo.day)
 
 
 
-## combine with MeteoSchweiz data
+## combine with MeteoSwiss data
 
 # convert MeteoSwiss to LWFBrook90 input..............................................
 #gre000d0  W/m2                                 Global radiation; daily mean
@@ -71,13 +71,13 @@ meteo = data.frame(dates=dateseq) %>% left_join(meteo.day)
 #fkl010d0  m/s                                  Wind speed scalar; daily mean
 
 # Sion station (SIO) lat. 46° 13' 07'' lon. 07° 19' 49'' elev. 482 m
-meteoCH = read.table("./Data/MeteoSchweiz/order_129912_data.txt", sep=";", header=T, skip=2)
+meteoCH = read.table("../../Data/MeteoSwiss/Sion/order_129912_data.txt", sep=";", header=T, skip=2)
 
 meteoCH2<-meteoCH%>%
   mutate( dates = as.Date(as.character(time), format="%Y%m%d"),
           tmin_degC = tre200dn,
           tmax_degC = tre200jx,
-          tmean =tre200d0,
+          tmean = tre200d0,
           prec_mmDay = rka150d0,
           relhum = ure200d0,
           globrad_MJDayM2 = ((24*60*60)/1000000)*gre000d0, # convert from W/m2 to MJ/day/m2
