@@ -14,6 +14,7 @@ obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
 obs_swc = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
 select!(obs_swc, :date, :depth, :VWC); # remove extra columns
+filter!(:date => >(Date(2003, 4, 1)), obs_swc); # filter out early dates
 
 obs_swc = unstack(obs_swc, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
 sort!(obs_swc, :date); # sort by date
@@ -26,6 +27,8 @@ function obj_fun(sim, obs)
     obs_40cm = dropmissing(obs[!, [:date, :VWC_40cm]]);
     obs_60cm = dropmissing(obs[!, [:date, :VWC_60cm]]);
     obs_80cm = dropmissing(obs[!, [:date, :VWC_80cm]]);
+
+    filter!(:date => >(Date(2015, 1, 1)), obs_80cm); # filter out early dates
 
     # match simulated data to available dates for each depth
     sim_10cm = sim[sim.dates .∈ [obs_10cm.date], :theta_m3m3_100mm];
