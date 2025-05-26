@@ -18,8 +18,8 @@ filter!(:date => >(Date(2003, 4, 1)), obs_swc); # filter out early dates
 obs_swc.src .= "obs"; # add source column
 
 ## retrieve metrics and parameters from calibration
-met = CSV.read("LWFBcal_output/metrics_20250519.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250519.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_20250523.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250523.csv", DataFrame);
 
 met_good = met[met.nse10 .> 0 .&& 
               met.nse40 .> 0 .&&

@@ -7,6 +7,8 @@ using Distributions, QuasiMonteCarlo
 using Distributed
 using Plots; gr()
 
+# cd("DeepDrought/Code/Julia/") # for cluster
+
 ## load behavioral data and define objective function
 
 # behavioral data
@@ -86,13 +88,13 @@ n = 200; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.0, 1.0), # drainage
-    ("BYPAR", 0.0, 1.0), # bypass flow
+    #("DRAIN", 0.0, 1.0), # drainage
+    #("BYPAR", 0.0, 1.0), # bypass flow
     # meteo parameters
     ("ALB", 0.1, 0.3), # surface albedo
     # soil parameters
-    ("RSSA", 1.0, 1500.0), # soil resistance
-    ("ths", 0.5, 2.0), # multiplier on theta_sat
+    #("RSSA", 1.0, 1500.0), # soil resistance
+    ("ths", 0.8, 1.5), # multiplier on theta_sat
     ("ksat", -0.5, 0.5), # additive factor on log10(k_sat)
     # plant parameters
     ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI
@@ -105,8 +107,8 @@ param = [
     ("PSICR", -4.0, -1.0), # critical water potential
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity
-    ("VXYLEM_mm", 1.0, 100.0), # xylem volume
-    ("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient
+    #("VXYLEM_mm", 1.0, 100.0), # xylem volume
+    #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient
     ("MAXROOTDEPTH", -5.0, -0.5), # max rooting depth
     ("BETAROOT", 0.8, 1.0) # beta root coefficient
 ];
@@ -127,8 +129,9 @@ nsets = n * np; # total number of samples
 param_sets = QuasiMonteCarlo.sample(nsets, lb, ub, LatinHypercubeSample());
 
 # output parameter sets
-param_out = DataFrame(param_sets', param_names);
-CSV.write("LWFBcal_output/param_" * string(Dates.format(now(), "yyyymmdd")) * ".csv", param_out);
+param_out = DataFrame(param_sets', param_names); # transpose parameter sets to add column names
+curDate = string(Dates.format(today(), "yyyymmdd")); # save date for consistency over multi-day calibrations 
+CSV.write("LWFBcal_output/param_" * curDate * ".csv", param_out);
 
 ## make output folder structure and create calibration parameter files
 
@@ -277,4 +280,4 @@ Threads.@threads for i in 1:nsets
 
 end
 
-CSV.write("LWFBcal_output/metrics_" * string(Dates.format(now(), "yyyymmdd")) * ".csv", metrics);
+CSV.write("LWFBcal_output/metrics_" * curDate * ".csv", metrics);
