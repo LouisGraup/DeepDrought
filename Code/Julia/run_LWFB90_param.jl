@@ -103,8 +103,8 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
     if root_pars
         # retrieve root parameter values
-        betaroot = par["BETAROOT"];
-        maxroot= par["MAXROOTDEPTH"];
+        betaroot = par.BETAROOT[1];
+        maxroot= par.MAXROOTDEPTH[1];
 
         # run model with modified root distribution
         model = loadSPAC(output_path, output_prefix, simulate_isotopes = true,
