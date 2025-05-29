@@ -1,7 +1,8 @@
 .vscode/settings.json
+.vscode
 ./Code/Julia/LWFBcalibration/
 LWFBcalibration
-./Code/R/.Rproj.user
-./Code/R/.Rhistory
+Code/R/.Rproj.user
+Code/R/.Rhistory
 .Rproj.user
 .Rhistory
