@@ -4,10 +4,6 @@ using CSV, DataFrames, Dates
 using HypothesisTests
 using StatsPlots, Plots; gr()
 
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250526.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250526.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250526.csv", DataFrame);
-
 # function for density plot of metrics
 function density_plot(met)
     density(met.nse10, label="NSE10")
@@ -63,6 +59,24 @@ function par_plot(par, met; met_y="rmse_com", behave=true)
     return par_plots
 end
 
+# function to plot metric comparisons
+function met_plot(met, x, y)
+    
+    if isa(x, Array)
+        # create subplots
+        n = length(x);
+        met_plots = [];
+        for i in 1:n
+            p = scatter(met[!, x[i]], met[!, y[i]], xlabel=x[i], ylabel=y[i], legend=false)
+            push!(met_plots, p)
+        end
+        return plot(met_plots..., size=(1000, 1000), layout=(ceil(Int, sqrt(n)), ceil(Int, sqrt(n))))
+    else
+        return scatter(met[!, x], met[!, y], xlabel=x, ylabel=y, legend=false)
+    end
+
+end
+
 # function to calculate and plot K-S statistic for parameters
 function KS_plot(par, met)
     par_good, par_bad = sep_params(par, met);
@@ -86,6 +100,31 @@ function KS_plot(par, met)
     return ks_stat, par_plots
 end
 
+# function to compare scenarios across parameters
+function scen_plot(par, met_ctr, met_irr)
+    # retrieve behavioral parameters for both scenarios
+    par_ctr_good, = sep_params(par, met_ctr);
+    par_irr_good, = sep_params(par, met_irr);
+    
+    np = size(par, 2);
+    ks_stat = DataFrame(par=names(par), D=zeros(np), pval=zeros(np));
+    par_plots = [];
+    
+    # loop through each parameter
+    for i in 1:np
+        ks_test = ApproximateTwoSampleKSTest(par_ctr_good[!, i], par_irr_good[!, i]);
+        ks_stat.D[i] = ks_test.δ; # D statistic
+        ks_stat.pval[i] = pvalue(ks_test); # p-value
+
+        p=ecdfplot(par_ctr_good[!, i], label="C")
+        ecdfplot!(p, par_irr_good[!, i], label="I")
+        title!(p, "K-S test for $(ks_stat.par[i]),\n D=$(round(ks_stat.D[i], sigdigits=3)), pval=$(round(ks_stat.pval[i], sigdigits=3))")
+        push!(par_plots, p)
+    end
+    
+    return ks_stat, par_plots
+end
+
 # function to calculate combined NSE metric
 function nse_quad(met)
     return sqrt.((met.nse10 .^ 2 + met.nse40 .^ 2 + met.nse60 .^ 2 + met.nse80 .^ 2) / 4);
@@ -95,6 +134,20 @@ end
 function rmse_quad(met)
     return sqrt.((met.rmse10 .^ 2 + met.rmse40 .^ 2 + met.rmse60 .^ 2 + met.rmse80 .^ 2) / 4);
 end
+
+# function to find best scenario
+function met_best_scen(met, metric=:nse_com)
+    # find the index of the maximum value
+    max_idx = argmax(met[!, metric]);
+    best_scen = met.scen[max_idx];
+    
+    return best_scen, met[max_idx, :]
+end
+
+# calibration results
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250529.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250529.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250529.csv", DataFrame);
 
 density_plot(met_ctr)
 density_plot(met_irr)
@@ -106,17 +159,54 @@ met_irr_good = behavioral_met(met_irr);
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
+# add combined metrics
+met_ctr_good.nse_com = nse_quad(met_ctr_good);
+met_irr_good.nse_com = nse_quad(met_irr_good);
+met_ctr_good.rmse_com = rmse_quad(met_ctr_good);
+met_irr_good.rmse_com = rmse_quad(met_irr_good);
+
 describe(met_ctr_good)
 
-# compare metrics
-@df met_ctr_good scatter(:nse10, :nse40, xlabel="NSE10", ylabel="NSE40", legend=false)
-@df met_ctr_good scatter(:nse40, :nse60, xlabel="NSE40", ylabel="NSE60", legend=false)
-@df met_ctr_good scatter(:nse60, :nse80, xlabel="NSE60", ylabel="NSE80", legend=false)
-@df met_ctr_good scatter(:nse10, :nse80, xlabel="NSE10", ylabel="NSE80", legend=false)
+# compare metrics across depths
+met_plot(met_ctr_good, [:nse10, :nse40, :nse60, :nse10], [:nse40, :nse60, :nse80, :nse80])
+met_plot(met_irr_good, [:nse10, :nse40, :nse60, :nse10], [:nse40, :nse60, :nse80, :nse80])
+
+# compare metrics across type
+met_plot(met_ctr_good, :nse_com, :rmse_com)
+met_plot(met_irr_good, :nse_com, :rmse_com)
+
+# compare metrics across scenarios
+scatter(met_ctr.nse10, met_irr.nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
+
+# compare behavioral parameter sets across both scenarios
+ks_stat, ks_plots = scen_plot(par, met_ctr, met_irr);
+plot(ks_plots..., size=(1000,1000), layout=(3,5), legend=:bottomright, titlefontsize=8, guidefontsize=6)
+
+# find common parameters
+common_params = intersect(met_ctr_good.scen, met_irr_good.scen);
+
+met_ctr_best = met_ctr_good[met_ctr_good.scen .∈ [common_params], :];
+met_irr_best = met_irr_good[met_irr_good.scen .∈ [common_params], :];
+
+met_ctr_best.nse_com = nse_quad(met_ctr_best);
+met_irr_best.nse_com = nse_quad(met_irr_best);
+
+scatter(met_ctr_best.nse_com, met_irr_best.nse_com, 
+    xlabel="NSE Combined Control", ylabel="NSE Combined Irrigation", legend=false)
+
+# best control scenario
+scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good);
+# best irrigation scenario
+scen_max_irr, met_max_irr = met_best_scen(met_irr_good);
+
+# parameter values for the best performing scenario
+par_ctr_best = par[scen_max_ctr, :];
+par_ctr_best
+
 
 # parameter relationships
 par_plots_ctr = par_plot(par, met_ctr);
-par_plots_irr = par_plot(par, met_irr);
+par_plots_irr = par_plot(par, met_irr, behave=false);
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(3,5), legend=false, titlefontsize=8, guidefontsize=6)
 

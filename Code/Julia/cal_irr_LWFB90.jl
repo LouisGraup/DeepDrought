@@ -14,7 +14,7 @@ using Plots; gr()
 # behavioral data
 obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-filter!(:date => >(Date(2003, 4, 1)), obs_swc); # filter out early dates
+filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -97,29 +97,31 @@ n = 200; # number of parameter sets
 
 param = [
     # hydro parameters
-    #("DRAIN", 0.0, 1.0), # drainage
-    #("BYPAR", 0.0, 1.0), # bypass flow
+    ("DRAIN", 0.0, 1.0), # drainage
+    ("INFEXP", 0.0, 1.0), # infiltration exponent
+    ("IDEPTH_m", 0.05, 0.5), # infiltration depth (m)
     # meteo parameters
     ("ALB", 0.1, 0.3), # surface albedo
+    ("ALBSN", 0.4, 0.8), # snow surface albedo
     # soil parameters
-    #("RSSA", 1.0, 1500.0), # soil resistance
-    ("ths", 0.5, 1.5), # multiplier on theta_sat
-    ("ksat", -0.5, 0.5), # additive factor on log10(k_sat)
+    ("RSSA", 1.0, 1500.0), # soil resistance
+    ("ths", 0.8, 1.3), # multiplier on theta_sat
+    ("ksat", -0.75, 0.25), # additive factor on log10(k_sat)
     # plant parameters
     ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI
-    ("GLMAX", 0.001, 0.03), # stomatal conductance
+    ("GLMAX", 0.001, 0.015), # stomatal conductance
     ("CVPD", 1.0, 3.0), # vpd sensitivity
     ("R5", 50, 400), # radiation sensitivity
     ("T1", 5, 15), # low temperature threshold
     ("T2", 20, 35), # high temperature threshold
-    ("PSICR", -4.0, -1.0), # critical water potential
+    ("PSICR", -3.0, -1.0), # critical water potential
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient
-    ("MAXROOTDEPTH", -5.0, -0.5), # max rooting depth
-    ("BETAROOT", 0.8, 1.0) # beta root coefficient
+    ("MAXROOTDEPTH", -2.0, -0.5), # max rooting depth
+    ("BETAROOT", 0.85, 1.0) # beta root coefficient
 ];
 
 ### END USER INPUT ###

@@ -10,6 +10,11 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
     if new_folder
         ## make output folder structure and create parameter files
 
+        # create output directory if it doesn't exist
+        if !ispath(output_path)
+            mkpath(output_path);
+        end
+
         # check for soil parameters
         if "ths" ∈ names(par) || "ksat" ∈ names(par)
             soil_pars = true;
