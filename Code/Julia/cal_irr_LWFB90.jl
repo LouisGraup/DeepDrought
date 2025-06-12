@@ -12,9 +12,14 @@ using Plots; gr()
 ## load behavioral data and define objective function
 
 # behavioral data
+# soil water content and soil matric potential
 obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
 filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
+
+obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
+filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
+filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -27,9 +32,11 @@ select!(obs_swc_irr, :date, :depth, :VWC); # remove extra columns
 obs_swc_irr = unstack(obs_swc_irr, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
 sort!(obs_swc_irr, :date); # sort by date
 
+obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
+obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select control treatment
 
 # objective function to compare model output to observed data
-function obj_fun(sim, obs)
+function obj_fun_swc(sim, obs)
 
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
@@ -72,6 +79,29 @@ function obj_fun(sim, obs)
     return nse10, rmse10, nse40, rmse40, nse60, rmse60, nse80, rmse80
 end
 
+function obj_fun_swp(sim, obs)
+
+    # separate observed data into different depths and remove missing values
+    obs_10cm = dropmissing(obs[!, [:date, :SWP_10cm]]);
+    obs_80cm = dropmissing(obs[!, [:date, :SWP_80cm]]);
+
+    # match simulated data to available dates for each depth
+    sim_10cm = sim[sim.dates .∈ [obs_10cm.date], :psi_kPa_100mm];
+    sim_80cm = sim[sim.dates .∈ [obs_80cm.date], :psi_kPa_800mm];
+
+    function NSE(sim, obs)
+        # calculate Nash-Sutcliffe Efficiency
+        nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
+        return nse
+    end
+
+    # calculate NSE
+    nse10 = NSE(sim_10cm, obs_10cm.SWP_10cm);
+    nse80 = NSE(sim_80cm, obs_80cm.SWP_80cm);
+
+    return nse10, nse80
+end
+
 ### BEGIN USER INPUT ###
 
 ## parameter input and output paths
@@ -97,31 +127,32 @@ n = 200; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.0, 1.0), # drainage
-    ("INFEXP", 0.0, 1.0), # infiltration exponent
-    ("IDEPTH_m", 0.05, 0.5), # infiltration depth (m)
+    ("DRAIN", 0.0, 1.0), # drainage (0, 1)
+    ("INFEXP", 0, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.05, 0.5), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
-    ("ALB", 0.1, 0.3), # surface albedo
-    ("ALBSN", 0.4, 0.8), # snow surface albedo
+    ("ALB", 0.1, 0.3), # surface albedo (0.1, 0.3)
+    #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 1.0, 1500.0), # soil resistance
-    ("ths", 0.8, 1.3), # multiplier on theta_sat
-    ("ksat", -0.75, 0.25), # additive factor on log10(k_sat)
+    ("RSSA", 1.0, 1500.0), # soil resistance (1, 1500)
+    ("ths", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
-    ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI
-    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI
-    ("GLMAX", 0.001, 0.015), # stomatal conductance
-    ("CVPD", 1.0, 3.0), # vpd sensitivity
-    ("R5", 50, 400), # radiation sensitivity
-    ("T1", 5, 15), # low temperature threshold
-    ("T2", 20, 35), # high temperature threshold
-    ("PSICR", -3.0, -1.0), # critical water potential
-    ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction
-    ("MXKPL", 1.0, 30.0), # maximum plant conductivity
-    #("VXYLEM_mm", 1.0, 100.0), # xylem volume
-    #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient
-    ("MAXROOTDEPTH", -2.0, -0.5), # max rooting depth
-    ("BETAROOT", 0.85, 1.0) # beta root coefficient
+    ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
+    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.03)
+    ("CVPD", 1.0, 3.0), # vpd sensitivity (1, 3)
+    ("R5", 50, 400), # radiation sensitivity (50, 400)
+    ("T1", 5, 15), # low temperature threshold (5, 15)
+    ("T2", 20, 35), # high temperature threshold (20, 35)
+    ("PSICR", -3, -1.0), # critical water potential (-4, -1)
+    ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
+    ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
+    ("MXRTLN", 500, 6000), # maximum root length (100, 6000)
+    #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
+    #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
+    ("MAXROOTDEPTH", -2.0, -0.5), # max rooting depth (-5, -0.5)
+    ("BETAROOT", 0.8, 1.0) # beta root coefficient (0.8, 1.0)
 ];
 
 ### END USER INPUT ###
@@ -237,14 +268,16 @@ end_index = Dates.value(end_date - ref_date);
 # initialize metrics data frame
 metrics_ctr = DataFrame(
     scen = 1:nsets,
-    nse10 = fill(0.0, nsets),
-    rmse10 = fill(0.0, nsets),
-    nse40 = fill(0.0, nsets),
-    rmse40 = fill(0.0, nsets),
-    nse60 = fill(0.0, nsets),
-    rmse60 = fill(0.0, nsets),
-    nse80 = fill(0.0, nsets),
-    rmse80 = fill(0.0, nsets)
+    swc_nse10 = fill(0.0, nsets),
+    swc_rmse10 = fill(0.0, nsets),
+    swc_nse40 = fill(0.0, nsets),
+    swc_rmse40 = fill(0.0, nsets),
+    swc_nse60 = fill(0.0, nsets),
+    swc_rmse60 = fill(0.0, nsets),
+    swc_nse80 = fill(0.0, nsets),
+    swc_rmse80 = fill(0.0, nsets),
+    swp_nse10 = fill(0.0, nsets),
+    swp_nse80 = fill(0.0, nsets)
 );
 metrics_irr = copy(metrics_ctr);
 
@@ -293,17 +326,21 @@ Threads.@threads for i in 1:(2*nsets)
     ## retrieve model output
 
     # soil water content
-    z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = 1:end_index);
+    z_theta = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = 1:end_index);
+    z_psi = get_soil_(:psi, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = 1:end_index);
 
     # add dates column
     dates_to_read_out = LWFBrook90.RelativeDaysFloat2DateTime.(1:end_index,sim.parametrizedSPAC.reference_date);
-    z.dates = Date.(dates_to_read_out);
+    z_theta.dates = Date.(dates_to_read_out);
+    z_psi.dates = Date.(dates_to_read_out);
 
     # calculate goodness of fit to observed data
     if i <= nsets
-        metrics_ctr[par_id, 2:9] = obj_fun(z, obs_swc_ctr);
+        metrics_ctr[par_id, 2:9] = obj_fun_swc(z_theta, obs_swc_ctr);
+        metrics_ctr[par_id, 10:11] = obj_fun_swp(z_psi, obs_swp_ctr);
     else
-        metrics_irr[par_id, 2:9] = obj_fun(z, obs_swc_irr);
+        metrics_irr[par_id, 2:9] = obj_fun_swc(z_theta, obs_swc_irr);
+        metrics_ctr[par_id, 10:11] = obj_fun_swp(z_psi, obs_swp_irr);
     end
 
 end

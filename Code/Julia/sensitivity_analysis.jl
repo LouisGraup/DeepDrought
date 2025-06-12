@@ -4,6 +4,12 @@ using CSV, DataFrames, Dates
 using HypothesisTests
 using StatsPlots, Plots; gr()
 
+# function to filter out scenarios which produced error
+function filter_error(met)
+    println("Filtering out $(sum(met.rmse10 .== 0)) scenarios out of total $(size(met, 1)) which failed to run.")
+    return met[met.rmse10 .!= 0, :]
+end
+
 # function for density plot of metrics
 function density_plot(met)
     density(met.nse10, label="NSE10")
@@ -14,10 +20,10 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.nse10 .> 0 .&& 
-               met.nse40 .> 0 .&&
-               met.nse60 .> 0 .&&
-               met.nse80 .> 0, :]
+    return met[met.nse10 .> 0.5 .&& 
+               met.nse40 .> 0.5 .&&
+               met.nse60 .> 0.5 .&&
+               met.nse80 .> 0.5, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -33,11 +39,6 @@ end
 
 # function to plot parameter relationships with combined metric
 function par_plot(par, met; met_y="rmse_com", behave=true)
-    
-    # add combined metric if desired
-    if met_y == "rmse_com"
-        met.rmse_com = rmse_quad(met);
-    end
 
     if behave
         # only plot behavioral parameter sets
@@ -125,14 +126,27 @@ function scen_plot(par, met_ctr, met_irr)
     return ks_stat, par_plots
 end
 
-# function to calculate combined NSE metric
+# function to calculate combined NSE metric as quadratic mean
 function nse_quad(met)
     return sqrt.((met.nse10 .^ 2 + met.nse40 .^ 2 + met.nse60 .^ 2 + met.nse80 .^ 2) / 4);
+end
+
+# function to calculate combined NSE metric as arithmetic mean
+function nse_avg(met)
+    return (met.nse10 + met.nse40 + met.nse60 + met.nse80) / 4;
 end
 
 # function to calculate combined RMSE metric
 function rmse_quad(met)
     return sqrt.((met.rmse10 .^ 2 + met.rmse40 .^ 2 + met.rmse60 .^ 2 + met.rmse80 .^ 2) / 4);
+end
+
+# function to add combined metrics to DataFrame
+function met_comb(met)
+    met.nse_com = nse_quad(met);
+    met.nse_avg = nse_avg(met);
+    met.rmse_com = rmse_quad(met);
+    return met
 end
 
 # function to find best scenario
@@ -145,25 +159,30 @@ function met_best_scen(met, metric=:nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250529.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250529.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250529.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250602.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250602.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250602.csv", DataFrame);
+
+# filter out scenarios which produced an error
+met_ctr = filter_error(met_ctr);
+met_irr = filter_error(met_irr);
 
 density_plot(met_ctr)
 density_plot(met_irr)
+
+# add combined metrics
+met_ctr = met_comb(met_ctr);
+met_irr = met_comb(met_irr);
 
 # filter metrics for behavioral runs
 met_ctr_good = behavioral_met(met_ctr);
 met_irr_good = behavioral_met(met_irr);
 
+println("$(size(met_ctr_good, 1)) behavioral parameter sets out of total $(size(met_ctr, 1)) in control scenario.")
+println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(met_irr, 1)) in irrigation scenario.")
+
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
-
-# add combined metrics
-met_ctr_good.nse_com = nse_quad(met_ctr_good);
-met_irr_good.nse_com = nse_quad(met_irr_good);
-met_ctr_good.rmse_com = rmse_quad(met_ctr_good);
-met_irr_good.rmse_com = rmse_quad(met_irr_good);
 
 describe(met_ctr_good)
 
@@ -180,16 +199,13 @@ scatter(met_ctr.nse10, met_irr.nse10, xlabel="NSE10 Control", ylabel="NSE10 Irri
 
 # compare behavioral parameter sets across both scenarios
 ks_stat, ks_plots = scen_plot(par, met_ctr, met_irr);
-plot(ks_plots..., size=(1000,1000), layout=(3,5), legend=:bottomright, titlefontsize=8, guidefontsize=6)
+plot(ks_plots..., size=(1000,1000), layout=(4,5), legend=:bottomright, titlefontsize=8, guidefontsize=6)
 
 # find common parameters
 common_params = intersect(met_ctr_good.scen, met_irr_good.scen);
 
 met_ctr_best = met_ctr_good[met_ctr_good.scen .∈ [common_params], :];
 met_irr_best = met_irr_good[met_irr_good.scen .∈ [common_params], :];
-
-met_ctr_best.nse_com = nse_quad(met_ctr_best);
-met_irr_best.nse_com = nse_quad(met_irr_best);
 
 scatter(met_ctr_best.nse_com, met_irr_best.nse_com, 
     xlabel="NSE Combined Control", ylabel="NSE Combined Irrigation", legend=false)
@@ -203,15 +219,19 @@ scen_max_irr, met_max_irr = met_best_scen(met_irr_good);
 par_ctr_best = par[scen_max_ctr, :];
 par_ctr_best
 
+par_irr_best = par[scen_max_irr, :];
+par_irr_best
+
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr);
-par_plots_irr = par_plot(par, met_irr, behave=false);
+par_plots_ctr = par_plot(par, met_ctr, met_y="nse_com");
+par_plots_irr = par_plot(par, met_irr, met_y="nse_com", behave=false);
 
-plot(par_plots_ctr..., size=(1000,1000), layout=(3,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
 ks_stat_ctr, ks_plots_ctr = KS_plot(par, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par, met_irr);
 
-plot(ks_plots_ctr..., size=(1000,1000), layout=(3,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+# behavioral is blue, non-behavioral is red

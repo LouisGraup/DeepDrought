@@ -25,7 +25,7 @@ end
 ## behavioral data
 obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-filter!(:date => >(Date(2003, 4, 1)), obs_swc); # filter out early dates
+filter!(:date => >(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -58,8 +58,8 @@ par_best = par[scen_max, :];
 par_best
 
 # run LWFBrook90.jl with single parameter set
-sim_ctr = run_LWFB90_param(par_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irrigation/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irrigation/", "pfynwald", "LWFB_testrun/irrigation/");
 # after first time, run the model with new_folder=false
 # sim = run_LWFB90_param(par_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/", "pfynwald", "LWFB_testrun/", new_folder=false);
 

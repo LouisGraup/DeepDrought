@@ -3,7 +3,6 @@
 
 library(tidyverse)
 library(lubridate)
-library(plantecophys)
 
 ## read in meteo data
 # data from MeteoSwiss stations Sion and Sierre (precip post-2013)
@@ -170,17 +169,17 @@ opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-1
 
 # control scenario
 par_c = set_paramLWFB90(maxlai=lai_ext$LAI, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
-                      coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+                      coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont, soil=soil_df)
 
 # irrigation scenario
 par_ir = set_paramLWFB90(maxlai=lai_ext_irr$LAI, winlaifrac=.6, height=ht_irr, height_ini=ht_irr, 
-                        coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+                        coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 generate_LWFBrook90jl_Input("Pfyn_irrigation","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr, soil=soil_df)
 
 # irrigation stop scenario
 par_irst = set_paramLWFB90(maxlai=lai_ext_irrstp$LAI_irrstp, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
-                         coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, budburst_species="Pinus sylvestris")
+                         coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 generate_LWFBrook90jl_Input("Pfyn_irr_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
 
 
