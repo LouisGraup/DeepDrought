@@ -59,7 +59,7 @@ par_best
 
 # run LWFBrook90.jl with single parameter set
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irrigation/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
 # after first time, run the model with new_folder=false
 # sim = run_LWFB90_param(par_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/", "pfynwald", "LWFB_testrun/", new_folder=false);
 

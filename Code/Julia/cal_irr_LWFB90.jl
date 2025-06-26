@@ -7,7 +7,7 @@ using Distributions, QuasiMonteCarlo
 using Distributed
 using Plots; gr()
 
-# cd("DeepDrought/Code/Julia/") # for cluster
+cd("DeepDrought/Code/Julia/") # for cluster
 
 ## load behavioral data and define objective function
 
@@ -107,7 +107,7 @@ end
 ## parameter input and output paths
 # input
 input_path_ctr = "LWFBinput/Pfyn_control/";
-input_path_irr = "LWFBinput/Pfyn_irrigation/";
+input_path_irr = "LWFBinput/Pfyn_irrigation_ambient/";
 input_prefix = "pfynwald";
 
 # output
@@ -121,7 +121,7 @@ end_date = Date(2020, 12, 31);
 
 ## define calibration parameter sets
 
-n = 200; # number of parameter sets
+n = 50; # number of parameter sets
 
 # define prior parameter ranges
 
@@ -140,7 +140,7 @@ param = [
     # plant parameters
     ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.03)
+    ("GLMAX", 0.001, 0.03), # stomatal conductance (0.001, 0.03)
     ("CVPD", 1.0, 3.0), # vpd sensitivity (1, 3)
     ("R5", 50, 400), # radiation sensitivity (50, 400)
     ("T1", 5, 15), # low temperature threshold (5, 15)
@@ -284,7 +284,8 @@ metrics_irr = copy(metrics_ctr);
 ## run LWFBrook90 for each parameter set
 # using parallel processing
 
-Threads.@threads for i in 1:(2*nsets)
+#Threads.@threads for i in 1:(2*nsets)
+for i in 1:(2*nsets)
     
     if i <= nsets
         # control scenario
@@ -340,7 +341,7 @@ Threads.@threads for i in 1:(2*nsets)
         metrics_ctr[par_id, 10:11] = obj_fun_swp(z_psi, obs_swp_ctr);
     else
         metrics_irr[par_id, 2:9] = obj_fun_swc(z_theta, obs_swc_irr);
-        metrics_ctr[par_id, 10:11] = obj_fun_swp(z_psi, obs_swp_irr);
+        metrics_irr[par_id, 10:11] = obj_fun_swp(z_psi, obs_swp_irr);
     end
 
 end

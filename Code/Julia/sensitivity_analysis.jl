@@ -6,24 +6,27 @@ using StatsPlots, Plots; gr()
 
 # function to filter out scenarios which produced error
 function filter_error(met)
-    println("Filtering out $(sum(met.rmse10 .== 0)) scenarios out of total $(size(met, 1)) which failed to run.")
-    return met[met.rmse10 .!= 0, :]
+    println("Filtering out $(sum(met.swc_rmse10 .== 0)) scenarios out of total $(size(met, 1)) which failed to run.")
+    return met[met.swc_rmse10 .!= 0, :]
 end
 
 # function for density plot of metrics
 function density_plot(met)
-    density(met.nse10, label="NSE10")
-    density!(met.nse40, label="NSE40")
-    density!(met.nse60, label="NSE60")
-    density!(met.nse80, label="NSE80")
+    density(met.swc_nse10, label="NSE10")
+    density!(met.swc_nse40, label="NSE40")
+    density!(met.swc_nse60, label="NSE60")
+    density!(met.swc_nse80, label="NSE80")
 end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.nse10 .> 0.5 .&& 
-               met.nse40 .> 0.5 .&&
-               met.nse60 .> 0.5 .&&
-               met.nse80 .> 0.5, :]
+    return met[met.swc_nse10 .> 0.0 .&& 
+               met.swc_nse40 .> 0.0 .&&
+               met.swc_nse60 .> 0.0 .&&
+               met.swc_nse80 .> 0.0, :]
+               #met.swc_nse80 .> 0.0 .&&
+               #met.swp_nse10 .> 0.0 .&&
+               #met.swp_nse80 .> 0.0, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -126,31 +129,18 @@ function scen_plot(par, met_ctr, met_irr)
     return ks_stat, par_plots
 end
 
-# function to calculate combined NSE metric as quadratic mean
-function nse_quad(met)
-    return sqrt.((met.nse10 .^ 2 + met.nse40 .^ 2 + met.nse60 .^ 2 + met.nse80 .^ 2) / 4);
-end
-
-# function to calculate combined NSE metric as arithmetic mean
-function nse_avg(met)
-    return (met.nse10 + met.nse40 + met.nse60 + met.nse80) / 4;
-end
-
-# function to calculate combined RMSE metric
-function rmse_quad(met)
-    return sqrt.((met.rmse10 .^ 2 + met.rmse40 .^ 2 + met.rmse60 .^ 2 + met.rmse80 .^ 2) / 4);
-end
-
 # function to add combined metrics to DataFrame
 function met_comb(met)
-    met.nse_com = nse_quad(met);
-    met.nse_avg = nse_avg(met);
-    met.rmse_com = rmse_quad(met);
+    met.swc_nse_com = sqrt.((met.swc_nse10 .^ 2 + met.swc_nse40 .^ 2 + met.swc_nse60 .^ 2 + met.swc_nse80 .^ 2) / 4);
+    met.swc_nse_avg = (met.swc_nse10 + met.swc_nse40 + met.swc_nse60 + met.swc_nse80) / 4;
+    met.swp_nse_com = sqrt.((met.swp_nse10 .^ 2 + met.swp_nse80 .^ 2) / 2);
+    met.swp_nse_avg = (met.swp_nse10 + met.swp_nse80) / 2;
+    met.rmse_com = sqrt.((met.swc_rmse10 .^ 2 + met.swc_rmse40 .^ 2 + met.swc_rmse60 .^ 2 + met.swc_rmse80 .^ 2) / 4);
     return met
 end
 
 # function to find best scenario
-function met_best_scen(met, metric=:nse_com)
+function met_best_scen(met, metric=:swc_nse_com)
     # find the index of the maximum value
     max_idx = argmax(met[!, metric]);
     best_scen = met.scen[max_idx];
@@ -159,9 +149,9 @@ function met_best_scen(met, metric=:nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250602.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250602.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250602.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250618.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250618.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250618.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -187,15 +177,18 @@ density_plot(met_irr_good)
 describe(met_ctr_good)
 
 # compare metrics across depths
-met_plot(met_ctr_good, [:nse10, :nse40, :nse60, :nse10], [:nse40, :nse60, :nse80, :nse80])
-met_plot(met_irr_good, [:nse10, :nse40, :nse60, :nse10], [:nse40, :nse60, :nse80, :nse80])
+met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
+met_plot(met_irr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
+
+met_plot(met_ctr_good, :swp_nse10, :swp_nse80)
+met_plot(met_irr_good, :swp_nse10, :swp_nse80)
 
 # compare metrics across type
-met_plot(met_ctr_good, :nse_com, :rmse_com)
-met_plot(met_irr_good, :nse_com, :rmse_com)
+met_plot(met_ctr_good, :swc_nse_com, :rmse_com)
+met_plot(met_irr_good, :swc_nse_com, :rmse_com)
 
 # compare metrics across scenarios
-scatter(met_ctr.nse10, met_irr.nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
+scatter(met_ctr.swc_nse10, met_irr.swc_nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
 
 # compare behavioral parameter sets across both scenarios
 ks_stat, ks_plots = scen_plot(par, met_ctr, met_irr);
@@ -207,7 +200,7 @@ common_params = intersect(met_ctr_good.scen, met_irr_good.scen);
 met_ctr_best = met_ctr_good[met_ctr_good.scen .∈ [common_params], :];
 met_irr_best = met_irr_good[met_irr_good.scen .∈ [common_params], :];
 
-scatter(met_ctr_best.nse_com, met_irr_best.nse_com, 
+scatter(met_ctr_best.swc_nse_com, met_irr_best.swc_nse_com, 
     xlabel="NSE Combined Control", ylabel="NSE Combined Irrigation", legend=false)
 
 # best control scenario
@@ -224,8 +217,8 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="nse_com");
-par_plots_irr = par_plot(par, met_irr, met_y="nse_com", behave=false);
+par_plots_ctr = par_plot(par, met_ctr, met_y="swc_nse_com");
+par_plots_irr = par_plot(par, met_irr, met_y="rmse_com", behave=false);
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
