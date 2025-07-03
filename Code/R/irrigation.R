@@ -116,7 +116,7 @@ meteoLWF_Con$precip_irrstp = with(meteoLWF_Con, if_else(dates < "2014-01-01", pr
 
 
 ## plot irrigation amounts
-meteo_plot = meteoLWF_Con %>% filter(dates >= "2003-01-01") %>% select(-c(2:7,9:10)) %>% pivot_longer(-dates, names_to="treatment", values_to="mm")
+meteo_plot = meteoLWF_Con %>% filter(dates >= "2003-01-01") %>% select(-c(2:7,9)) %>% pivot_longer(-dates, names_to="treatment", values_to="mm")
 
 # daily
 ggplot(meteo_plot, aes(dates, mm, color=treatment)) + geom_line() + facet_wrap(~treatment, ncol=1)
@@ -124,13 +124,16 @@ ggplot(meteo_plot, aes(dates, mm, color=treatment)) + geom_line() + facet_wrap(~
 meteo_plot$year = year(meteo_plot$dates)
 meteo_plot$month = month(meteo_plot$dates)
 meteo_plot2 = meteo_plot %>% group_by(year, month, treatment) %>% summarize_at(vars(mm), list(sum))
-meteo_plot2$treatment = factor(meteo_plot2$treatment, levels=c("precip_irr", "precip_irrstp", "precip_ctrl"))
+meteo_plot2$treatment = factor(meteo_plot2$treatment, levels=c("precip_irr", "irrig_mm", "precip_irrstp", "precip_ctrl"))
 meteo_plot2$date = as.Date(paste(meteo_plot2$year, meteo_plot2$month, 1, sep="-"))
 
 # monthly
-ggplot(filter(meteo_plot2, treatment!="precip_irrstp"), aes(x=date, y=mm, fill=treatment))+geom_bar(position="stack", stat="identity")
+ggplot(filter(meteo_plot2, treatment %in% c("precip_ctrl", "irrig_mm")), aes(x=date, y=mm, fill=treatment))+geom_bar(position="stack", stat="identity")
 
 # yearly comparison
-meteo_yr = meteo_plot %>% group_by(year, treatment) %>% summarize_at(vars(mm), list(sum)) %>% 
-  group_by(treatment) %>% summarize_at(vars(mm), list(mean))
+meteo_yr = meteo_plot %>% group_by(year, treatment) %>% summarize_at(vars(mm), list(sum)) 
+meteo_yr_pre14 = meteo_yr %>% filter(year<2014) %>% group_by(treatment) %>% summarize_at(vars(mm), list(mean))
+meteo_yr_post14 = meteo_yr %>% filter(year>=2014) %>% group_by(treatment) %>% summarize_at(vars(mm), list(mean))
+meteo_yr = meteo_yr %>% group_by(treatment) %>% summarize_at(vars(mm), list(mean))
+
 meteo_yr
