@@ -21,7 +21,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
         end
 
         # initially assume root parameters are not present
-        root_pars = false;
+        global root_pars = false;
 
         # input parameter file
 
@@ -62,7 +62,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
             elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
                 # root parameters are present
-                root_pars = true;
+                global root_pars = true;
 
             else
                 # get index of parameter name in file

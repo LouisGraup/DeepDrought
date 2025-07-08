@@ -133,7 +133,7 @@ end
 
 ## define calibration parameter sets
 
-n = 200; # number of parameter sets
+n = 250; # number of parameter sets
 
 # define prior parameter ranges
 
@@ -147,8 +147,8 @@ param = [
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
     ("RSSA", 1.0, 1500.0), # soil resistance (1, 1500)
-    ("ths", 0.75, 1.5), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat", -0.25, 0.25), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
     ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
@@ -157,7 +157,7 @@ param = [
     ("R5", 50, 400), # radiation sensitivity (50, 400)
     ("T1", 5, 15), # low temperature threshold (5, 15)
     ("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -2.5, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -3, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 500, 6000), # maximum root length (100, 6000)
@@ -222,7 +222,7 @@ end
 
 # create empty dict for root parameter indices
 root_dict = Dict("ROOTS" => 0);
-root_params = false; # boolean to check for root parameters
+global root_params = false; # boolean to check for root parameters
 
 # loop through parameter sets and create parameter files
 for i in 1:nsets
@@ -246,7 +246,7 @@ for i in 1:nsets
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
             # save index for later
             push!(root_dict, name => j);
-            root_params = true;
+            global root_params = true;
 
         else
             # get index of parameter name in file
@@ -274,8 +274,8 @@ end
 ## set up calibration runs
 
 # dummy run for reference date
-model = loadSPAC(input_path_ctr, input_prefix);
-ref_date = Date(model.reference_date);
+model_temp = loadSPAC(input_path_ctr, input_prefix);
+ref_date = Date(model_temp.reference_date);
 
 start_index = Dates.value(start_date - ref_date);
 end_index = Dates.value(end_date - ref_date);

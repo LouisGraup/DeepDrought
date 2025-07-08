@@ -208,7 +208,7 @@ end
 
 # create empty dict for root parameter indices
 root_dict = Dict("ROOTS" => 0);
-root_params = false; # boolean to check for root parameters
+global root_params = false; # boolean to check for root parameters
 
 # loop through parameter sets and create parameter files
 for i in 1:nsets
@@ -232,7 +232,7 @@ for i in 1:nsets
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
             # save index for later
             push!(root_dict, name => j);
-            root_params = true;
+            global root_params = true;
 
         else
             # get index of parameter name in file
@@ -259,8 +259,8 @@ end
 ## set up calibration runs
 
 # dummy run for reference date
-model = loadSPAC(input_path_ctr, input_prefix);
-ref_date = Date(model.reference_date);
+model_temp = loadSPAC(input_path_ctr, input_prefix);
+ref_date = Date(model_temp.reference_date);
 
 start_index = Dates.value(start_date - ref_date);
 end_index = Dates.value(end_date - ref_date);
