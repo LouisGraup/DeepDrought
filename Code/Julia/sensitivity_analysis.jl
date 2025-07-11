@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.0 .&& 
-               met.swc_nse40 .> 0.0 .&&
-               met.swc_nse60 .> 0.0 .&&
-               met.swc_nse80 .> 0.0, :]
-               #met.swc_nse80 .> 0.5 .&&
-               #met.swp_nse10 .> 0.5 .&&
-               #met.swp_nse80 .> 0.5, :]
+    return met[met.swc_nse10 .> 0.5 .&& 
+               met.swc_nse40 .> 0.5 .&&
+               met.swc_nse60 .> 0.5 .&&
+               #met.swc_nse80 .> 0.0, :]
+               met.swc_nse80 .> 0.5 .&&
+               met.swp_nse10 .> 0.5 .&&
+               met.swp_nse80 .> 0.5, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -148,9 +148,9 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250707.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250707.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250707.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250710.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250710.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250710.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -216,8 +216,8 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="swc_nse_com");
-par_plots_irr = par_plot(par, met_irr, met_y="rmse_com", behave=true);
+par_plots_ctr = par_plot(par, met_ctr, met_y="swp_nse_com");
+par_plots_irr = par_plot(par, met_irr, met_y="swp_nse80");
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
