@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.5 .&& 
-               met.swc_nse40 .> 0.5 .&&
-               met.swc_nse60 .> 0.5 .&&
+    return met[met.swc_nse10 .> 0.0 .&& 
+               met.swc_nse40 .> 0.0 .&&
+               met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.0, :]
-               met.swc_nse80 .> 0.5 .&&
-               met.swp_nse10 .> 0.5 .&&
-               met.swp_nse80 .> 0.5, :]
+               met.swc_nse80 .> 0.0 .&&
+               met.swp_nse10 .> -1.0 .&&
+               met.swp_nse80 .> -1.0, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -182,6 +182,9 @@ met_plot(met_irr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_n
 met_plot(met_ctr_good, :swp_nse10, :swp_nse80)
 met_plot(met_irr_good, :swp_nse10, :swp_nse80)
 
+met_plot(met_ctr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse10])
+met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse10])
+
 # compare metrics across type
 met_plot(met_ctr_good, :swc_nse_com, :swp_nse_com)
 met_plot(met_irr_good, :swc_nse_com, :rmse_com)
@@ -203,7 +206,7 @@ scatter(met_ctr_best.swc_nse_com, met_irr_best.swc_nse_com,
     xlabel="NSE Combined Control", ylabel="NSE Combined Irrigation", legend=false)
 
 # best control scenario
-scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good, :swp_nse_com);
+scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good, :swc_nse_com);
 # best irrigation scenario
 scen_max_irr, met_max_irr = met_best_scen(met_irr_good);
 

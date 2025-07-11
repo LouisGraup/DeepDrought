@@ -33,7 +33,7 @@ obs_swc_irr = unstack(obs_swc_irr, :date, :depth, :VWC, renamecols=x->Symbol("VW
 sort!(obs_swc_irr, :date); # sort by date
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
-obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select control treatment
+obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
 
 # objective function to compare model output to observed data
 function obj_fun_swc(sim, obs)
