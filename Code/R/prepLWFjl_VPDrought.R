@@ -60,7 +60,7 @@ soil_df = read_csv("../../Data/Pfyn/soil_hydraulic.csv")
 ## use LWFBrook90R to prepare input files for julia version
 
 # options common to all scenarios
-opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-12-31"), 
+opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2025-06-30"), 
                         root_method="soilvar", budburst_method="Menzel", 
                         leaffall_method="vonWilpert", lai_method="Coupmodel")
 
