@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.0 .&& 
-               met.swc_nse40 .> 0.0 .&&
-               met.swc_nse60 .> 0.0 .&&
+    return met[met.swc_nse10 .> 0.5 .&& 
+               met.swc_nse40 .> 0.5 .&&
+               met.swc_nse60 .> 0.5 .&&
                #met.swc_nse80 .> 0.0, :]
-               met.swc_nse80 .> 0.0 .&&
-               met.swp_nse10 .> -1.0 .&&
-               met.swp_nse80 .> -1.0, :]
+               met.swc_nse80 .> 0.5 .&&
+               met.swp_nse10 .> 0.5 .&&
+               met.swp_nse80 .> 0.5, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -148,9 +148,9 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250710.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250710.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250710.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250715.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250715.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250715.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -187,10 +187,10 @@ met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse10])
 
 # compare metrics across type
 met_plot(met_ctr_good, :swc_nse_com, :swp_nse_com)
-met_plot(met_irr_good, :swc_nse_com, :rmse_com)
+met_plot(met_irr_good, :swc_nse_com, :swp_nse_com)
 
 # compare metrics across scenarios
-scatter(met_ctr.swc_nse10, met_irr.swc_nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
+scatter(met_ctr.swc_nse40, met_irr.swc_nse40, xlabel="NSE40 Control", ylabel="NSE40 Irrigation", legend=false)
 
 # compare behavioral parameter sets across both scenarios
 ks_stat, ks_plots = scen_plot(par, met_ctr, met_irr);
@@ -206,9 +206,9 @@ scatter(met_ctr_best.swc_nse_com, met_irr_best.swc_nse_com,
     xlabel="NSE Combined Control", ylabel="NSE Combined Irrigation", legend=false)
 
 # best control scenario
-scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good, :swc_nse_com);
+scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good, :met_com);
 # best irrigation scenario
-scen_max_irr, met_max_irr = met_best_scen(met_irr_good);
+scen_max_irr, met_max_irr = met_best_scen(met_irr_good, :met_com);
 
 # parameter values for the best performing scenario
 par_ctr_best = par[scen_max_ctr, :];
@@ -219,8 +219,8 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="swp_nse_com");
-par_plots_irr = par_plot(par, met_irr, met_y="swp_nse80");
+par_plots_ctr = par_plot(par, met_ctr, met_y="met_com");
+par_plots_irr = par_plot(par, met_irr, met_y="swp_nse_com");
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
