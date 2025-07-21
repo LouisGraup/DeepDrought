@@ -133,26 +133,26 @@ end
 
 ## define calibration parameter sets
 
-n = 250; # number of parameter sets
+n = 500; # number of parameter sets
 
 # define prior parameter ranges
 
 param = [
     # hydro parameters
     ("DRAIN", 0.0, 1.0), # drainage (0, 1)
-    ("INFEXP", 0.3, 0.9), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.3, 0.8), # infiltration depth (m) (0.05, 0.5)
+    ("INFEXP", 0.4, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.4, 0.8), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 100, 500), # soil resistance (1, 1500)
-    ("ths1", 1.0, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("RSSA", 150, 500), # soil resistance (1, 1500)
+    ("ths1", 1.1, 1.4), # multiplier on theta_sat (0.5, 1.5)
     ("ksat1", -0.25, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths2", 1.1, 1.5), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths3", 1.2, 1.5), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat3", -0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths2", 1.2, 1.4), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat2", -0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths3", 1.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat3", 0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.1, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
@@ -161,14 +161,14 @@ param = [
     ("R5", 150, 200), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -1.3, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -1.25, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.3, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 12.0, 24.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 500, 5000), # maximum root length (100, 6000)
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
     ("MAXROOTDEPTH", -2.0, -1.0), # max rooting depth (-5, -0.5)
-    ("BETAROOT", 0.95, 0.99) # beta root coefficient (0.8, 1.0)
+    ("BETAROOT", 0.96, 0.98) # beta root coefficient (0.8, 1.0)
 ];
 
 ### END USER INPUT ###

@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.5 .&& 
-               met.swc_nse40 .> 0.5 .&&
-               met.swc_nse60 .> 0.5 .&&
+    return met[met.swc_nse10 .> 0.1 .&& 
+               met.swc_nse40 .> 0.1 .&&
+               met.swc_nse60 .> 0.1 .&&
                #met.swc_nse80 .> 0.0, :]
-               met.swc_nse80 .> 0.5 .&&
-               met.swp_nse10 .> 0.5 .&&
-               met.swp_nse80 .> 0.5, :]
+               met.swc_nse80 .> 0.1 .&&
+               met.swp_nse10 .> 0.1 .&&
+               met.swp_nse80 .> 0.1, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -148,9 +148,9 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250715.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250715.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250715.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250717.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250717.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250717.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -219,8 +219,8 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="met_com");
-par_plots_irr = par_plot(par, met_irr, met_y="swp_nse_com");
+par_plots_ctr = par_plot(par, met_ctr, met_y="swc_nse10");
+par_plots_irr = par_plot(par, met_irr, met_y="met_com");
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
@@ -228,5 +228,5 @@ plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsi
 ks_stat_ctr, ks_plots_ctr = KS_plot(par, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par, met_irr);
 
-plot(ks_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
