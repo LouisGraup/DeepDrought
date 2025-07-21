@@ -23,7 +23,7 @@ function behavioral_met(met)
     return met[met.swc_nse10 .> 0.1 .&& 
                met.swc_nse40 .> 0.1 .&&
                met.swc_nse60 .> 0.1 .&&
-               #met.swc_nse80 .> 0.0, :]
+               #met.swc_nse80 .> 0.5, :]
                met.swc_nse80 .> 0.1 .&&
                met.swp_nse10 .> 0.1 .&&
                met.swp_nse80 .> 0.1, :]
@@ -148,9 +148,9 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250717.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250717.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250717.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250718.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250718.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_20250718.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -219,10 +219,10 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="swc_nse10");
+par_plots_ctr = par_plot(par, met_ctr, met_y="swp_nse10");
 par_plots_irr = par_plot(par, met_irr, met_y="met_com");
 
-plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
 ks_stat_ctr, ks_plots_ctr = KS_plot(par, met_ctr);

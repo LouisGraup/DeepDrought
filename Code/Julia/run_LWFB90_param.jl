@@ -15,13 +15,15 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
             mkpath(output_path);
         end
 
-        # check for soil parameters
-        if "ths" ∈ names(par) || "ksat" ∈ names(par)
-            soil_pars = true;
-        end
-
-        # initially assume root parameters are not present
+        # initially assume root and soil parameters are not present
         global root_pars = false;
+        global soil_pars = false;
+
+        # check for soil parameters
+        if any(contains.(names(par), "ths")) || any(contains.(names(par), "ksat"))
+            soil_pars = true;
+            soil_par_count = count(contains.(names(par), "ths"));
+        end
 
         # input parameter file
 
@@ -52,13 +54,25 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
             # get parameter value
             value = par[name];
 
-            if name == "ths"
-                # apply multiplier to ths_volfrac for each soil horizon
-                soil0.ths_volFrac = soil0.ths_volFrac * value;
+            if contains(name, "ths")
+                if soil_par_count > 1
+                    # apply multiplier to ths_volfrac for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.ths_volFrac[k] = soil0.ths_volFrac[k] * value;
+                else
+                    # apply multiplier to ths_volfrac for each soil horizon
+                    soil0.ths_volFrac = soil0.ths_volFrac * value;
+                end
 
-            elseif name == "ksat"
-                # apply additive factor to log10(ksat) for each soil horizon
-                soil0.ksat_mmDay = 10 .^ (log10.(soil0.ksat_mmDay) .+ value);
+            elseif contains(name, "ksat")
+                if soil_par_count > 1
+                    # apply additive factor to log10(ksat) for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.ksat_mmDay[k] = 10 .^ (log10.(soil0.ksat_mmDay[k]) .+ value);
+                else
+                    # apply additive factor to log10(ksat) for each soil horizon
+                    soil0.ksat_mmDay = 10 .^ (log10.(soil0.ksat_mmDay) .+ value);
+                end
 
             elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
                 # root parameters are present
@@ -90,9 +104,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
         # and check for root parameters
         if "BETAROOT" ∈ names(par) || "MAXROOTDEPTH" ∈ names(par)
-            root_pars = true;
-        else
-            root_pars = false;
+            global root_pars = true;
         end
 
     end

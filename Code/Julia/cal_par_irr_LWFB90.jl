@@ -139,31 +139,31 @@ n = 500; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.0, 0.9), # drainage (0, 1)
-    ("INFEXP", 0.4, 0.9), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.4, 0.8), # infiltration depth (m) (0.05, 0.5)
+    ("DRAIN", 0.0, 0.8), # drainage (0, 1)
+    ("INFEXP", 0.5, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.5, 0.75), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 150, 500), # soil resistance (1, 1500)
+    ("RSSA", 150, 400), # soil resistance (1, 1500)
     ("ths1", 1.1, 1.4), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat1", -0.25, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ksat1", -0.2, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("ths2", 1.25, 1.35), # multiplier on theta_sat (0.5, 1.5)
     ("ksat2", -0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("ths3", 1.35, 1.5), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat3", 0.1, 0.35), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ksat3", 0.2, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.1, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.008, 0.015), # stomatal conductance (0.001, 0.03)
-    ("CVPD", 1.5, 2.5), # vpd sensitivity (1, 3)
-    ("R5", 160, 200), # radiation sensitivity (50, 400)
+    ("FRINTLAI", 0.13, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.015, 0.022), # stomatal conductance (0.001, 0.03)
+    ("CVPD", 2, 2.7), # vpd sensitivity (1, 3)
+    ("R5", 150, 190), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -1.25, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -1.2, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.3, 0.8), # aboveground xylem fraction (0.2, 0.8)
-    ("MXKPL", 12.0, 24.0), # maximum plant conductivity (1, 30)
+    ("MXKPL", 16.0, 24.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 500, 5000), # maximum root length (100, 6000)
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
@@ -190,7 +190,7 @@ param_sets = QuasiMonteCarlo.sample(nsets, lb, ub, LatinHypercubeSample());
 # output parameter sets
 param_out = DataFrame(param_sets', param_names); # transpose parameter sets to add column names
 curDate = string(Dates.format(today(), "yyyymmdd")); # save date for consistency over multi-day calibrations 
-CSV.write("LWFBcal_output/param_ctr_" * curDate * ".csv", param_out);
+CSV.write("LWFBcal_output/param_irr_" * curDate * ".csv", param_out);
 
 
 ## make output folder structure and create calibration parameter files
@@ -261,7 +261,7 @@ for i in 1:nsets
                 # apply additive factor to log10(ksat) for each soil horizon
                 soil_set.ksat_mmDay = 10 .^ (log10.(soil_set.ksat_mmDay) .+ value);
             end
-
+            
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
             # save index for later
             push!(root_dict, name => j);
@@ -275,25 +275,25 @@ for i in 1:nsets
     end
 
     # output folders
-    out_dir_ctr = output_path * subdir_name_ctr * string(i) * "/";
-    #out_dir_irr = output_path * subdir_name_irr * string(i) * "/";
+    #out_dir_ctr = output_path * subdir_name_ctr * string(i) * "/";
+    out_dir_irr = output_path * subdir_name_irr * string(i) * "/";
     
     # copy folder structure to output folders
-    cp(input_path_ctr, out_dir_ctr, force=true);
-    #cp(input_path_irr, out_dir_irr, force=true);
+    #cp(input_path_ctr, out_dir_ctr, force=true);
+    cp(input_path_irr, out_dir_irr, force=true);
 
     # write parameter and soil horizons files
-    CSV.write(out_dir_ctr * output_prefix * "_param.csv", param_set);
-    #CSV.write(out_dir_irr * output_prefix * "_param.csv", param_set);
-    output_soil_file(soil_set, out_dir_ctr * output_prefix);
-    #output_soil_file(soil_set, out_dir_irr * output_prefix);
+    #CSV.write(out_dir_ctr * output_prefix * "_param.csv", param_set);
+    CSV.write(out_dir_irr * output_prefix * "_param.csv", param_set);
+    #output_soil_file(soil_set, out_dir_ctr * output_prefix);
+    output_soil_file(soil_set, out_dir_irr * output_prefix);
 end
 
 
 ## set up calibration runs
 
 # dummy run for reference date
-model_temp = loadSPAC(input_path_ctr, input_prefix);
+model_temp = loadSPAC(input_path_irr, input_prefix);
 ref_date = Date(model_temp.reference_date);
 
 start_index = Dates.value(start_date - ref_date);
@@ -310,7 +310,7 @@ end_index = Dates.value(end_date - ref_date);
 ## run LWFBrook90 for each parameter set
 # using parallel processing
 @everywhere function run_calibration(i)
-    if i <= nsets
+    if i > nsets
         cal_dir = output_path * subdir_name_ctr * string(i) * "/";
         par_id = i
     else
@@ -343,7 +343,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (i <= nsets ? "ctr" : "irr", par_id, fill(0, 8), fill(0,2)) # skip if simulation fails
+        return (i > nsets ? "ctr" : "irr", par_id, fill(0, 8), fill(0,2)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -357,7 +357,7 @@ end_index = Dates.value(end_date - ref_date);
     z_theta.dates = Date.(dates_to_read_out);
     z_psi.dates = Date.(dates_to_read_out);
 
-    if i <= nsets
+    if i > nsets
         swc_met = obj_fun_swc(z_theta, obs_swc_ctr)
         swp_met = obj_fun_swp(z_psi, obs_swp_ctr)
     else
@@ -365,7 +365,7 @@ end_index = Dates.value(end_date - ref_date);
         swp_met = obj_fun_swp(z_psi, obs_swp_irr)
     end
 
-    return (i <= nsets ? "ctr" : "irr", par_id, swc_met, swp_met)
+    return (i > nsets ? "ctr" : "irr", par_id, swc_met, swp_met)
 
 end
 
@@ -399,5 +399,5 @@ for res in results
     end
 end
 
-CSV.write("LWFBcal_output/metrics_ctr_" * curDate * ".csv", metrics_ctr);
-#CSV.write("LWFBcal_output/metrics_irr_" * curDate * ".csv", metrics_irr);
+#CSV.write("LWFBcal_output/metrics_ctr_" * curDate * ".csv", metrics_ctr);
+CSV.write("LWFBcal_output/metrics_irr_" * curDate * ".csv", metrics_irr);
