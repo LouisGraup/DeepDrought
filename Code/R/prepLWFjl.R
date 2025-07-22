@@ -8,7 +8,7 @@ library(lubridate)
 # data from MeteoSwiss stations Sion and Sierre (precip post-2013)
 # combined with irrigation data in Pfynwald
 
-meteo = read.csv("../../Data/Pfyn/meteo_irr.csv")
+meteo = read.csv("../../Data/Pfyn/meteo/meteo_irr.csv")
 meteo$dates = as.Date(meteo$dates)
 
 # separate treatments
@@ -89,7 +89,7 @@ LAI_pw_linear = function(year, obs) {
   LAI_pw_linear = lai
 }
 
-lai_ext <- data.frame(year=c(2000:2024))
+lai_ext <- data.frame(year=c(2000:2025))
 lai_ext$LAI = sapply(lai_ext$year, LAI_pw_linear, lai_cont)
 ggplot(lai_ext, aes(year, LAI))+geom_point()
 
@@ -115,10 +115,10 @@ ggplot(lai_irr, aes(year, LAI))+geom_point()+
   geom_line(aes(year, pred), color="red")
 
 # extend LAI series using non-linear model with high predictive power
-lai_ext_irr <- data.frame(year=c(2000:2024))
+lai_ext_irr <- data.frame(year=c(2000:2025))
 lai_ext_irr$lai_pred<-predict(lai_lm_i, newdata=lai_ext_irr,type="response")
 lai_ext_irr$lai_pred[1:4] = lai_cont$LAI[1] # assume years before irrigation are same as first year of control
-lai_ext_irr$lai_pred[20:25] = lai_irr$LAI[8] # assume most recent years are same as last observation
+lai_ext_irr$lai_pred[20:26] = lai_irr$LAI[8] # assume most recent years are same as last observation
 lai_ext_irr = left_join(lai_ext_irr, lai_irr)
 # fill in years without observations with modeled regression
 lai_ext_irr$LAI[is.na(lai_ext_irr$LAI)] = lai_ext_irr$lai_pred[is.na(lai_ext_irr$LAI)]
@@ -153,6 +153,10 @@ lai_ext_irrstp$LAI_irrstp = sapply(lai_ext_irrstp$year, LAI_pw_irrstp, lai_ext_i
 # compare LAI trajectories across treatments
 lai_comp = pivot_longer(lai_ext_irrstp, -year)
 ggplot(lai_comp, aes(year, value, color=name))+geom_point()
+
+# round off LAI values
+lai_ext_irrstp[,-1] = round(lai_ext_irrstp[,-1], 4)
+#write_csv(lai_ext_irrstp, "../../Data/Pfyn/LAI_ext.csv")
 
 ## read in soil and root data
 

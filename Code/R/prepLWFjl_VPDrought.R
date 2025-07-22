@@ -7,12 +7,45 @@ library(lubridate)
 library(LWFBrook90R)
 source("C:/Users/grauplou/Documents/LWFBrook90.jl/src/generate_LWFBrook90jl_Input_mod.R", echo=F)
 
+# function to extend time series with leaf out timing for incomplete year
+extend_meteoveg = function(meteo_scen, scen) {
+  
+  # append scenario name to file path
+  filename = paste0(scen,"/pfynwald_meteoveg.csv")
+  
+  # retrieve file header and column names
+  met_head = read_csv(filename, n_max=1, show_col_types=F)
+  met_names = colnames(met_head)
+  
+  # read in file with column names and skip header
+  met = read_csv(filename, skip=2, col_names=met_names, show_col_types=F)
+  
+  # extract substitution year for veg data
+  veg_fill = met %>% mutate(year=year(dates), month=month(dates)) %>% filter(year==2014, month < 7) %>% select(densef_percent:sai_percent)
+  
+  # retrieve most recent data from meteo measurements
+  meteo_fill = meteo_scen %>% filter(dates >= "2025-01-01") %>% select(-tmean)
+  meteo_fill[,2:6] = round(meteo_fill[,2:6], 5)
+  
+  # combine meteo with veg and add column names
+  meteo_fill = cbind(meteo_fill, veg_fill)
+  colnames(meteo_fill) = met_names
+  
+  # append recent data to LWFBrook90 output
+  meteo_rep = rbind(met, meteo_fill)
+  meteo_rep$dates = as.character(meteo_rep$dates)
+  
+  # create output data frame with file header and replace in folder
+  meteo_out = rbind(met_head, meteo_rep)
+  write_csv(meteo_out, filename)
+  
+}
+
 
 ## meteo inputs for control and vpd manipulation experiment
 
 meteo_Con = read_csv("../../Data/Pfyn/meteo/meteo_irr_Control.csv")
 meteo_VPD = read_csv("../../Data/Pfyn/meteo/meteo_irr_VPD.csv")
-
 
 # separate treatments
 
@@ -51,6 +84,7 @@ ht_stp = mean(filter(site_df, BEZKM == "stop")$height_m)
 # modeled LAI data from prepLWFjl.R
 
 LAI_df = read_csv("../../Data/Pfyn/LAI_ext.csv")
+LAI_df = LAI_df[1:25,]
 
 # soil data
 
@@ -60,7 +94,7 @@ soil_df = read_csv("../../Data/Pfyn/soil_hydraulic.csv")
 ## use LWFBrook90R to prepare input files for julia version
 
 # options common to all scenarios
-opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2025-06-30"), 
+opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-12-31"), 
                         root_method="soilvar", budburst_method="Menzel", 
                         leaffall_method="vonWilpert", lai_method="Coupmodel")
 
@@ -69,31 +103,64 @@ opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2025-0
 # control scenario
 par_c = set_paramLWFB90(maxlai=LAI_df$LAI_ctrl, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
                         coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont, soil=soil_df)
-
+generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_cont, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_cont, "Pfyn_control")
 
 # drought scenarios use same parameters as control
 
 # drought scenario under ambient climate
-generate_LWFBrook90jl_Input("Pfyn_drought_ambient","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_roof_con, soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_drought_ambient","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_roof_con, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_roof_con, "Pfyn_drought_ambient")
 
 # drought scenario under manipulated VPD
-generate_LWFBrook90jl_Input("Pfyn_drought_VPD","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_roof_vpd, soil=soil_df)
-
+generate_LWFBrook90jl_Input("Pfyn_drought_VPD","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_roof_vpd, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_roof_vpd, "Pfyn_drought_VPD")
 
 # irrigation stop scenario
 par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
                            coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_irr_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
-
+generate_LWFBrook90jl_Input("Pfyn_irr_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=filter(meteo_irrstp, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_irrstp, "Pfyn_irr_stop")
 
 # irrigation scenarios use same parameters
 par_ir = set_paramLWFB90(maxlai=LAI_df$LAI_irr, winlaifrac=.6, height=ht_irr, height_ini=ht_irr, 
                          coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 
 # irrigation under ambient climate
-generate_LWFBrook90jl_Input("Pfyn_irrigation_ambient","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_con, soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigation_ambient","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=filter(meteo_irr_con, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_irr_con, "Pfyn_irrigation_ambient")
 
 # irrigation under manipulated VPD
-generate_LWFBrook90jl_Input("Pfyn_irrigation_VPD","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_vpd, soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigation_VPD","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=filter(meteo_irr_vpd, dates<"2025-01-01"), soil=soil_df)
+#extend_meteoveg(meteo_irr_vpd, "Pfyn_irrigation_VPD")
 
+
+
+# reverse engineer budburst day algorithm to fill in 2025 with closest approximation in record
+par_test = set_paramLWFB90(maxlai=3, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
+                                   coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_test","pfynwald",".", options_b90=opt, param_b90=par_test, climate=meteo_cont, soil=soil_df)
+
+met_head = read_csv("Pfyn_test/pfynwald_meteoveg.csv", n_max=3)
+met_names = colnames(met_head)
+met_sub = met_head[1,]
+
+met = read_csv("Pfyn_test/pfynwald_meteoveg.csv", skip=2, col_names=met_names)
+met$year = year(met$dates)
+met$month = month(met$dates)
+
+ggplot(met, aes(dates, lai_percent))+geom_line()
+
+leafoutday = function(lai) {
+  leafoutday = which(lai>60)[1]
+}
+
+met_year = met %>% filter(month<7) %>% group_by(year) %>% summarize(tmax=mean(tmax_degC), lod=leafoutday(lai_percent))
+
+summary(met_year)
+
+plot(met_year$lod, met_year$tmax) # leaf out day is well described by mean of max temperatures in first half of year
+ggplot(met_year, aes(lod, tmax, color=year))+geom_point()
+
+meteo_full_Con$year = year(meteo_full_Con$dates)
+mean(filter(meteo_full_Con, year == 2025)$tmax) # use 2014 for 2025 (budburst day 114)
