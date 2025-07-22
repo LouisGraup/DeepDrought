@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.1 .&& 
-               met.swc_nse40 .> 0.1 .&&
-               met.swc_nse60 .> 0.1 .&&
+    return met[met.swc_nse10 .> 0.75 .&& 
+               met.swc_nse40 .> 0.75 .&&
+               met.swc_nse60 .> 0.75 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.1 .&&
-               met.swp_nse10 .> 0.1 .&&
-               met.swp_nse80 .> 0.1, :]
+               met.swc_nse80 .> 0.75 .&&
+               met.swp_nse10 .> 0.75 .&&
+               met.swp_nse80 .> 0.75, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -105,13 +105,13 @@ function KS_plot(par, met)
 end
 
 # function to compare scenarios across parameters
-function scen_plot(par, met_ctr, met_irr)
+function scen_plot(par_ctr, par_irr, met_ctr, met_irr)
     # retrieve behavioral parameters for both scenarios
-    par_ctr_good, = sep_params(par, met_ctr);
-    par_irr_good, = sep_params(par, met_irr);
+    par_ctr_good, = sep_params(par_ctr, met_ctr);
+    par_irr_good, = sep_params(par_irr, met_irr);
     
-    np = size(par, 2);
-    ks_stat = DataFrame(par=names(par), D=zeros(np), pval=zeros(np));
+    np = size(par_ctr, 2);
+    ks_stat = DataFrame(par=names(par_ctr), D=zeros(np), pval=zeros(np));
     par_plots = [];
     
     # loop through each parameter
@@ -148,9 +148,10 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250718.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250718.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250718.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250721.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250721.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250721.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250721.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -173,7 +174,7 @@ println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
-describe(met_ctr_good)
+describe(met_irr_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
@@ -182,18 +183,18 @@ met_plot(met_irr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_n
 met_plot(met_ctr_good, :swp_nse10, :swp_nse80)
 met_plot(met_irr_good, :swp_nse10, :swp_nse80)
 
-met_plot(met_ctr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse10])
-met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse10])
+met_plot(met_ctr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse80])
+met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse80])
 
 # compare metrics across type
 met_plot(met_ctr_good, :swc_nse_com, :swp_nse_com)
 met_plot(met_irr_good, :swc_nse_com, :swp_nse_com)
 
 # compare metrics across scenarios
-scatter(met_ctr.swc_nse40, met_irr.swc_nse40, xlabel="NSE40 Control", ylabel="NSE40 Irrigation", legend=false)
+scatter(met_ctr.swc_nse10, met_irr.swc_nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
 
 # compare behavioral parameter sets across both scenarios
-ks_stat, ks_plots = scen_plot(par, met_ctr, met_irr);
+ks_stat, ks_plots = scen_plot(par_ctr, par_irr, met_ctr, met_irr);
 plot(ks_plots..., size=(1000,1000), layout=(4,5), legend=:bottomright, titlefontsize=8, guidefontsize=6)
 
 # find common parameters
@@ -211,22 +212,22 @@ scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good, :met_com);
 scen_max_irr, met_max_irr = met_best_scen(met_irr_good, :met_com);
 
 # parameter values for the best performing scenario
-par_ctr_best = par[scen_max_ctr, :];
+par_ctr_best = par_ctr[scen_max_ctr, :];
 par_ctr_best
 
-par_irr_best = par[scen_max_irr, :];
+par_irr_best = par_irr[scen_max_irr, :];
 par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par, met_ctr, met_y="swp_nse10");
-par_plots_irr = par_plot(par, met_irr, met_y="met_com");
+par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="met_com");
+par_plots_irr = par_plot(par_irr, met_irr, met_y="met_com");
 
-plot(par_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
-ks_stat_ctr, ks_plots_ctr = KS_plot(par, met_ctr);
-ks_stat_irr, ks_plots_irr = KS_plot(par, met_irr);
+ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
+ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 
-plot(ks_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
