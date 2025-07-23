@@ -28,7 +28,7 @@ function par_best(met, par)
     return par_best, scen_best
 end
 
-function get_swc(sim)
+function get_swc(sim; shape = "long")
     # retrieve soil water potential data from sim
     days = range(sim.ODESolution.prob.tspan...);
     dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
@@ -36,10 +36,21 @@ function get_swc(sim)
     z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = days);
     z.date = Date.(dates_out);
 
+    select!(z, Not(:time));
+
+    if shape=="long"
+        # reshape data
+        z_long = stack(z, Not(:date), variable_name = "depth", value_name="VWC");
+        z_long.depth = parse.(Int, map(x -> x[(end-4):(end-2)], z_long.depth)) .÷ 10; # convert depth to cm from var name
+        return z_long
+    else
+        return z
+    end
+
     return z
 end
 
-function get_swp(sim)
+function get_swp(sim; shape="long")
     # retrieve soil water potential data from sim
     days = range(sim.ODESolution.prob.tspan...);
     dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
@@ -47,7 +58,42 @@ function get_swp(sim)
     z = get_soil_(:psi, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = days);
     z.date = Date.(dates_out);
 
+    select!(z, Not(:time));
+
+    if shape=="long"
+        # reshape data
+        z_long = stack(z, Not(:date), variable_name = "depth", value_name="SWP");
+        z_long.depth = parse.(Int, map(x -> x[(end-4):(end-2)], z_long.depth)) .÷ 10; # convert depth to cm from var name
+        
+        return z_long
+    else
+        return z
+    end
+
+end
+
+function get_sap(sim)
+    # retrieve soil water potential data from sim
+    days = range(sim.ODESolution.prob.tspan...);
+    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+
+    z = get_fluxes(sim);
+    z.date = Date.(dates_out);
+    z.trans = z.cum_d_tran;
+    select!(z, :date, :trans);
+    
     return z
+end
+
+function ann_trans(sim)
+    # calculates annual transpiration
+    z = get_sap(sim);
+
+    z.year = year.(z.date);
+
+    z_ann = combine(groupby(z, :year), :trans => sum);
+
+    return z_ann
 end
 
 function swc_comp(sim, obs_swc)
@@ -57,18 +103,14 @@ function swc_comp(sim, obs_swc)
     z_theta = get_swc(sim);
 
     filter!(:date => >(obs_swc.date[1]), z_theta);
-    select!(z_theta, Not(:time));
 
-    # reshape data
-    z_long = stack(z_theta, Not(:date), variable_name = "depth", value_name="VWC");
-    z_long.depth = parse.(Int, map(x -> x[(end-4):(end-2)], z_long.depth)) .÷ 10; # convert depth to cm from var name
-    z_long.src .= "sim"; # add source column
+    z_theta.src .= "sim"; # add source column
 
     select!(obs_swc, :date, :depth, :VWC); # remove extra columns
     obs_swc.src .= "obs"; # add source column
 
     # combine observed and simulated data
-    swc_comp = [obs_swc; z_long];
+    swc_comp = [obs_swc; z_theta];
 
     return swc_comp
 
@@ -81,12 +123,8 @@ function swp_comp(sim, obs_swp)
     z_psi = get_swp(sim);
 
     filter!(:date => >(obs_swp.date[1]), z_psi);
-    select!(z_psi, Not(:time));
 
-    # reshape data
-    z_long = stack(z_psi, Not(:date), variable_name = "depth", value_name="SWP");
-    z_long.depth = parse.(Int, map(x -> x[(end-4):(end-2)], z_long.depth)) .÷ 10; # convert depth to cm from var name
-    z_long.src .= "sim"; # add source column
+    z_psi.src .= "sim"; # add source column
 
     obs_swp_long = stack(obs_swp, Not(:date, :meta), variable_name = "depth", value_name="SWP");
     select!(obs_swp_long, :date, :depth, :SWP);
@@ -94,16 +132,33 @@ function swp_comp(sim, obs_swp)
     obs_swp_long.src .= "obs"; # add source column
 
     # combine observed and simulated data
-    swp_comp = [obs_swp_long; z_long];
+    swp_comp = [obs_swp_long; z_psi];
 
     return swp_comp
+
+end
+
+function sap_comp(sim, obs_sap)
+    # sim is the LWFBrook90 simulation
+    # obs is the observed soil water potential data
+
+    z_trans = get_sap(sim);
+
+    filter!(:date => >(obs_sap.date[1]), z_trans);
+    filter!(:date => <(Date(2023, 1, 1)), z_trans);
+
+    obs_sap = select(obs_sap, Not(:meta));
+
+    sap_comp = leftjoin(z_trans, obs_sap, on = :date);
+
+    return sap_comp
 
 end
 
 # calculate NSE for soil water potential
 function obj_fun_swp(sim, obs)
 
-    z = get_swp(sim);
+    z = get_swp(sim, shape="wide");
 
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :SWP_10cm]]);
@@ -126,25 +181,43 @@ function obj_fun_swp(sim, obs)
     return nse10, nse80
 end
 
-# calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250715.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250715.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_20250715.csv", DataFrame);
+# calculate correlation coefficient between sap flow and transpiration data
+function obs_fun_sap(sap_comp)
 
-par_ctr_best, scen_ctr_best = par_best(met_ctr, par);
-par_irr_best, scen_irr_best = par_best(met_irr, par);
+    # remove missing values
+    sap_comp = dropmissing(sap_comp);
+
+    cc = cor(sap_comp.trans, sap_comp.sfd);
+
+    return cc
+
+end
+
+# calibration results
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250722.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250722.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250722.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250722.csv", DataFrame);
+
+par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
+par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
 
 met_ctr[scen_ctr_best, :]
 met_irr[scen_irr_best, :]
 
 ## behavioral data
+# soil water content
 obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
 filter!(:date => >(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
+# soil water potential
 obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
 filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
-filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
+filter!(:date => <(Date(2024, 1, 1)), obs_swp); # filter out late dates
+
+# sap flow
+obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -154,44 +227,55 @@ obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
 obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
 obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
+obs_sap_ctr = obs_sap[obs_sap.meta .== "Control", :]; # select control treatment
+obs_sap_irr = obs_sap[obs_sap.meta .== "Irrigation", :]; # select irrigation treatment
+obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigation stop treatment
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
-sim_irst = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2020, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_irst = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
-# combine observed and simulated data
+## combine observed and simulated data
 # soil water content
 swc_comp_ctr = swc_comp(sim_ctr, obs_swc_ctr);
 swc_comp_irr = swc_comp(sim_irr, obs_swc_irr);
 
+# soil water potential
 swp_comp_ctr = swp_comp(sim_ctr, obs_swp_ctr);
 swp_comp_irr = swp_comp(sim_irr, obs_swp_irr);
 swp_comp_irst = swp_comp(sim_irst, obs_swp_irst);
 
+# sap flow
+sap_comp_ctr = sap_comp(sim_ctr, obs_sap_ctr);
+sap_comp_irr = sap_comp(sim_irr, obs_sap_irr);
+sap_comp_irst = sap_comp(sim_irst, obs_sap_irst);
+
+# compare sap flow against modelled transpiration
+obs_fun_sap(sap_comp_ctr)
+obs_fun_sap(sap_comp_irr)
+obs_fun_sap(sap_comp_irst)
+
 # compare irrigation stop scenario against observations
 obj_fun_swp(sim_irst, obs_swp_irst)
 
-# plot observed and simulated data using ggplot
+# individually by year
+obs_swp_irst.year = year.(obs_swp_irst.date);
+for year in unique(obs_swp_irst.year)
+    # loop through each year and calculate NSE
+    nse10, nse80 = obj_fun_swp(sim_irst, obs_swp_irst[obs_swp_irst.year .== year, :]);
+    println("Year: $year, NSE10: $nse10, NSE80: $nse80");
+end
+
+
+## plot observed and simulated data using ggplot
+
+# soil water potential
 R"""
 rdf = $swp_comp_irst
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
     facet_wrap(~depth, ncol=1) +
     labs(title="Soil Water Potential Comparison for Irrigation Stop")
-"""
-
-R"""
-rdf = $swc_comp_ctr
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Content Comparison for Control")
-"""
-
-R"""
-rdf = $swc_comp_irr
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Content Comparison for Irrigation")
 """
 
 R"""
@@ -206,4 +290,96 @@ rdf = $swp_comp_irr
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
     facet_wrap(~depth, ncol=1) +
     labs(title="Soil Water Potential Comparison for Irrigation")
+"""
+
+# soil water content
+R"""
+rdf = $swc_comp_ctr
+ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, ncol=1) +
+    labs(title="Soil Water Content Comparison for Control")
+"""
+
+R"""
+rdf = $swc_comp_irr
+ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, ncol=1) +
+    labs(title="Soil Water Content Comparison for Irrigation")
+"""
+
+# sap flow
+R"""
+rdf = $sap_comp_ctr
+ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
+    geom_point(aes(date, sfd, color="sap")) +
+    labs(title="Sap Flow Comparison for Control")
+"""
+
+R"""
+rdf = $sap_comp_ctr
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
+    labs(title="Sap Flow Comparison for Control")
+"""
+
+R"""
+rdf = $sap_comp_irr
+ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
+    geom_point(aes(date, sfd, color="sap")) +
+    labs(title="Sap Flow Comparison for Irrigation")
+"""
+
+R"""
+rdf = $sap_comp_irr
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
+    labs(title="Sap Flow Comparison for Irrigation")
+"""
+
+R"""
+rdf = $sap_comp_irst
+ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
+    geom_point(aes(date, sfd, color="sap")) +
+    labs(title="Sap Flow Comparison for Irrigation Stop")
+"""
+
+R"""
+rdf = $sap_comp_irst
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
+    labs(title="Sap Flow Comparison for Irrigation Stop")
+"""
+
+# compare soil water potential across scenarios
+ctr_swp = get_swp(sim_ctr);
+ctr_swp.scen .= "Control";
+
+irr_swp = get_swp(sim_irr);
+irr_swp.scen .= "Irrigation";
+
+irst_swp = get_swp(sim_irst);
+irst_swp.scen .= "Irrigation Stop";
+
+swp_comp_scen = [ctr_swp; irr_swp; irst_swp];
+
+R"""
+rdf = $swp_comp_scen
+ggplot(filter(rdf, date>="2014-01-01"), aes(x=date, y=SWP, color=scen)) + geom_point(size=.5) +
+    facet_wrap(~depth, ncol=1) +
+    labs(title="Soil Water Potential Comparison across Scenarios")
+"""
+
+# compare annual transpiration across scenarios
+ctr_yr = ann_trans(sim_ctr);
+ctr_yr.scen .= "Control";
+
+irr_yr = ann_trans(sim_irr);
+irr_yr.scen .= "Irrigation";
+
+irst_yr = ann_trans(sim_irst);
+irst_yr.scen .= "Irrigation Stop";
+
+yr_comp = [ctr_yr; irr_yr; irst_yr];
+
+R"""
+rdf = $yr_comp
+ggplot(rdf, aes(x=year, y=trans_sum, group=scen, fill=scen)) + geom_col(position="dodge") +
+    labs(title="Transpiration Comparison Across Scenarios")
 """
