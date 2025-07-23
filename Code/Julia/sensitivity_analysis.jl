@@ -148,10 +148,10 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250721.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250721.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250721.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250721.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250722.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250722.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250722.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250722.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -221,7 +221,7 @@ par_irr_best
 
 # parameter relationships
 par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="met_com");
-par_plots_irr = par_plot(par_irr, met_irr, met_y="met_com");
+par_plots_irr = par_plot(par_irr, met_irr, met_y="swc_nse10");
 
 plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
