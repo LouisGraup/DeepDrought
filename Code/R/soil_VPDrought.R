@@ -98,6 +98,10 @@ daily.df <- VPD_wide %>% select(-c(datetime, pfraw, delT, delpF, pFcr)) %>%
 
 #write_csv(daily.df, file="../../Data/Pfyn/soil_daily_VPDrought.csv")
 
+# summarize across treatments
+scen.df = daily.df %>% group_by(date, treatment, depth) %>% summarize_at(vars(SWP_corr, VWC), list(mean))
+write_csv(scen.df, file="../../Data/Pfyn/PFY_VPD_swp_swc.csv")
+
 ## start here
 daily.df = read_csv("../../Data/Pfyn/soil_daily_VPDrought.csv")
 
