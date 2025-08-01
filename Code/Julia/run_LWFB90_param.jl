@@ -3,7 +3,7 @@
 
 using LWFBrook90, CSV, DataFrames, Dates;
 
-function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true)
+function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true, watbal=false)
     # new_folder tells the function whether it needs to create a new folder
     # or if it can skip this step and just run the model with par
     
@@ -138,8 +138,14 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
     # model set up
     sim = setup(model, requested_tspan=(start_index, end_index));
-    # run model
-    simulate!(sim);
+
+    if watbal
+        # run model with modified output for partitioning
+        simulate!(sim, save_everystep = false, saveat = start_index:end_index);
+    else
+        # run model as normal
+        simulate!(sim);
+    end
 
     return sim
 

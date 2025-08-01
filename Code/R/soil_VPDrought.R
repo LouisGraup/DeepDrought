@@ -99,8 +99,8 @@ daily.df <- VPD_wide %>% select(-c(datetime, pfraw, delT, delpF, pFcr)) %>%
 #write_csv(daily.df, file="../../Data/Pfyn/soil_daily_VPDrought.csv")
 
 # summarize across treatments
-scen.df = daily.df %>% group_by(date, treatment, depth) %>% summarize_at(vars(SWP_corr, VWC), list(mean))
-write_csv(scen.df, file="../../Data/Pfyn/PFY_VPD_swp_swc.csv")
+#scen.df = daily.df %>% group_by(date, treatment, depth) %>% summarize_at(vars(SWP_corr, VWC), list(mean))
+#write_csv(scen.df, file="../../Data/Pfyn/PFY_VPD_swp_swc.csv")
 
 ## start here
 daily.df = read_csv("../../Data/Pfyn/soil_daily_VPDrought.csv")
@@ -117,22 +117,42 @@ ggplot(daily.df, aes(date, VWC, color=treatment, fill=treatment))+
   stat_summary(geom="ribbon", alpha=.3)+
   facet_wrap(~depth, ncol=1)+theme_bw()
 
-ggplot(daily.df, aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
+ggplot(daily.df, aes(date, ECS, color=treatment, fill=treatment))+
   stat_summary(geom="line", fun=mean)+
   stat_summary(geom="ribbon", alpha=.3)+
-  facet_wrap(~depth, scales="free_y", ncol=1)+theme_bw()+labs(x="", y="SMP (MPa)")
+  facet_wrap(~depth, ncol=1)+theme_bw()
 
-ggplot(filter(daily.df, treatment %in% c("roof_vpd", "roof")), aes(date, SWP_corr/1000, color=depth, fill=depth))+
+ggplot(filter(daily.df, date>="2024-04-01"), aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
   stat_summary(geom="line", fun=mean)+
   stat_summary(geom="ribbon", alpha=.3)+
-  facet_wrap(~treatment)+theme_bw()+labs(x="", y="SMP (MPa)")
+  facet_wrap(~depth, scales="free_y", ncol=1)+theme_bw()+labs(x="", y="SMP (MPa)")+
+  theme(legend.position="bottom", legend.text=element_text(size=12),
+        legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
+ggplot(filter(daily.df, date>="2025-03-01"), aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
+  stat_summary(geom="line", fun=mean)+stat_summary(geom="ribbon", alpha=.3)+
+  facet_wrap(~depth, ncol=1, scales="free")+theme_bw()+labs(x="", y="SMP (MPa)")+
+  theme(legend.text=element_text(size=12),
+        legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))
 
 
 # plot mean and standard deviation per depth for roof treatments
-ggplot(filter(daily.df, treatment %in% c("roof_vpd", "roof")), aes(date, SWP_corr/1000, color=depth, fill=depth))+
+ggplot(filter(daily.df, date>="2024-04-01", treatment %in% c("roof_vpd", "roof")), aes(date, SWP_corr/1000, color=depth, fill=depth))+
   stat_summary(geom="line", fun=mean)+
   stat_summary(geom="ribbon", alpha=.3)+
-  facet_wrap(~treatment)+theme_bw()+labs(x="", y="SMP (MPa)")
+  facet_wrap(~treatment, ncol=1)+theme_bw()+labs(x="", y="SMP (MPa)")
+
+
+ggplot(filter(daily.df, date>="2024-04-01", treatment %in% c("roof_vpd", "roof")), aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
+  stat_summary(geom="line", fun=mean)+stat_summary(geom="ribbon", alpha=.3)+
+  facet_wrap(~depth, scales="free_y", ncol=1)+theme_bw()+labs(x="", y="SMP (MPa)")+
+  theme(legend.position=c(.1,.85), legend.text=element_text(size=12),
+        legend.title=element_text(size=12), strip.text = element_text(size=12, face="bold"),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))
+
 
 ggplot(filter(daily.df, treatment %in% c("roof_vpd", "roof"), year==2025), aes(date, SWP_corr/1000, color=depth, fill=depth))+
   stat_summary(geom="line", fun=mean)+

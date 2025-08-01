@@ -20,13 +20,13 @@ end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
-    return met[met.swc_nse10 .> 0.75 .&& 
-               met.swc_nse40 .> 0.75 .&&
-               met.swc_nse60 .> 0.75 .&&
+    return met[met.swc_nse10 .> 0.35 .&& 
+               met.swc_nse40 .> 0.35 .&&
+               met.swc_nse60 .> 0.35 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.75 .&&
-               met.swp_nse10 .> 0.75 .&&
-               met.swp_nse80 .> 0.75, :]
+               met.swc_nse80 .> 0.35 .&&
+               met.swp_nse10 .> 0.35 .&&
+               met.swp_nse80 .> 0.35, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -148,10 +148,10 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250722.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250722.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250722.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250722.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250724.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250724.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250724.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250724.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -174,7 +174,7 @@ println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
-describe(met_irr_good)
+describe(met_ctr_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
@@ -221,13 +221,35 @@ par_irr_best
 
 # parameter relationships
 par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="met_com");
-par_plots_irr = par_plot(par_irr, met_irr, met_y="swc_nse10");
+par_plots_irr = par_plot(par_irr, met_irr, met_y="met_com");
 
-plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
 ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 
-plot(ks_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
+
+
+
+# plotting recipes
+
+function ind_par_plot(par_ctr, par_irr, ind)
+    p=density(par_ctr[!,ind], label="Control", color=:red, fillrange=0, alpha=.5);
+    p=density!(par_irr[!,ind], label="Irrigation", color=:blue, fillrange=0, alpha=.5);
+    return p
+end
+
+p1 = ind_par_plot(par_ctr_good, par_irr_good, 12);
+p1=xlabel!(p1, "Maximum stomatal conductance (cm/s)");
+plot(p1, size=(400,500), legend=:top)
+
+p2 = ind_par_plot(par_ctr_good, par_irr_good, 13);
+p2=xlabel!(p2,"VPD at 50% stomatal closure (kPa)");
+plot(p2, size=(400,500), legend=:top)
+
+p3 = ind_par_plot(par_ctr_good, par_irr_good, 15);
+p3=xlabel!(p3,"Critical leaf water potential (MPa)");
+plot(p3, size=(400,500), legend=:top)

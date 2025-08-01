@@ -2,7 +2,8 @@
 ## for all Pfynwald scenarios
 ## and examine output against observed data
 
-using CSV, DataFrames, Dates, Statistics, RCall;
+using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RCall;
+using CairoMakie, AlgebraOfGraphics, CategoricalArrays, Chain;
 using Plots; gr()
 R"""
 library(tidyverse)
@@ -47,7 +48,6 @@ function get_swc(sim; shape = "long")
         return z
     end
 
-    return z
 end
 
 function get_swp(sim; shape="long")
@@ -155,6 +155,125 @@ function sap_comp(sim, obs_sap)
 
 end
 
+function plot_monthly_water_partitioning(df_partitioning_monthly)
+    # color palette
+    color_palette = reverse([
+            "Transpiration deficit" => :red2,
+            "Actual transpiration" => :darkolivegreen2,
+            "Interception loss" => :forestgreen,
+            "Soil evaporation" => :khaki3,
+            #"Snow sublimation" => :white,
+            "Runoff" => :lightskyblue,
+            "Drainage" => :darkblue,
+            # "ETa" => :black,
+            # "P2" => :darkblue,
+            "Precipitation" => :black,
+            # "Swat" => :brown
+        ]);
+
+    # Preprocess
+    df_part_mth = copy(df_partitioning_monthly);
+    rename!(df_part_mth, :Td => "Transpiration deficit",
+            :Ta => "Actual transpiration",
+            :Einterception => "Interception loss",
+            :Esoil => "Soil evaporation",
+            :Esnow => "Snow sublimation",
+            :R => "Runoff",
+            :D => "Drainage",
+            :Precip => "Precipitation");
+
+    # Preprocess
+    df_part_monthly_forMakie = @chain df_part_mth begin
+        stack(Not([:year, :month, :nrow, :date]))
+        # only keep variables we need
+        @subset(:variable .∈ ([first(pair) for pair in color_palette],))
+        # make categorical
+        @transform :variable = CategoricalArrays.categorical(:variable, levels = [first(pair) for pair in color_palette])
+        @transform :variable_code = CategoricalArrays.levelcode.(:variable)
+        # Remove fluxes that were not computed (e.g. removes runoff)
+        @subset(:value .!= 0.0)
+        end
+
+    # Plot
+    aog_monthly = mapping(
+            :date => "",
+            :value => "Water flux per month (mm)",
+            stack = :variable => "Water fluxes",
+            color = :variable => "") *
+        # bar plot of fluxes
+        data(@subset(df_part_monthly_forMakie, :variable .!= "Precipitation")) * visual(BarPlot) +
+        mapping(
+            :date => "",
+            :value => "Water flux per month (mm)",
+            color = :variable => "") *
+        # line plot of precip input
+        data(@subset(df_part_monthly_forMakie, :variable .== "Precipitation")) * visual(Lines)
+        
+    xticks = sort(unique(Dates.floor.(df_part_monthly_forMakie.date, Dates.Month(6))))
+
+    aog_draw = draw(aog_monthly, scales(Color = (; palette = color_palette)),
+        axis = (; ygridvisible = true))
+                #xticks = AlgebraOfGraphics.datetimeticks((x -> Dates.format(x, "u\nY")), (Date.(xticks)))))
+    return aog_draw
+end
+
+function plot_yearly_water_partitioning(df_partitioning_yearly)
+    color_palette = reverse([
+            #"Transpiration deficit" => :red2,
+            "Actual transpiration" => :darkolivegreen2,
+            "Interception loss" => :forestgreen,
+            "Soil evaporation" => :khaki3,
+            #"Snow sublimation" => :white,
+            "Runoff" => :lightskyblue,
+            "Drainage" => :darkblue,
+            # "ETa" => :black,
+            # "P2" => :darkblue,
+            "Precipitation" => :black,
+            # "Swat" => :brown
+        ]);
+
+    # Preprocess
+    df_part_yr = copy(df_partitioning_yearly);
+    rename!(df_part_yr, :Td => "Transpiration deficit",
+            :Ta => "Actual transpiration",
+            :Einterception => "Interception loss",
+            :Esoil => "Soil evaporation",
+            :Esnow => "Snow sublimation",
+            :R => "Runoff",
+            :D => "Drainage",
+            :Precip => "Precipitation");
+    
+    df_part_yearly_forMakie = @chain df_part_yr begin
+        stack(Not([:year, :nrow, :date]))
+        # only keep variables we need
+        @subset(:variable .∈ ([first(pair) for pair in color_palette],))
+        # make categorical
+        @transform :variable = categorical(:variable, levels = [first(pair) for pair in color_palette])
+        @transform :variable_code = levelcode.(:variable)
+        # Remove fluxes that were not computed (e.g. removes runoff)
+        @subset(:value .!= 0.0)
+        end
+
+    # Plot
+    aog_yearly = mapping(
+            :year => "",
+            :value => "Water flux per year (mm)",
+            stack = :variable => "Water fluxes",
+            color = :variable => "") *
+        # bar plot of fluxes
+        data(@subset(df_part_yearly_forMakie, :variable .!= "Precipitation")) * visual(BarPlot) +
+        mapping(
+            :year => "",
+            :value => "Water flux per year (mm)",
+            color = :variable => "") *
+        # line plot of precip input
+        data(@subset(df_part_yearly_forMakie, :variable .== "Precipitation")) * visual(Lines)
+        
+    aog_draw = draw(aog_yearly, scales(Color = (; palette = color_palette)))
+        
+    return aog_draw
+end
+
 # calculate NSE for soil water potential
 function obj_fun_swp(sim, obs)
 
@@ -194,10 +313,10 @@ function obs_fun_sap(sap_comp)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250722.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250722.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250722.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250722.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250724.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250724.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250724.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250724.csv", DataFrame);
 
 par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
 par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
@@ -234,7 +353,7 @@ obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigati
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
 sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
-sim_irst = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
+sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
 # soil water content
@@ -256,6 +375,10 @@ obs_fun_sap(sap_comp_ctr)
 obs_fun_sap(sap_comp_irr)
 obs_fun_sap(sap_comp_irst)
 
+# validation metrics for soil water potential
+obj_fun_swp(sim_ctr, obs_swp_ctr[obs_swp_ctr.date .>= Date(2021, 1, 1), :])
+obj_fun_swp(sim_irr, obs_swp_irr[obs_swp_irr.date .>= Date(2021, 1, 1), :])
+
 # compare irrigation stop scenario against observations
 obj_fun_swp(sim_irst, obs_swp_irst)
 
@@ -274,15 +397,17 @@ end
 R"""
 rdf = $swp_comp_irst
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison for Irrigation Stop")
+    facet_wrap(~depth, ncol=1) + theme_bw() +
+    labs(x="", y="SMP (kPa)", color="Source", title="Soil Water Potential Comparison for Irrigation Stop") +
+    theme(plot.title = element_text(hjust=0.5))
 """
 
 R"""
 rdf = $swp_comp_ctr
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison for Control")
+    facet_wrap(~depth, ncol=1) + theme_bw() +
+    labs(x="", y="SMP (kPa)", color="Source", title="Soil Water Potential Comparison for Control Scenario") +
+    theme(plot.title = element_text(hjust=0.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
 """
 
 R"""
@@ -361,9 +486,11 @@ swp_comp_scen = [ctr_swp; irr_swp; irst_swp];
 
 R"""
 rdf = $swp_comp_scen
-ggplot(filter(rdf, date>="2014-01-01"), aes(x=date, y=SWP, color=scen)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison across Scenarios")
+ggplot(filter(rdf, date>="2014-01-01", date<"2020-01-01"), aes(x=date, y=SWP, color=scen)) + geom_point(size=.5) +
+    facet_wrap(~depth, ncol=1) + theme_bw() +
+    labs(x="", y="SMP (kPa)", color="Scenario", title="Soil Water Potential Comparison across Scenarios") +
+    theme(plot.title = element_text(hjust=0.5), strip.text=element_text(size=12, face="bold"),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))
 """
 
 # compare annual transpiration across scenarios
@@ -380,6 +507,43 @@ yr_comp = [ctr_yr; irr_yr; irst_yr];
 
 R"""
 rdf = $yr_comp
-ggplot(rdf, aes(x=year, y=trans_sum, group=scen, fill=scen)) + geom_col(position="dodge") +
+ggplot(filter(rdf, year>=2003), aes(x=year, y=trans_sum, group=scen, fill=scen)) + geom_col(position="dodge") +
     labs(title="Transpiration Comparison Across Scenarios")
 """
+
+
+# water balance modelling
+
+sim_ctr_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/", new_folder=false, watbal=true);
+sim_irr_wb = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false, watbal=true);
+sim_irst_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false, watbal=true);
+
+# water partitioning
+
+# control
+wb_d_ctr, wb_m_ctr, wb_y_ctr = get_water_partitioning(sim_ctr_wb);
+wb_m_ctr = wb_m_ctr[wb_m_ctr.year .== 2014, :]; # filter out single years
+wb_y_ctr = wb_y_ctr[wb_y_ctr.year .>= 2003, :]; # filter out early years
+
+wb_yr_ctr_plot = plot_yearly_water_partitioning(wb_y_ctr);
+wb_yr_ctr_plot
+
+# irrigation
+wb_d_irr, wb_m_irr, wb_y_irr = get_water_partitioning(sim_irr_wb);
+wb_mth_irr = wb_m_irr[wb_m_irr.year .== 2014, :]; # filter out single year
+wb_yr_irr = wb_y_irr[wb_y_irr.year .>= 2003, :]; # filter out early years
+
+wb_mth_irr_plot = plot_monthly_water_partitioning(wb_mth_irr);
+
+wb_yr_irr_plot = plot_yearly_water_partitioning(wb_yr_irr);
+wb_yr_irr_plot
+
+# irrigation stop
+wb_d_irst, wb_m_irst, wb_y_irst = get_water_partitioning(sim_irst_wb);
+wb_mth_irst = wb_m_irst[wb_m_irst.year .== 2014, :]; # filter out single year
+wb_yr_irst = wb_y_irst[wb_y_irst.year .>= 2003, :]; # filter out early years
+
+wb_mth_irst_plot = plot_monthly_water_partitioning(wb_mth_irst);
+
+wb_yr_irst_plot = plot_yearly_water_partitioning(wb_yr_irst);
+wb_yr_irst_plot
