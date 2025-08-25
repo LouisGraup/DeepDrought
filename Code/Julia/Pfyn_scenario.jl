@@ -219,7 +219,7 @@ end
 
 function plot_yearly_water_partitioning(df_partitioning_yearly)
     color_palette = reverse([
-            #"Transpiration deficit" => :red2,
+            "Transpiration deficit" => :red2,
             "Actual transpiration" => :darkolivegreen2,
             "Interception loss" => :forestgreen,
             "Soil evaporation" => :khaki3,
@@ -300,6 +300,36 @@ function obj_fun_swp(sim, obs)
     return nse10, nse80
 end
 
+# calculate NSE for soil water content
+function obj_fun_swc(sim, obs)
+
+    z = get_swc(sim, shape="wide");
+
+    # process observed data
+    obs = unstack(obs, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
+    sort!(obs, :date); # sort by date
+
+    # separate observed data into different depths and remove missing values
+    obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
+    obs_80cm = dropmissing(obs[!, [:date, :VWC_80cm]]);
+
+    # match simulated data to available dates for each depth
+    sim_10cm = z[z.date .∈ [obs_10cm.date], :theta_m3m3_100mm];
+    sim_80cm = z[z.date .∈ [obs_80cm.date], :theta_m3m3_800mm];
+
+    function NSE(sim, obs)
+        # calculate Nash-Sutcliffe Efficiency
+        nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
+        return nse
+    end
+
+    # calculate NSE
+    nse10 = NSE(sim_10cm, obs_10cm.VWC_10cm);
+    nse80 = NSE(sim_80cm, obs_80cm.VWC_80cm);
+
+    return nse10, nse80
+end
+
 # calculate correlation coefficient between sap flow and transpiration data
 function obs_fun_sap(sap_comp)
 
@@ -313,10 +343,10 @@ function obs_fun_sap(sap_comp)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250724.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250724.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250724.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250724.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250814.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250814.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250814.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250814.csv", DataFrame);
 
 par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
 par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
@@ -326,9 +356,10 @@ met_irr[scen_irr_best, :]
 
 ## behavioral data
 # soil water content
-obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
-obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-filter!(:date => >(Date(2004, 1, 1)), obs_swc); # filter out early dates
+obs_swc = CSV.read("../../Data/Pfyn/PFY_swat_ext.csv", DataFrame);
+#obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
+filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
 # soil water potential
 obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
@@ -340,10 +371,11 @@ obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
+obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
+obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
-obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
+obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
 obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_sap_ctr = obs_sap[obs_sap.meta .== "Control", :]; # select control treatment
@@ -359,6 +391,7 @@ sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), 
 # soil water content
 swc_comp_ctr = swc_comp(sim_ctr, obs_swc_ctr);
 swc_comp_irr = swc_comp(sim_irr, obs_swc_irr);
+swc_comp_irst = swc_comp(sim_irst, obs_swc_irst);
 
 # soil water potential
 swp_comp_ctr = swp_comp(sim_ctr, obs_swp_ctr);
@@ -381,12 +414,15 @@ obj_fun_swp(sim_irr, obs_swp_irr[obs_swp_irr.date .>= Date(2021, 1, 1), :])
 
 # compare irrigation stop scenario against observations
 obj_fun_swp(sim_irst, obs_swp_irst)
+obj_fun_swc(sim_irst, obs_swc_irst)
 
 # individually by year
 obs_swp_irst.year = year.(obs_swp_irst.date);
+obs_swc_irst.year = year.(obs_swc_irst.date);
 for year in unique(obs_swp_irst.year)
     # loop through each year and calculate NSE
     nse10, nse80 = obj_fun_swp(sim_irst, obs_swp_irst[obs_swp_irst.year .== year, :]);
+    #nse10, nse80 = obj_fun_swc(sim_irst, obs_swc_irst[obs_swc_irst.year .== year, :]);
     println("Year: $year, NSE10: $nse10, NSE80: $nse80");
 end
 
@@ -430,6 +466,13 @@ rdf = $swc_comp_irr
 ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
     facet_wrap(~depth, ncol=1) +
     labs(title="Soil Water Content Comparison for Irrigation")
+"""
+
+R"""
+rdf = $swc_comp_irst
+ggplot(filter(rdf, depth %in% c(10,80)), aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, ncol=1) +
+    labs(title="Soil Water Content Comparison for Irrigation Stop")
 """
 
 # sap flow
@@ -488,9 +531,9 @@ R"""
 rdf = $swp_comp_scen
 ggplot(filter(rdf, date>="2014-01-01", date<"2020-01-01"), aes(x=date, y=SWP, color=scen)) + geom_point(size=.5) +
     facet_wrap(~depth, ncol=1) + theme_bw() +
-    labs(x="", y="SMP (kPa)", color="Scenario", title="Soil Water Potential Comparison across Scenarios") +
-    theme(plot.title = element_text(hjust=0.5), strip.text=element_text(size=12, face="bold"),
-        axis.text=element_text(size=12), axis.title=element_text(size=14))
+    labs(x="", y="SMP (kPa)", color="Scenario", title="Modelled Soil Water Potential Comparison across Scenarios") +
+    theme(legend.position="right",legend.text=element_text(size=12),legend.title=element_text(size=14),plot.title = element_text(hjust=0.5), strip.text=element_text(size=12, face="bold"), axis.text=element_text(size=12), axis.title=element_text(size=14)) +
+    scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
 """
 
 # compare annual transpiration across scenarios

@@ -86,8 +86,8 @@ meteoLWF = select(meteoLWF, -c(prec_Sion, precip_Sierre, precip_Sierre_hist))
 
 ## last, in-situ data from 2024
 
-meteo_ins_VPD = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0625_insitu_VPD.csv")
-meteo_ins_Con = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0625_insitu_Control.csv")
+meteo_ins_VPD = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_VPD.csv")
+meteo_ins_Con = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_Control.csv")
 
 # VPD is reduced VPD from manipulation experiment, also includes changes in temp
 meteoLWF_Con = rbind(meteoLWF, rename(meteo_ins_Con, precip_ctrl=precip))

@@ -7,7 +7,7 @@ library(humidity)
 
 
 start_date <- as.POSIXct("2023-08-01 00:00:00", tz="GMT")
-end_date <- as.POSIXct("2025-07-01 00:00:00", tz="GMT")
+end_date <- as.POSIXct("2025-08-01 00:00:00", tz="GMT")
 
 conn <- db_connect('grauplou', rstudioapi::askForPassword("Database password"), db_host = 'pgdblwf', db_name = 'lwf')
 
@@ -26,7 +26,7 @@ pfyndata.tbl = db_tbl(conn, table="pfyn_messdat", retrieve = F)
 # code from Katrin
 
 data.df = pfyndata.tbl %>% 
-  filter(messvar_id %in% soilvar.df$messvar_id,
+  filter(messvar_id %in% !!soilvar.df$messvar_id,
          messtime >= start_date, messtime < end_date) %>% 
   inner_join(soilvar.tbl, by="messvar_id") %>% 
   select(messtime, messval, messvar_id, messvar_name, varname_name, varvpos, type, installation_name, scaffold, treatment, descr) %>% collect()
@@ -115,7 +115,11 @@ daily.df$treatment = factor(daily.df$treatment,
 ggplot(daily.df, aes(date, VWC, color=treatment, fill=treatment))+
   stat_summary(geom="line", fun=mean)+
   stat_summary(geom="ribbon", alpha=.3)+
-  facet_wrap(~depth, ncol=1)+theme_bw()
+  facet_wrap(~depth, ncol=1)+theme_bw()+labs(x="")+
+  theme(legend.position="bottom", legend.text=element_text(size=12),
+        legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
 ggplot(daily.df, aes(date, ECS, color=treatment, fill=treatment))+
   stat_summary(geom="line", fun=mean)+
@@ -131,7 +135,7 @@ ggplot(filter(daily.df, date>="2024-04-01"), aes(date, SWP_corr/1000, color=trea
         axis.text=element_text(size=12), axis.title=element_text(size=14))+
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
-ggplot(filter(daily.df, date>="2025-03-01"), aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
+ggplot(filter(daily.df, date>="2025-04-01"), aes(date, SWP_corr/1000, color=treatment, fill=treatment))+
   stat_summary(geom="line", fun=mean)+stat_summary(geom="ribbon", alpha=.3)+
   facet_wrap(~depth, ncol=1, scales="free")+theme_bw()+labs(x="", y="SMP (MPa)")+
   theme(legend.text=element_text(size=12),
@@ -167,7 +171,6 @@ ggplot(filter(daily.df, !is.na(descr)), aes(date, SWP_corr/1000, group=interacti
 # by depth, treatment and position
 ggplot(filter(daily.df, !is.na(descr)), aes(date, SWP_corr/1000, group=interaction(descr, site)))+geom_line(aes(color=as.factor(descr)))+
   facet_grid(depth~treatment, scales="free_y")+theme_bw()+labs(x="", y="SMP (MPa)")
-
 
 # plot roof treatments from recent sensors only
 ggplot(filter(daily.df, date>="2025-04-25", !is.na(descr)), aes(date, SWP_corr/1000, group=interaction(depth, site)))+

@@ -48,7 +48,7 @@ meteo.df <- ada_get_data(conn,
                          messvar = unique(metadata.df$MESSVAR_ID),
                          messtime_from = start_date,
                          messtime_to = end_date,
-                         faults_correct = TRUE,
+                         #faults_correct = TRUE,
                          retrieve = TRUE) %>%
   dplyr::rename_with(toupper)
 

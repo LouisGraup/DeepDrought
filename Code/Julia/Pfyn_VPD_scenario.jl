@@ -137,6 +137,26 @@ function get_RWU_centroid(sim)
     return col_RWU_centroid_mm
 end
 
+function get_VPD(sim)
+
+    met = get_forcing(sim);
+    met.date = Date.(met.dates);
+
+    met = met[met.date .>= Date(2024, 1, 1), :];
+
+    met = select(met, :date, :vappres_kPa, :tmax_degC, :tmin_degC);
+    met.month = month.(met.date);
+
+    met.tmean = (met.tmax_degC .+ met.tmin_degC) ./ 2;
+
+    # calc saturation vapor pressure
+    met.Es = 0.61078 .* exp.(17.26939 .* met.tmean ./ (met.tmean .+ 237.3));
+    # calc vapor pressure deficit
+    met.VPD = met.Es .- met.vappres_kPa;
+
+    return met
+end
+
 function met_comp(sim, obs)
     # sim is the LWFBrook90 simulation
     # obs is the observed soil moisture data
@@ -162,10 +182,10 @@ end
 
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250724.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250724.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250724.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250724.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250814.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250814.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20250814.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250814.csv", DataFrame);
 
 par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
 par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
@@ -185,13 +205,30 @@ obs_irr_vpd = obs[obs.treatment .== "irrigation_vpd", :];
 obs_drt = obs[obs.treatment .== "roof", :];
 obs_drt_vpd = obs[obs.treatment .== "roof_vpd", :];
 
+# include extended long-term observations
+obs_ext = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
+filter!(:date => >=(Date(2024, 1, 1)), obs_ext); # filter out early dates
+obs_ext_long = stack(obs_ext, Not(:date, :meta), variable_name = "depth", value_name="SWP");
+obs_ext_long.depth = parse.(Int, map(x -> x[(end-3):(end-2)], obs_ext_long.depth)) / 100; # convert depth from var name
+obs_ext_long.src .= "long-term obs"; # add source column
+
+# separate scenarios
+obs_ext_ctr = obs_ext_long[obs_ext_long.meta .== "control", Not(:meta)];
+obs_ext_irr = obs_ext_long[obs_ext_long.meta .== "irrigation", Not(:meta)];
+
+# include multiple roof observations
+obs_roof = CSV.read("../../Data/Pfyn/soil_daily_VPDrought.csv", DataFrame,  missingstring="NA");
+obs_roof = obs_roof[obs_roof.treatment .== "roof" .|| obs_roof.treatment .== "roof_vpd", :];
+select!(obs_roof, :date, :treatment, :depth, :site, :descr, :SWP_corr);
+rename!(obs_roof, :SWP_corr => :SWP);
+obs_roof.depth = -1 * obs_roof.depth;
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 6, 30), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_VPD/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 6, 30), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_VPD/irr_amb/");
-sim_irr_vpd = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 6, 30), "LWFBinput/Pfyn_irrigation_VPD/", "pfynwald", "LWFB_VPD/irr_vpd/");
-sim_drt = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 6, 30), "LWFBinput/Pfyn_drought_ambient/", "pfynwald", "LWFB_VPD/drt_amb/");
-sim_drt_vpd = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 6, 30), "LWFBinput/Pfyn_drought_VPD/", "pfynwald", "LWFB_VPD/drt_vpd/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_VPD/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_VPD/irr_amb/");
+sim_irr_vpd = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_VPD/", "pfynwald", "LWFB_VPD/irr_vpd/");
+sim_drt = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_ambient/", "pfynwald", "LWFB_VPD/drt_amb/");
+sim_drt_vpd = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_VPD/", "pfynwald", "LWFB_VPD/drt_vpd/");
 
 ctr_comp = met_comp(sim_ctr, obs_ctr);
 irr_comp = met_comp(sim_irr, obs_irr);
@@ -199,14 +236,31 @@ irr_vpd_comp = met_comp(sim_irr_vpd, obs_irr_vpd);
 drt_comp = met_comp(sim_drt, obs_drt);
 drt_vpd_comp = met_comp(sim_drt_vpd, obs_drt_vpd);
 
+# add extended observations
+ctr_swp_comp = [select(ctr_comp, Not(:VWC)); obs_ext_ctr];
+irr_swp_comp = [select(irr_comp, Not(:VWC)); obs_ext_irr];
 
 R"""
 rdf = $ctr_comp
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
+    facet_wrap(~depth, scales="free_y", ncol=1) +
     labs(title="Soil Water Potential Comparison for Control")
 """
 
+R"""
+rdf = $ctr_swp_comp
+ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() +
+    labs(title="Soil Water Potential Comparison for Control Scenario", x="", y="SMP (kPa)", color="Source") +
+    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
+"""
+
+R"""
+rdf = $ctr_comp
+ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, scales="free_y", ncol=1) +
+    labs(title="Soil Water Content Comparison for Control")
+"""
 
 R"""
 rdf = $irr_comp
@@ -215,11 +269,24 @@ ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
     labs(title="Soil Water Potential Comparison for Irrigation")
 """
 
+R"""
+rdf = $irr_swp_comp
+ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, scales="free_y", ncol=1) +
+    labs(title="Soil Water Potential Comparison for Irrigation")
+"""
+
+R"""
+rdf = $irr_comp
+ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
+    facet_wrap(~depth, scales="free_y", ncol=1) +
+    labs(title="Soil Water Content Comparison for Irrigation")
+"""
 
 R"""
 rdf = $irr_vpd_comp
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
+    facet_wrap(~depth, scales="free_y", ncol=1) +
     labs(title="Soil Water Potential Comparison for Irrigation VPD")
 """
 
@@ -227,10 +294,10 @@ ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
 R"""
 rdf = $drt_comp
 ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Potential Comparison for Roof")
+    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() + 
+    labs(title="Soil Water Potential Comparison for Roof") +
+    theme(legend.position=c(.1,.1), plot.title=element_text(hjust=.5))
 """
-
 
 R"""
 rdf = $drt_vpd_comp
@@ -238,7 +305,6 @@ ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
     facet_wrap(~depth, ncol=1) +
     labs(title="Soil Water Potential Comparison for Roof VPD")
 """
-
 
 R"""
 rdf1 = $drt_comp
@@ -248,6 +314,42 @@ ggplot(filter(rdf1, src=="sim"), aes(x=date, y=SWP, color="roof")) + geom_point(
     facet_wrap(~depth, ncol=1) +
     labs(title="Soil Water Potential Comparison for Drought Scenarios")
 """
+
+R"""
+rdf1 = $drt_comp
+rdf2 = $drt_vpd_comp
+ggplot(rdf1, aes(x=date, y=SWP, color="roof", linetype=as.factor(src))) + geom_line(size=.5) +
+    geom_line(data=rdf2, aes(x=date, y=SWP, color="roof_vpd", linetype=as.factor(src)), size=.5) +
+    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() +
+    labs(title="Soil Water Potential Comparison for Drought Scenarios", x="", y="SMP (kPa)", color="Scenario", linetype="Source") + 
+    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
+"""
+
+R"""
+rdf1 = $drt_comp
+rdf2 = $obs_roof
+ggplot(filter(rdf1, date>="2025-04-25", depth==.1, src=="sim"), aes(x=date, y=SWP, color="sim")) + geom_line(size=.5) +
+    geom_line(data=filter(rdf2, date>="2025-04-25", treatment=="roof", depth==.1), aes(x=date, y=SWP, group=interaction(as.factor(descr), as.factor(site)), linetype=as.factor(site), color=as.factor(descr)), size=.5) +
+    labs(title="Soil Water Potential Comparison at 10 cm for Roof Scenario in 2025", x="", y="SMP (kPa)", color="Source", linetype="Plot") + theme_bw() +
+    scale_color_manual(values=c("red","purple","green","blue","black")) + guides(linetype="none") +
+    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12), legend.title=element_text(size=12), axis.text=element_text(size=12), axis.title=element_text(size=14))
+"""
+
+drt_comp.treatment .= "roof";
+drt_vpd_comp.treatment .= "roof_vpd";
+
+R"""
+rdf1 = $drt_comp
+rdf1a = $drt_vpd_comp
+rdf2 = $obs_roof
+ggplot(filter(rdf1, date>="2025-04-25", depth==.1, src=="sim"), aes(x=date, y=SWP, color="sim")) + geom_line(size=.5) +
+    geom_line(data=filter(rdf1a, date>="2025-04-25", depth==.1, src=="sim"), aes(x=date, y=SWP, color="sim"), size=.5) +
+    geom_line(data=filter(rdf2, date>="2025-04-25", depth==.1), aes(x=date, y=SWP, group=interaction(as.factor(descr), as.factor(site)), color=as.factor(descr)), size=.5) +
+    labs(title="Soil Water Potential Comparison at 10 cm for Roof Scenarios in 2025", x="", y="SMP (kPa)", color="Source", linetype="Plot") + theme_bw() +
+    scale_color_manual(values=c("red","purple","orange","blue","black")) + facet_wrap(~treatment) + 
+    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12), legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"), axis.text=element_text(size=12), axis.title=element_text(size=14))
+"""
+
 
 # compare RWU depth across scenarios
 
@@ -277,6 +379,45 @@ rwu_yr = combine(groupby(rwu_comp, [:year, :treatment]), :RWU .=> [mean maximum]
 
 R"""
 rdf = $rwu_yr
-ggplot(filter(rdf, year>2003), aes(x=year, y=RWU_mean, group=treatment, fill=treatment)) + geom_col(position="dodge") +
+ggplot(filter(rdf, year>2023), aes(x=year, y=RWU_mean, group=treatment, fill=treatment)) + geom_col(position="dodge") +
     labs(title="Mean RWU Depth Comparison Across Scenarios")
 """
+
+
+# compare VPD across scenarios
+met_drt = get_VPD(sim_drt);
+met_drt_vpd = get_VPD(sim_drt_vpd);
+
+R"""
+rdf1 = $met_drt
+rdf2 = $met_drt_vpd
+ggplot(rdf1, aes(x=date, y=tmean, color="roof")) + geom_line() +
+    geom_line(data=rdf2, aes(x=date, y=tmean, color="roof_vpd")) +
+    labs(title="Temperature Comparison for Drought Scenarios")
+"""
+
+R"""
+rdf1 = $met_drt
+rdf2 = $met_drt_vpd
+ggplot(rdf1, aes(x=date, y=vappres_kPa, color="roof")) + geom_line() +
+    geom_line(data=rdf2, aes(x=date, y=vappres_kPa, color="roof_vpd")) +
+    labs(title="Vapor Pressure Comparison for Drought Scenarios")
+"""
+
+R"""
+rdf1 = $met_drt
+rdf2 = $met_drt_vpd
+ggplot(rdf1, aes(x=date, y=VPD, color="roof")) + geom_line() +
+    geom_line(data=rdf2, aes(x=date, y=VPD, color="roof_vpd")) +
+    labs(title="VPD Comparison for Drought Scenarios")
+"""
+
+# actual VPD reductions during summer months
+
+met_drt = met_drt[met_drt.month .>= 5 .&& met_drt.month .<= 8, :];
+met_drt_vpd = met_drt_vpd[met_drt_vpd.month .>= 5 .&& met_drt_vpd.month .<= 8, :];
+
+abs_diff = met_drt.VPD - met_drt_vpd.VPD;
+rel_diff = abs_diff ./ met_drt_vpd.VPD * 100;
+
+mean(rel_diff) # 15%

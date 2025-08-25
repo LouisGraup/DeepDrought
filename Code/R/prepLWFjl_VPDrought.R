@@ -21,7 +21,7 @@ extend_meteoveg = function(meteo_scen, scen) {
   met = read_csv(filename, skip=2, col_names=met_names, show_col_types=F)
   
   # extract substitution year for veg data
-  veg_fill = met %>% mutate(year=year(dates), month=month(dates)) %>% filter(year==2014, month < 7) %>% select(densef_percent:sai_percent)
+  veg_fill = met %>% mutate(year=year(dates), month=month(dates)) %>% filter(year==2014, month < 8) %>% select(densef_percent:sai_percent)
   
   # retrieve most recent data from meteo measurements
   meteo_fill = meteo_scen %>% filter(dates >= "2025-01-01") %>% select(-tmean)
