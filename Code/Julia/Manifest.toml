@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.6"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "8348ee464041903692df6e5d1b1f80bf679ca529"
+project_hash = "1a3f9bde91df12b722d2bac1b41bc5c7b60dd5d0"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -1328,7 +1328,9 @@ version = "18.1.8+0"
 
 [[deps.LWFBrook90]]
 deps = ["BenchmarkTools", "CSV", "CategoricalArrays", "ComponentArrays", "DataFrames", "DataFramesMeta", "Dates", "DiffEqCallbacks", "Distributions", "FileIO", "Interpolations", "LinearAlgebra", "Literate", "Logging", "Measures", "OrdinaryDiffEq", "PlotUtils", "Printf", "ProgressLogging", "Random", "RecipesBase", "Roots", "SciMLBase", "Statistics", "StatsBase", "UnPack"]
-git-tree-sha1 = "dda9775c170b4e25614886e5bd5e76772a6a585e"
+git-tree-sha1 = "7faa91d485fa7827c177b460de4edc0e171441c8"
+repo-rev = "add-below-canopy-irrigation"
+repo-url = "https://github.com/fabern/LWFBrook90.jl"
 uuid = "100deb6c-4418-4b77-ad5c-a1fadb580743"
 version = "0.9.9"
 
