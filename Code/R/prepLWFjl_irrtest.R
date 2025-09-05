@@ -49,15 +49,16 @@ meteo_VPD = read_csv("../../Data/Pfyn/meteo/meteo_irr_VPD.csv")
 
 # use existing control treatment and add irrigation column
 
-met_head = read_csv("../Julia/LWFBinput/Pfyn_control/pfynwald_meteoveg.csv", n_max=1, show_col_types=F)
+met_head = read_csv("../Julia/LWFBinput/Pfyn_irrigation_ambient/pfynwald_meteoveg.csv", n_max=1, show_col_types=F)
 met_names = colnames(met_head)
 
 # read in file with column names and skip header
-metveg = read_csv("../Julia/LWFBinput/Pfyn_control/pfynwald_meteoveg.csv", skip=2, col_names=met_names, show_col_types=F)
+metveg = read_csv("../Julia/LWFBinput/Pfyn_irrigation_ambient/pfynwald_meteoveg.csv", skip=2, col_names=met_names, show_col_types=F)
 
 met = metveg[, 1:7]
 veg = metveg[, 8:11]
 
+met$prec_mmDay = meteo_Con$precip_ctrl
 met$irrig_mmDay = meteo_Con$irrig_mm
 
 metirr = cbind(met, veg)

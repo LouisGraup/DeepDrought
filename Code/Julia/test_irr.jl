@@ -9,17 +9,21 @@ input_path = "./LWFBinput/Pfyn_irrigation_test/";
 input_prefix = "pfynwald";
 
 # no irrigation
-model_noirr = loadSPAC(input_path, input_prefix; simulate_isotopes = true,
-    root_distribution = (beta = 0.97, z_rootMax_m=-1.9));
+model_noirr = loadSPAC("./LWFB_testrun/irrigation/", input_prefix; simulate_isotopes = true,
+    Δz_thickness_m = "soil_discretization.csv",    
+    root_distribution = (beta = 0.97, z_rootMax_m=-1.9),
+    IC_soil = (PSIM_init_kPa = -6.5,
+    delta18O_init_permil = -13.0,
+    delta2H_init_permil = -95.0));
 
 sim_noirr = setup(model_noirr);
-simulate!(sim_noirr)
+simulate!(sim_noirr, save_everystep = false, saveat = 0:9344);
 
 # with irrigation
 model_irr = loadSPAC(input_path, input_prefix; simulate_isotopes = true, simulate_irrigation = true,
     root_distribution = (beta = 0.97, z_rootMax_m=-1.9));
 
-sim_irr = setup(model_irr, requested_tspan=(start_index, end_index));
+sim_irr = setup(model_irr); #, requested_tspan=(start_index, end_index));
 simulate!(sim_irr)
 
 # restrict dates for testing
@@ -27,7 +31,8 @@ ref_date = Date(model_irr.reference_date);
 start_index = Dates.value(Date(2003, 1, 1) - ref_date);
 end_index = Dates.value(Date(2003, 12, 31) - ref_date);
 
-simulate!(sim_irr, save_everystep = false, saveat = start_index:end_index); # for watbal comparison
+#simulate!(sim_irr, save_everystep = false, saveat = start_index:end_index); # for watbal comparison
+simulate!(sim_irr, save_everystep = false, saveat = 0:9344); # for watbal comparison
 
 using Plots, Measures; gr();
 
@@ -104,6 +109,7 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             # "ETa" => :black,
             # "P2" => :darkblue,
             "Precipitation" => :black,
+            "Irrigation" => :brown
             # "Swat" => :brown
         ]);
 
@@ -111,7 +117,7 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
     df_part_yr = copy(df_partitioning_yearly);
 
     # add irrigation to precipitation
-    df_part_yr.Precip = df_part_yr.Precip .+ df_part_yr.Irrig;
+    #df_part_yr.Precip = df_part_yr.Precip .+ df_part_yr.Irrig;
 
     rename!(df_part_yr, :Td => "Transpiration deficit",
             :Ta => "Actual transpiration",
@@ -120,7 +126,8 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             :Esnow => "Snow sublimation",
             :R => "Runoff",
             :D => "Drainage",
-            :Precip => "Precipitation");
+            :Precip => "Precipitation",
+            :Irrig => "Irrigation");
     
     df_part_yearly_forMakie = @chain df_part_yr begin
         stack(Not([:year, :nrow, :date]))
@@ -140,13 +147,13 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             stack = :variable => "Water fluxes",
             color = :variable => "") *
         # bar plot of fluxes
-        data(@subset(df_part_yearly_forMakie, :variable .!= "Precipitation")) * visual(BarPlot) +
+        data(@subset(df_part_yearly_forMakie, :variable .∉ (["Precipitation","Irrigation"],))) * visual(BarPlot) +
         mapping(
             :year => "",
             :value => "Water flux per year (mm)",
             color = :variable => "") *
         # line plot of precip input
-        data(@subset(df_part_yearly_forMakie, :variable .== "Precipitation")) * visual(Lines)
+        data(@subset(df_part_yearly_forMakie, :variable .∈ (["Precipitation","Irrigation"],))) * visual(Lines)
         
     aog_draw = draw(aog_yearly, scales(Color = (; palette = color_palette)))
         
