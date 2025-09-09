@@ -2,6 +2,48 @@
 
 library(tidyverse)
 
+# sap flow data from Zweifel et al. (2020)
+
+sf = read_tsv("../../Data/Pfyn/pfynwald_sapflow.tab", skip=33)
+
+# lengthen data frame and separate column names into multiple variables
+sf_long = sf %>% pivot_longer(cols=-1, names_to=c(".value", "tree_id","scenario"), 
+                              names_pattern="^(.*?) \\[.*?\\] \\(at tree (\\d+),\\s*([^\\)]+)\\)")
+
+# remove plot from scenario names
+sf_long$scenario <- sf_long$scenario %>%
+  str_replace(" plot$", "") %>%
+  str_trim()
+
+# remove spaces from column names
+sf_long = sf_long %>% rename(deltaT='delta T', Tree_SR='Tree SR', datetime='Date/Time')
+
+ggplot(sf_long, aes(x=datetime, y=Tree_SR, color=as.factor(tree_id)))+geom_line()+
+  facet_wrap(~tree_id)
+
+
+# summarize daily sap flow
+sf_long$date = as.Date(sf_long$datetime)
+
+sf_daily = sf_long %>% select(-datetime) %>% group_by(date, tree_id, scenario) %>% 
+  summarize(sfd=mean(Tree_SR)) %>% mutate(year=year(date))
+
+ggplot(sf_daily, aes(date, sfd, color=as.factor(tree_id)))+geom_line(alpha=.7)+
+  facet_wrap(~scenario, ncol=1)
+
+ggplot(filter(sf_daily, scenario!="irrigation"), aes(date, sfd, color=as.factor(scenario)))+
+  stat_summary(geom="line", fun=mean)+
+  stat_summary(geom="ribbon", alpha=.3)+
+  facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()
+
+# group by scenario
+sf_meta = sf_daily %>% group_by(date, scenario) %>% summarize(sfd=mean(sfd, na.rm=T))
+sf_meta$year = year(sf_meta$date)
+
+ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sfd, color=as.factor(scenario)))+geom_line()+
+  facet_wrap(~year, ncol=1, scales="free_x")
+
+
 # sap flow data from Richard Peters
 sap = readRDS("../../Data/Pfyn/PFY_sfd_cleaned.Rds")
 sap$tree = factor(sap$tree)
