@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "1a3f9bde91df12b722d2bac1b41bc5c7b60dd5d0"
+project_hash = "eed36f723d8f8b7a21bace29238314a6fd09fbde"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7927b9af540ee964cc5d1b73293f1eb0b761a3a1"
@@ -1296,6 +1296,11 @@ git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.1+0"
 
+[[deps.KahanSummation]]
+git-tree-sha1 = "6292e7878fe190651e74148edb11356dbbc2e194"
+uuid = "8e2b3108-d4c1-50be-a7a2-16352aec75c3"
+version = "0.3.1"
+
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
 git-tree-sha1 = "ba51324b894edaf1df3ab16e2cc6bc3280a2f1a7"
@@ -2409,6 +2414,12 @@ git-tree-sha1 = "58cdd8fb2201a6267e1db87ff148dd6c1dbd8ad8"
 uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
 version = "0.5.1+0"
 
+[[deps.RollingFunctions]]
+deps = ["KahanSummation", "LinearAlgebra", "Statistics", "StatsBase"]
+git-tree-sha1 = "4c67c9d97498ca54c14b02bb051721272f56cede"
+uuid = "b0e4dd01-7b14-53d8-9b45-175a3e362653"
+version = "0.8.1"
+
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
 git-tree-sha1 = "668e411c0616a70860249b4c96e5d35296631a1d"
@@ -2834,6 +2845,12 @@ deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedP
 git-tree-sha1 = "02aca429c9885d1109e58f400c333521c13d48a0"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 version = "0.11.4"
+
+[[deps.TimeSeries]]
+deps = ["Dates", "DelimitedFiles", "DocStringExtensions", "IteratorInterfaceExtensions", "PrettyTables", "RecipesBase", "Reexport", "Statistics", "TableTraits", "Tables"]
+git-tree-sha1 = "f4d78e050e6734625bdecf386775bde88f77a9cd"
+uuid = "9e3dc215-6440-5c97-bce1-76c03772f85e"
+version = "0.25.0"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]

@@ -2,7 +2,7 @@
 ## for all Pfynwald VPDrought scenarios
 ## and examine output against observed data
 
-using CSV, DataFrames, Dates, Statistics, RCall;
+using CSV, DataFrames, Dates, Statistics, RollingFunctions, RCall;
 using Plots; gr()
 R"""
 library(tidyverse)
@@ -224,11 +224,11 @@ rename!(obs_roof, :SWP_corr => :SWP);
 obs_roof.depth = -1 * obs_roof.depth;
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_VPD/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_VPD/irr_amb/");
-sim_irr_vpd = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_VPD/", "pfynwald", "LWFB_VPD/irr_vpd/");
-sim_drt = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_ambient/", "pfynwald", "LWFB_VPD/drt_amb/");
-sim_drt_vpd = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_VPD/", "pfynwald", "LWFB_VPD/drt_vpd/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_VPD/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_VPD/irr_amb/");
+sim_irr_vpd = run_LWFB90_param(par_irr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_VPD/", "pfynwald", "LWFB_VPD/irr_vpd/");
+sim_drt = run_LWFB90_param(par_ctr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_ambient/", "pfynwald", "LWFB_VPD/drt_amb/");
+sim_drt_vpd = run_LWFB90_param(par_ctr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_drought_VPD/", "pfynwald", "LWFB_VPD/drt_vpd/");
 
 ctr_comp = met_comp(sim_ctr, obs_ctr);
 irr_comp = met_comp(sim_irr, obs_irr);
@@ -357,20 +357,21 @@ days, dates_out = get_dates(sim_ctr);
 
 rwu_comp = DataFrame(date=dates_out);
 
-rwu_comp.control = get_RWU_centroid(sim_ctr);
-rwu_comp.irrigation = get_RWU_centroid(sim_irr);
-rwu_comp.irrigation_vpd = get_RWU_centroid(sim_irr_vpd);
-rwu_comp.roof = get_RWU_centroid(sim_drt);
-rwu_comp.roof_vpd = get_RWU_centroid(sim_drt_vpd);
+rwu_comp.control = runmean(get_RWU_centroid(sim_ctr), 7);
+rwu_comp.irrigation = runmean(get_RWU_centroid(sim_irr), 7);
+rwu_comp.irrigation_vpd = runmean(get_RWU_centroid(sim_irr_vpd), 7);
+rwu_comp.roof = runmean(get_RWU_centroid(sim_drt), 7);
+rwu_comp.roof_vpd = runmean(get_RWU_centroid(sim_drt_vpd), 7);
 
 rwu_comp = stack(rwu_comp, Not(:date), variable_name="treatment", value_name="RWU");
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
 
 R"""
 rdf = $rwu_comp
-ggplot(filter(rdf, date>="2024-01-01"), aes(x=date, y=RWU, color=treatment)) + geom_line() +
-    facet_wrap(~treatment)+
-    labs(title="RWU Depth Comparison across Scenarios")
+#rdf$treatment = factor(rdf$treatment, levels=c("roof", "roof_vpd", "control", "irrigation", "irrigation_vpd"))
+rdf$treatment = factor(rdf$treatment, levels=c("control", "roof", "irrigation"))
+ggplot(filter(rdf, date>="2024-01-07"), aes(x=date, y=RWU, color=treatment)) + geom_line() +
+    labs(x="", title="RWU Depth Comparison across Scenarios") + theme_bw()
 """
 
 rwu_comp = dropmissing(rwu_comp);

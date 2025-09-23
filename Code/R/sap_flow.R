@@ -173,7 +173,7 @@ library(shiny)
 library(plotly)
 
 # one time series at a time
-raw = TN_ctr %>% filter(series_id==932) %>% select(-series_id) %>% rename(timestamp=ts)
+raw = TN_irr %>% filter(series_id==1018) %>% select(-series_id) %>% rename(timestamp=ts)
 
 #input = is.trex(raw, tz="Etc/GMT-1", time.format="%Y-%m-%d %H:%M:%S", solar.time=F)
 
@@ -191,18 +191,18 @@ input = zoo::zoo(data$value, order.by = data$timestamp)
 
 # clip input and aggregate to hourly
 input_clip <- dt.steps(input=input, 
-                  start="2025-01-01 00:00:00",
-                  end="2025-07-13 23:50:00",
+                  start="2024-01-01 00:00:00",
+                  end="2024-12-31 23:50:00",
                   time.int=60,
                   max.gap=120,
                   df=TRUE)
 
-# save(input_clip, file="input24.RData")
+# save(input_clip, file="input23.RData")
 
 outlier()
 
-input_list = readRDS("input24_Cleaned.Rds")
-# input_clean = input_list$series_input
+input_list = readRDS("input23_Cleaned.Rds")
+#input_clean = input_list$series_input
 out = rbind(input_list$selected_data_auto, input_list$selected_data_manual)
 
 input_clean = input_clip
@@ -238,4 +238,4 @@ sfd_data <- output.data$sfd.pd$sfd
 plot(sfd_data)
 
 sfd_df = data.frame(timeseries=index(output.data$sfd.pd), coredata(output.data$sfd.pd))
-# write_csv(sfd_df, "Pfyn_sap_tree109.csv")
+# write_csv(sfd_df, "Pfyn_sap_tree247.csv")

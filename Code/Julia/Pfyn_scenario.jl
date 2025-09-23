@@ -2,7 +2,7 @@
 ## for all Pfynwald scenarios
 ## and examine output against observed data
 
-using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RCall;
+using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RollingFunctions, RCall;
 using CairoMakie, AlgebraOfGraphics, CategoricalArrays, Chain;
 using Plots; gr()
 R"""
@@ -27,6 +27,12 @@ function par_best(met, par)
     par_best = par[scen_best, :];
 
     return par_best, scen_best
+end
+
+function get_dates(sim)
+    days = range(sim.ODESolution.prob.tspan...);
+    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+    return days, Date.(dates_out)
 end
 
 function get_swc(sim; shape = "long")
@@ -153,6 +159,35 @@ function sap_comp(sim, obs_sap)
 
     return sap_comp
 
+end
+
+function get_RWU_centroid(sim)
+    # borrow code from LWFBrook90 package
+    solu = sim.ODESolution;
+
+    days_to_read_out_d = unique(round.(solu.t));
+
+    y_center = cumsum(solu.prob.p.p_soil.p_THICK) - solu.prob.p.p_soil.p_THICK/2;
+
+    # Compute RWU centroid
+    rows_RWU_mmDay  = reduce(hcat, [solu(t).TRANI.mmday   for t in days_to_read_out_d]);
+
+    RWU_percent = rows_RWU_mmDay ./ sum(rows_RWU_mmDay; dims = 1);
+    #RWUcentroidLabel = "mean RWU depth"
+    if (any(RWU_percent .< 0))
+        #@warn "Some root water outfluxes detected. Centroid of RWU is  based only on uptakes."
+        rows_RWU_mmDay_onlyUptake = ifelse.(rows_RWU_mmDay.>0,rows_RWU_mmDay, 0);
+        RWU_percent_onlyUptake = rows_RWU_mmDay_onlyUptake ./ sum(rows_RWU_mmDay_onlyUptake; dims = 1);
+        RWU_percent = RWU_percent_onlyUptake;
+        
+        #RWUcentroidLabel = "mean RWU depth\n(based on uptake only)"
+    end
+
+    row_RWU_centroid_mm = sum(RWU_percent .* y_center; dims=1);
+
+    col_RWU_centroid_mm = reshape(row_RWU_centroid_mm, :);
+    
+    return col_RWU_centroid_mm
 end
 
 function plot_monthly_water_partitioning(df_partitioning_monthly)
@@ -383,8 +418,8 @@ obs_sap_irr = obs_sap[obs_sap.meta .== "Irrigation", :]; # select irrigation tre
 obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigation stop treatment
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
 sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
@@ -485,21 +520,21 @@ ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
 
 R"""
 rdf = $sap_comp_ctr
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
-    labs(title="Sap Flow Comparison for Control")
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
+    labs(title="Sap Flow Comparison for Control") + theme_bw()
 """
 
 R"""
 rdf = $sap_comp_irr
 ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
-    geom_point(aes(date, sfd, color="sap")) +
-    labs(title="Sap Flow Comparison for Irrigation")
+    geom_point(aes(date, sfd, color="sap")) + theme_bw() +
+    labs(x="", title="Sap Flow Comparison for Irrigation")
 """
 
 R"""
 rdf = $sap_comp_irr
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
-    labs(title="Sap Flow Comparison for Irrigation")
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
+    labs(title="Sap Flow Comparison for Irrigation") + theme_bw()
 """
 
 R"""
@@ -511,8 +546,8 @@ ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
 
 R"""
 rdf = $sap_comp_irst
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() +
-    labs(title="Sap Flow Comparison for Irrigation Stop")
+ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
+    labs(title="Sap Flow Comparison for Irrigation Stop") + theme_bw()
 """
 
 # compare soil water potential across scenarios
@@ -535,6 +570,28 @@ ggplot(filter(rdf, date>="2014-01-01", date<"2020-01-01"), aes(x=date, y=SWP, co
     theme(legend.position="right",legend.text=element_text(size=12),legend.title=element_text(size=14),plot.title = element_text(hjust=0.5), strip.text=element_text(size=12, face="bold"), axis.text=element_text(size=12), axis.title=element_text(size=14)) +
     scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
 """
+
+
+# compare RWU depth across scenarios
+
+days, dates_out = get_dates(sim_ctr);
+
+rwu_comp = DataFrame(date=dates_out);
+
+rwu_comp.control = runmean(get_RWU_centroid(sim_ctr), 14);
+rwu_comp.irrigation = runmean(get_RWU_centroid(sim_irr), 14);
+rwu_comp.irrigation_stop = runmean(get_RWU_centroid(sim_irst), 14);
+
+rwu_comp = stack(rwu_comp, Not(:date), variable_name="treatment", value_name="RWU");
+rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
+
+R"""
+rdf = $rwu_comp
+ggplot(filter(rdf, date<"2020-01-01"), aes(x=date, y=RWU, color=treatment)) + geom_line() +
+    labs(x="", title="RWU Depth Comparison across Scenarios") + theme_bw() +
+    scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
+"""
+
 
 # compare annual transpiration across scenarios
 ctr_yr = ann_trans(sim_ctr);

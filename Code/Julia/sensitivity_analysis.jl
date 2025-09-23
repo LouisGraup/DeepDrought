@@ -33,10 +33,10 @@ function behavioral_met(met)
     return met[met.swc_nse10 .> 0 .&& 
                met.swc_nse40 .> 0 .&&
                met.swc_nse60 .> 0 .&&
-               met.swc_nse80 .> 0, :]
-               #met.swc_nse80 .> 0.4 .&&
-               #met.swp_nse10 .> 0.35 .&&
-               #met.swp_nse80 .> 0.35, :]
+               #met.swc_nse80 .> 0, :]
+               met.swc_nse80 .> 0.0 .&&
+               met.swp_nse10 .> -0.25 .&&
+               met.swp_nse80 .> -0.25, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -159,9 +159,9 @@ end
 
 # calibration results
 met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250912.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250912.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20250915.csv", DataFrame);
 par_ctr = CSV.read("LWFBcal_output/param_ctr_20250912.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250912.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20250915.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -184,7 +184,7 @@ println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
-describe(met_ctr_good)
+describe(met_irr_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
