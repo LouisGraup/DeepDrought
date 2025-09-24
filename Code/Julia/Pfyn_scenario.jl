@@ -526,8 +526,8 @@ ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
 
 R"""
 rdf = $sap_comp_irr
-ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
-    geom_point(aes(date, sfd, color="sap")) + theme_bw() +
+ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() + geom_smooth( aes(x=date, y=trans, color="trans")) +
+    geom_point(aes(date, sfd/1.8, color="sap/1.8")) + geom_smooth(aes(date, sfd/1.8, color="sap/1.8")) + theme_bw() +
     labs(x="", title="Sap Flow Comparison for Irrigation")
 """
 
