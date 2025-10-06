@@ -611,6 +611,18 @@ ggplot(filter(rdf, year>=2003), aes(x=year, y=trans_sum, group=scen, fill=scen))
     labs(title="Transpiration Comparison Across Scenarios")
 """
 
+# compare RWU against transpiration
+
+df_rwu_tran = get_sap(sim_ctr);
+df_rwu_tran.RWU = get_RWU_centroid(sim_ctr);
+df_rwu_tran.month = month.(df_rwu_tran.date);
+
+draw(
+    data(df_rwu_tran[df_rwu_tran.month .> 5 .&& df_rwu_tran.month .< 12, :])*
+    mapping(:trans, :RWU, color=:month => nonnumeric)*visual(Scatter),
+    scales(Color = (; palette = from_continuous(:seaborn_colorblind6))),
+    axis = (; yreversed = true)
+)
 
 # water balance modelling
 
