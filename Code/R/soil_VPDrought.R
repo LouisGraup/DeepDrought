@@ -61,8 +61,8 @@ write_csv(VPD.df, file="../../Data/Pfyn/soil_VPDrought.csv")
 
 # Convert to wide format with separate columns for SWP and TEM
 VPD_wide <- VPD.df %>%
-  select(datetime, date, site, treatment, depth, para, descr, value) %>%
-  group_by(datetime, date, site, treatment, depth, para, descr) %>%
+  select(datetime, date, site, treatment, depth, para, descr, scaffold, value) %>%
+  group_by(datetime, date, site, treatment, depth, para, descr, scaffold) %>%
   summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
   pivot_wider(
     names_from = para,
@@ -90,6 +90,12 @@ VPD_wide <- VPD_wide %>%
     SWP_corr = ifelse(!is.na(SWP) & !is.na(pFcr), pmax(((10^pFcr) * -1) / 10, -3000), NA)  # Cap at -1500 kPa
   )
 head(VPD_wide)
+
+# summarize hourly values
+hourly.df = VPD_wide %>% mutate(datetime=floor_date(datetime, "1 hour")) %>% select(-c(date, pfraw, delT, delpF, pFcr)) %>% 
+  group_by(datetime, site, treatment, depth, descr, scaffold) %>% summarize_all(list(mean))
+#write_csv(hourly.df, file="../../Data/Pfyn/soil_hourly_VPDrought.csv")
+
 
 # summarize daily values
 daily.df <- VPD_wide %>% select(-c(datetime, pfraw, delT, delpF, pFcr)) %>% 

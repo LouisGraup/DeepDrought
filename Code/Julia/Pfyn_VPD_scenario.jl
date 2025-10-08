@@ -223,6 +223,27 @@ select!(obs_roof, :date, :treatment, :depth, :site, :descr, :SWP_corr);
 rename!(obs_roof, :SWP_corr => :SWP);
 obs_roof.depth = -1 * obs_roof.depth;
 
+# hourly soil water potential
+obs_swp = CSV.read("../../Data/Pfyn/soil_hourly_VPDrought.csv", DataFrame,  missingstring="NA");
+obs_swp.depth = -1 * obs_swp.depth;
+obs_swp.datetime = DateTime.(SubString.(obs_swp.datetime, 1, 19));
+obs_swp.date = Date.(obs_swp.datetime);
+obs_swp = obs_swp[obs_swp.date .>= Date("2024-04-01") .&& obs_swp.date .< Date("2025-01-01"), :];
+obs_swp = obs_swp[obs_swp.treatment .!= "control", :];
+
+obs_swp_pd = obs_swp[hour.(obs_swp.datetime) .== 6, :]; # retrieve pre-dawn swp
+
+# leaf water potential
+obs_lwp = CSV.read("../../Data/Pfyn/PFY_lwp.csv", DataFrame,  missingstring="NA");
+obs_lwp.treatment = ifelse.(obs_lwp.treat2 .== "irrigated", "irrigation",
+    ifelse.(obs_lwp.treat2 .== "irrigated-VPD", "irrigation_vpd",
+    ifelse.(obs_lwp.treat2 .== "roof-VPD", "roof_vpd", obs_lwp.treat2)));
+dropmissing!(obs_lwp);
+
+obs_lwp_pd = obs_lwp[obs_lwp.wp .== "pd", :]; # pre-dawn lwp
+obs_lwp_pd.date = Date.(DateTime.(obs_lwp_pd.MESSTIME, dateformat"y-m-d H:M:S"));
+select!(obs_lwp_pd, Not([:twd_n2, :treat2, :wp, :MESSTIME]));
+
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_VPD/control/");
 sim_irr = run_LWFB90_param(par_irr_best, Date(2020, 1, 1), Date(2025, 7, 30), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_VPD/irr_amb/");
@@ -327,6 +348,18 @@ ggplot(rdf1, aes(x=date, y=SWP, color="roof", linetype=as.factor(src))) + geom_l
 
 R"""
 rdf1 = $drt_comp
+rdf2 = $drt_vpd_comp
+rdf3 = $obs_roof
+ggplot(rdf1, aes(x=date, y=SWP, color="roof", linetype=src)) + geom_line(size=1) +
+    geom_line(data=rdf2, aes(x=date, y=SWP, color="roof_vpd", linetype=src), size=1) +
+    stat_summary(data=rdf3, geom="ribbon", mapping=aes(x=date, y=SWP, color=treatment, fill=treatment, linetype="obs"), alpha=.3, inherit.aes=F) +
+    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() +
+    labs(title="Soil Water Potential Comparison for Drought Scenarios", x="", y="SMP (kPa)", color="Scenario", fill="Scenario", linetype="Source") + 
+    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
+"""
+
+R"""
+rdf1 = $drt_comp
 rdf2 = $obs_roof
 ggplot(filter(rdf1, date>="2025-04-25", depth==.1, src=="sim"), aes(x=date, y=SWP, color="sim")) + geom_line(size=.5) +
     geom_line(data=filter(rdf2, date>="2025-04-25", treatment=="roof", depth==.1), aes(x=date, y=SWP, group=interaction(as.factor(descr), as.factor(site)), linetype=as.factor(site), color=as.factor(descr)), size=.5) +
@@ -350,6 +383,41 @@ ggplot(filter(rdf1, date>="2025-04-25", depth==.1, src=="sim"), aes(x=date, y=SW
     theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12), legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"), axis.text=element_text(size=12), axis.title=element_text(size=14))
 """
 
+# compare against pre-dawn leaf water potential
+
+swp_irr = get_swp(sim_irr);
+swp_irr.treatment .= "irrigation";
+
+swp_irr_vpd = get_swp(sim_irr_vpd);
+swp_irr_vpd.treatment .= "irrigation_vpd";
+
+swp_drt = get_swp(sim_drt);
+swp_drt.treatment .= "roof";
+
+swp_drt_vpd = get_swp(sim_drt_vpd);
+swp_drt_vpd.treatment .= "roof_vpd";
+
+swp_vpd = [swp_irr; swp_irr_vpd; swp_drt; swp_drt_vpd];
+swp_vpd = swp_vpd[swp_vpd.date .>= Date(2024, 4, 1) .&& swp_vpd.date .< Date(2025,1,1), :];
+
+R"""
+rdf1 = $swp_vpd
+rdf2 = $obs_swp_pd
+rdf3 = $obs_lwp_pd
+ggplot(rdf2, aes(date, SWP_corr/1000, color=as.factor(scaffold), linetype=as.factor(depth), group=interaction(as.factor(scaffold), as.factor(depth))))+geom_line()+
+  geom_point(data=rdf3, aes(date, wp_value/10, color=as.factor(scaffold)), inherit.aes=F)+
+  geom_line(data=rdf1, aes(x=date, y=SWP/1000, linetype=as.factor(depth), color="sim"), color="black", inherit.aes=F)+
+  facet_wrap(~treatment, scales="free_y")+theme_bw()+labs(x="", y="SWP, LWP (MPa)", color="Scaffold", linetype="Depth (m)")+
+  ggtitle("Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Soil Water Potential (SWP) with Modelled SWP")+theme(plot.title=element_text(hjust=.5))
+"""
+
+WP_comp = leftjoin(obs_lwp_pd, swp_vpd[swp_vpd.depth .== .1, :], on = [:date, :treatment]);
+
+R"""
+rdf = $WP_comp
+ggplot(rdf, aes(SWP/1000, wp_value/10, color=as.factor(tree)))+geom_point()+
+  geom_abline(aes(slope=1, intercept=0))+theme_bw()+guides(color="none")+facet_wrap(~treatment)
+"""
 
 # compare RWU depth across scenarios
 
