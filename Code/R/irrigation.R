@@ -114,7 +114,6 @@ meteoLWF_Con$precip_irrstp = with(meteoLWF_Con, if_else(dates < "2014-01-01", pr
 #write_csv(meteoLWF_Con, "../../Data/Pfyn/meteo/meteo_irr_Control.csv")
 #write_csv(meteoLWF_VPD, "../../Data/Pfyn/meteo/meteo_irr_VPD.csv")
 
-
 ## plot irrigation amounts
 meteo_plot = meteoLWF_Con %>% filter(dates >= "2003-01-01") %>% select(-c(2:7,9)) %>% pivot_longer(-dates, names_to="treatment", values_to="mm")
 
@@ -137,3 +136,26 @@ meteo_yr_post14 = meteo_yr %>% filter(year>=2014) %>% group_by(treatment) %>% su
 meteo_yr = meteo_yr %>% group_by(treatment) %>% summarize_at(vars(mm), list(mean))
 
 meteo_yr
+
+# get dates
+meteoLWF_Con$irrig_dates = ifelse(meteoLWF_Con$irrig_mm > 0, meteoLWF_Con$dates, NA)
+meteoLWF_Con$year = year(meteoLWF_Con$dates)
+meteo_irrig = select(meteoLWF_Con, irrig_dates, year)
+meteo_irrig = na.omit(meteo_irrig)
+met_irrig = meteo_irrig %>% group_by(year) %>% 
+  summarize(on=min(irrig_dates), off=max(irrig_dates))
+met_irrig$on = as.Date(met_irrig$on)
+met_irrig$off = as.Date(met_irrig$off)
+
+on = c("2003-06-19", "2004-05-15", "2005-04-23", "2006-05-06", "2007-05-04", "2008-05-15", 
+       "2009-05-14", "2010-06-17", "2011-05-14", "2012-05-11", "2013-05-17", "2014-05-19",
+       "2015-05-12", "2016-05-30", "2017-05-16", "2018-05-08", "2019-05-17", "2020-05-26",
+       "2021-05-18", "2022-05-11", "2023-05-15", "2024-05-26", "2025-04-30")
+
+off = c("2003-10-21", "2004-10-26", "2005-10-04", "2006-10-25", "2007-10-02", "2008-10-14",
+        "2009-10-12", "2010-10-01", "2011-10-16", "2012-10-02", "2013-09-23", "2014-10-01",
+        "2015-10-05", "2016-09-26", "2017-10-09", "2018-09-27", "2019-10-15", "2020-10-19",
+        "2021-10-11", "2022-10-21", "2023-10-18", "2024-10-24", "2025-07-31")
+
+irr = data.frame(on=as.Date(on), off=as.Date(off))
+irr$year = year(irr$on)

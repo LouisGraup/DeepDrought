@@ -42,7 +42,7 @@ den_daily$MDS = den_daily$TWD_md - den_daily$TWD_pd
 
 # calculate 99th percentile MDS over entire time series
 den_mds = den_daily %>% mutate(month=month(date)) %>% 
-  filter(month>3, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
+  filter(month>4, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
   group_by(tree_id) %>% summarize(mds_max = quantile(MDS, .99))
 
 # join max MDS to daily data frame
@@ -74,7 +74,8 @@ ggplot(filter(den_meta, scenario!="irrigation"), aes(date, TWD_pd, color=as.fact
   facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()+
   labs(x="", y="Pre-dawn TWD", color="Scenario")
 
-ggplot(den_meta, aes(date, TWD_pd, color=as.factor(scenario)))+geom_line()+
+ggplot()+geom_rect(data=filter(irr, year %in% c(2011, 2012, 2013, 2017)), aes(xmin=on, xmax=off, ymin=-Inf, ymax=Inf), alpha=.5, fill="lightblue")+
+  geom_line(data=den_meta, aes(date, TWD_pd, color=as.factor(scenario)), inherit.aes=F)+
   theme_bw()+theme(legend.position="inside",legend.position.inside=c(.9,.85))+
   labs(x="", y="Pre-dawn TWD", color="Scenario")+
   scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
@@ -107,7 +108,8 @@ TN_vpd_meta = TN_meta %>% filter(series_start=="2023-08-01")
 TN_vpd_meta$scenario = gsub("^pfynwald-([a-z]+_?[a-z]+)_.*", "\\1", TN_vpd_meta$measure_point)
 
 # filter timeseries for VPDrought trees and combine with scenario name
-TN_vpden = TN_dendro %>% select(-c(frost, flags, gro_start, gro_end)) %>% 
+TN_vpden = TN_dendro %>% filter(frost == FALSE) %>% 
+  select(-c(frost, flags, gro_start, gro_end)) %>% 
   filter(series_id %in% TN_vpd_meta$series_id) %>% 
   left_join(select(TN_vpd_meta, series_id, scenario))
 
@@ -137,7 +139,7 @@ TN_vpden_daily$MDS = TN_vpden_daily$twd_md - TN_vpden_daily$twd_pd
 
 # calculate 99th percentile MDS over entire time series
 vpden_mds = TN_vpden_daily %>% mutate(month=month(date)) %>% 
-  filter(month>3, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
+  filter(month>4, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
   group_by(series_id) %>% summarize(mds_max = quantile(MDS, .99))
 
 # join max MDS to daily data frame
@@ -150,7 +152,7 @@ TN_vpden_daily$MDS_norm = TN_vpden_daily$MDS / TN_vpden_daily$mds_max
 ggplot(TN_vpden_daily, aes(date, twd_pd, color=as.factor(series_id)))+geom_line()+
   facet_wrap(~scenario)+guides(color="none")+theme_bw()
 
-ggplot(filter(TN_vpden_daily, !(series_id %in% c(1580,1582))), aes(date, twd_pdn, color=as.factor(series_id)))+geom_line()+
+ggplot(filter(TN_vpden_daily, date>="2024-05-01", date<"2024-11-01", !(series_id %in% c(1580,1582))), aes(date, twd_pdn, color=as.factor(series_id)))+geom_line()+
   facet_wrap(~scenario)+guides(color="none")+theme_bw()
 
 
@@ -161,11 +163,11 @@ TN_vpden_meta = TN_vpden_daily %>% filter(!(series_id %in% c(1580,1582))) %>%
 TN_vpden_meta$scenario = factor(TN_vpden_meta$scenario, 
                             levels=c("control","roof","roof_vpd","irrigation","irrigation_vpd"))
 
-ggplot(TN_vpden_meta, aes(date, twd_pd, color=as.factor(scenario)))+geom_line()+
-  theme_bw()+theme(legend.position="inside",legend.position.inside=c(.8,.8))+
+ggplot(filter(TN_vpden_meta, date>="2024-05-01", date<"2024-11-01"), aes(date, twd_pd, color=as.factor(scenario)))+geom_line()+
+  theme_bw()+theme(legend.position="inside",legend.position.inside=c(.2,.8))+
   labs(x="", y="Pre-dawn TWD", color="Scenario")
 
-ggplot(TN_vpden_meta, aes(date, twd_pdn, color=as.factor(scenario)))+geom_line()+
+ggplot(filter(TN_vpden_meta, date>="2024-05-01", date<"2024-11-01"), aes(date, twd_pdn, color=as.factor(scenario)))+geom_line()+
   theme_bw()+#theme(legend.position="inside",legend.position.inside=c(.9,.9))+
   labs(x="", y="Normalized Pre-dawn TWD")+guides(color="none")
 
