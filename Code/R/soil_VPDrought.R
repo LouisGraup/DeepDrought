@@ -57,7 +57,7 @@ VPD.df <- data.df %>%
 
 write_csv(VPD.df, file="../../Data/Pfyn/soil_VPDrought.csv")
 
-## need to correct for temperature at finer measurement resolution (sub-daily)
+## need to correct for temperature and low water potentials at finer measurement resolution (sub-daily)
 
 # Convert to wide format with separate columns for SWP and TEM
 VPD_wide <- VPD.df %>%
@@ -80,26 +80,30 @@ VPD_wide <- VPD_wide %>%
     # Ensure delT is within reasonable limits
     delT = ifelse(delT > 10, 10, ifelse(delT < -10, -10, delT)),
     # Calculate delta pF correction (with upper bound)
-    delpF = ifelse(
-      !is.na(SWP) & !is.na(delT),
+    delpF = ifelse(!is.na(SWP) & !is.na(delT),
       pmin((6.206 * delT + 0.1137 * (delT)^2) * exp(-22.76 / (pfraw + 0.1913)), 2),  # Cap at 2
       NA),
-    # Compute corrected pF
-    pFcr = ifelse(!is.na(SWP) & !is.na(delpF), pfraw + delpF, NA),
+    # Compute temperature-corrected pF
+    pFtc = ifelse(!is.na(SWP) & !is.na(delpF), pfraw + delpF, NA),
+    # temperature-corrected SWP
+    SWP_tcorr = ifelse(!is.na(SWP) & !is.na(pFtc), pmax(((10^pFtc) * -1) / 10, -2000), NA),  # Cap at -2000 kPa
+    # Correct low water potentials
+    pFcr = ifelse(depth==10, ifelse(pFtc >= 3.811, 15.002 - 7.825 * pFtc + 1.283 * pFtc ^ 2, pFtc),  # soil at 10 cm uses sand-silt-humus coefficients
+                             ifelse(pFtc >= 3.909, 14.508 - 7.413 * pFtc + 1.203 * pFtc ^ 2, pFtc)), # soil at >80 cm uses sand-silt coefficients
     # Convert corrected pF back to SWP (apply a lower bound)
-    SWP_corr = ifelse(!is.na(SWP) & !is.na(pFcr), pmax(((10^pFcr) * -1) / 10, -3000), NA)  # Cap at -1500 kPa
+    SWP_corr = ifelse(!is.na(SWP) & !is.na(pFcr), pmax(((10^pFcr) * -1) / 10, -4000), NA)  # Cap at -4000 kPa
   )
 head(VPD_wide)
 
 # summarize hourly values
-hourly.df = VPD_wide %>% mutate(datetime=floor_date(datetime, "1 hour")) %>% select(-c(date, pfraw, delT, delpF, pFcr)) %>% 
+hourly.df = VPD_wide %>% mutate(datetime=floor_date(datetime, "1 hour")) %>% select(-c(date, pfraw, delT, delpF, pFtc, pFcr)) %>% 
   group_by(datetime, site, treatment, depth, descr, scaffold) %>% summarize_all(list(mean))
 #write_csv(hourly.df, file="../../Data/Pfyn/soil_hourly_VPDrought.csv")
 
 
 # summarize daily values
-daily.df <- VPD_wide %>% select(-c(datetime, pfraw, delT, delpF, pFcr)) %>% 
-  group_by(date, site, treatment, depth, descr) %>%
+daily.df <- VPD_wide %>% select(-c(datetime, pfraw, delT, delpF, pFtc, pFcr)) %>% 
+  group_by(date, site, treatment, depth, descr, scaffold) %>%
   summarize_all(list(mean))
 
 #write_csv(daily.df, file="../../Data/Pfyn/soil_daily_VPDrought.csv")
@@ -188,3 +192,12 @@ ggplot(filter(daily.df, date>="2025-04-25", !is.na(descr), depth=="10 cm"), aes(
   geom_line(aes(color=as.factor(descr)))+
   facet_wrap(~site, ncol=2)+theme_bw()+labs(x="", y="SMP (MPa)")+
   ggtitle("Comparison of SMP sensors at 10 cm for roof and roof_vpd treatments")
+
+# compare raw and corrected SWP values
+ggplot(filter(daily.df, date>="2024-04-01", depth=="10 cm", treatment %in% c("roof","roof_vpd")), aes(date, SWP, linetype=descr, color="raw"))+geom_line(linewidth=1)+
+         geom_line(aes(date, SWP_tcorr, linetype=descr, color="temp corr"), linewidth=1)+geom_line(aes(date, SWP_corr, linetype=descr, color="final"), linewidth=1)+
+         facet_wrap(treatment~scaffold)+theme_bw()
+
+ggplot(filter(daily.df, date>="2024-04-01", depth=="10 cm", treatment == "control"), aes(date, SWP, color="raw"))+geom_line(linewidth=1)+
+  geom_line(aes(date, SWP_tcorr, color="temp corr"), linewidth=1)+geom_line(aes(date, SWP_corr, color="final"), linewidth=1)+
+  facet_wrap(~scaffold)+theme_bw()

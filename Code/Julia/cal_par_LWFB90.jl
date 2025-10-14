@@ -22,8 +22,8 @@ end
     obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
     filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
-    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
-    filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
+    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
+    #filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
     # separate control and irrigation scenarios
@@ -139,36 +139,36 @@ n = 1000; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.3, 0.7), # drainage (0, 1)
-    ("INFEXP", 0.75, 0.9), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.5, 0.6), # infiltration depth (m) (0.05, 0.5)
+    ("DRAIN", 0.0, 1.0), # drainage (0, 1)
+    ("INFEXP", 0, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 150, 275), # soil resistance (1, 1500)
-    ("ths1", 1.2, 1.4), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat1", 0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths2", 1.27, 1.33), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat2", 0.1, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths3", 1.38, 1.44), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat3", 0.1, 0.22), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("RSSA", 1, 1500), # soil resistance (1, 1500)
+    ("ths1", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths2", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths3", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.12, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.0095, 0.011), # stomatal conductance (0.001, 0.03)
-    ("CVPD", 1.6, 2.5), # vpd sensitivity (1, 3)
-    ("R5", 165, 200), # radiation sensitivity (50, 400)
+    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.03), # stomatal conductance (0.001, 0.03)
+    ("CVPD", 1, 3), # vpd sensitivity (1, 3)
+    ("R5", 50, 400), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -1.2, -1.1), # critical water potential (-4, -1)
-    ("FXYLEM", 0.3, 0.65), # aboveground xylem fraction (0.2, 0.8)
-    ("MXKPL", 12.0, 15.0), # maximum plant conductivity (1, 30)
-    ("MXRTLN", 500, 5000), # maximum root length (100, 6000)
+    ("PSICR", -4, -1), # critical water potential (-4, -1)
+    ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
+    ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
+    ("MXRTLN", 100, 6000), # maximum root length (100, 6000)
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
-    ("MAXROOTDEPTH", -2.0, -1.25), # max rooting depth (-5, -0.5)
-    ("BETAROOT", 0.97, 0.98) # beta root coefficient (0.8, 1.0)
+    ("MAXROOTDEPTH", -2.0, -1.0), # max rooting depth (-5, -0.5)
+    ("BETAROOT", 0.9, 0.99) # beta root coefficient (0.8, 1.0)
 ];
 
 ### END USER INPUT ###

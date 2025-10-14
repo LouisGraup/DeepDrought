@@ -391,9 +391,9 @@ met_irr[scen_irr_best, :]
 
 ## behavioral data
 # soil water content
-obs_swc = CSV.read("../../Data/Pfyn/PFY_swat_ext.csv", DataFrame);
-#obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
+obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
+obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+#filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
 filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
 # soil water potential
@@ -406,7 +406,7 @@ obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
+obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
 obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
@@ -419,7 +419,7 @@ obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigati
 
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
 sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data

@@ -229,7 +229,8 @@ obs_swp.depth = -1 * obs_swp.depth;
 obs_swp.datetime = DateTime.(SubString.(obs_swp.datetime, 1, 19));
 obs_swp.date = Date.(obs_swp.datetime);
 obs_swp = obs_swp[obs_swp.date .>= Date("2024-04-01") .&& obs_swp.date .< Date("2025-01-01"), :];
-obs_swp = obs_swp[obs_swp.treatment .!= "control", :];
+#obs_swp = obs_swp[obs_swp.treatment .!= "control", :];
+obs_swp = obs_swp[obs_swp.treatment .== "roof" .|| obs_swp.treatment .== "roof_vpd", :];
 
 obs_swp_pd = obs_swp[hour.(obs_swp.datetime) .== 6, :]; # retrieve pre-dawn swp
 
@@ -239,6 +240,7 @@ obs_lwp.treatment = ifelse.(obs_lwp.treat2 .== "irrigated", "irrigation",
     ifelse.(obs_lwp.treat2 .== "irrigated-VPD", "irrigation_vpd",
     ifelse.(obs_lwp.treat2 .== "roof-VPD", "roof_vpd", obs_lwp.treat2)));
 dropmissing!(obs_lwp);
+obs_lwp = obs_lwp[obs_lwp.treatment .== "roof" .|| obs_lwp.treatment .== "roof_vpd", :];
 
 obs_lwp_pd = obs_lwp[obs_lwp.wp .== "pd", :]; # pre-dawn lwp
 obs_lwp_pd.date = Date.(DateTime.(obs_lwp_pd.MESSTIME, dateformat"y-m-d H:M:S"));
@@ -397,16 +399,17 @@ swp_drt.treatment .= "roof";
 swp_drt_vpd = get_swp(sim_drt_vpd);
 swp_drt_vpd.treatment .= "roof_vpd";
 
-swp_vpd = [swp_irr; swp_irr_vpd; swp_drt; swp_drt_vpd];
+#swp_vpd = [swp_irr; swp_irr_vpd; swp_drt; swp_drt_vpd];
+swp_vpd = [swp_drt; swp_drt_vpd];
 swp_vpd = swp_vpd[swp_vpd.date .>= Date(2024, 4, 1) .&& swp_vpd.date .< Date(2025,1,1), :];
 
 R"""
 rdf1 = $swp_vpd
 rdf2 = $obs_swp_pd
 rdf3 = $obs_lwp_pd
-ggplot(rdf2, aes(date, SWP_corr/1000, color=as.factor(scaffold), linetype=as.factor(depth), group=interaction(as.factor(scaffold), as.factor(depth))))+geom_line()+
-  geom_point(data=rdf3, aes(date, wp_value/10, color=as.factor(scaffold)), inherit.aes=F)+
-  geom_line(data=rdf1, aes(x=date, y=SWP/1000, linetype=as.factor(depth), color="sim"), color="black", inherit.aes=F)+
+ggplot(rdf2, aes(date, SWP_corr/1000, color=as.factor(scaffold), linetype=as.factor(depth), group=interaction(as.factor(scaffold), as.factor(depth))))+geom_line(linewidth=1)+
+  geom_point(data=rdf3, aes(date, wp_value/10, color=as.factor(scaffold)), size=2, inherit.aes=F)+
+  geom_line(data=rdf1, aes(x=date, y=SWP/1000, linetype=as.factor(depth), color="sim"), color="black", linewidth=1, inherit.aes=F)+
   facet_wrap(~treatment, scales="free_y")+theme_bw()+labs(x="", y="SWP, LWP (MPa)", color="Scaffold", linetype="Depth (m)")+
   ggtitle("Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Soil Water Potential (SWP) with Modelled SWP")+theme(plot.title=element_text(hjust=.5))
 """

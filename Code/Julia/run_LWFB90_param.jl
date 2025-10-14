@@ -3,7 +3,7 @@
 
 using LWFBrook90, CSV, DataFrames, Dates;
 
-function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true, watbal=false)
+function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true, watbal=false, irrig=false)
     # new_folder tells the function whether it needs to create a new folder
     # or if it can skip this step and just run the model with par
     
@@ -124,16 +124,14 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
         maxroot= par.MAXROOTDEPTH[1];
 
         # run model with modified root distribution
-        model = loadSPAC(output_path, output_prefix, simulate_isotopes = true,
-        Δz_thickness_m = "soil_discretization.csv",
-        root_distribution = (beta = betaroot, z_rootMax_m=maxroot),
-        IC_soil = (PSIM_init_kPa = -6.5,
-        delta18O_init_permil = -13.0,
-        delta2H_init_permil = -95.0));
+        model = loadSPAC(output_path, output_prefix, 
+        simulate_isotopes = true, simulate_irrigation = irrig,
+        root_distribution = (beta = betaroot, z_rootMax_m=maxroot));
 
     else
         # run model with input files
-        model = loadSPAC(output_path, output_prefix, simulate_isotopes = true)
+        model = loadSPAC(output_path, output_prefix, 
+        simulate_isotopes = true, simulate_irrigation = irrig)
     end
 
     # model set up
