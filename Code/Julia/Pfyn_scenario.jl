@@ -393,7 +393,7 @@ met_irr[scen_irr_best, :]
 # soil water content
 obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
 obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-#filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
+filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
 filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
 # soil water potential
@@ -407,7 +407,7 @@ obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
 obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
-obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+#obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
 obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
@@ -417,16 +417,30 @@ obs_sap_ctr = obs_sap[obs_sap.meta .== "Control", :]; # select control treatment
 obs_sap_irr = obs_sap[obs_sap.meta .== "Irrigation", :]; # select irrigation treatment
 obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigation stop treatment
 
+# irrigation dates
+on = ["2003-06-19", "2004-05-15", "2005-04-23", "2006-05-06", "2007-05-04", "2008-05-15", 
+       "2009-05-14", "2010-06-17", "2011-05-14", "2012-05-11", "2013-05-17", "2014-05-19",
+       "2015-05-12", "2016-05-30", "2017-05-16", "2018-05-08", "2019-05-17", "2020-05-26",
+       "2021-05-18", "2022-05-11", "2023-05-15", "2024-05-26", "2025-04-30"];
+
+off = ["2003-10-21", "2004-10-26", "2005-10-04", "2006-10-25", "2007-10-02", "2008-10-14",
+        "2009-10-12", "2010-10-01", "2011-10-16", "2012-10-02", "2013-09-23", "2014-10-01",
+        "2015-10-05", "2016-09-26", "2017-10-09", "2018-09-27", "2019-10-15", "2020-10-19",
+        "2021-10-11", "2022-10-21", "2023-10-18", "2024-10-24", "2025-07-31"];
+
+irr = DataFrame(on=Date.(on), off=Date.(off));
+irr.year = year.(irr.on);
+
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
-sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false);
+sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false);
 
 ## combine observed and simulated data
 # soil water content
 swc_comp_ctr = swc_comp(sim_ctr, obs_swc_ctr);
 swc_comp_irr = swc_comp(sim_irr, obs_swc_irr);
-swc_comp_irst = swc_comp(sim_irst, obs_swc_irst);
+#swc_comp_irst = swc_comp(sim_irst, obs_swc_irst);
 
 # soil water potential
 swp_comp_ctr = swp_comp(sim_ctr, obs_swp_ctr);
@@ -465,90 +479,116 @@ end
 ## plot observed and simulated data using ggplot
 
 # soil water potential
-R"""
-rdf = $swp_comp_irst
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) + theme_bw() +
-    labs(x="", y="SMP (kPa)", color="Source", title="Soil Water Potential Comparison for Irrigation Stop") +
-    theme(plot.title = element_text(hjust=0.5))
-"""
+draw(data(swp_comp_irst)*
+    mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+)
 
-R"""
-rdf = $swp_comp_ctr
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) + theme_bw() +
-    labs(x="", y="SMP (kPa)", color="Source", title="Soil Water Potential Comparison for Control Scenario") +
-    theme(plot.title = element_text(hjust=0.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
-"""
+draw(data(swp_comp_ctr)*
+    mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+)
 
-R"""
-rdf = $swp_comp_irr
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison for Irrigation")
-"""
+draw(data(swp_comp_irr)*
+    mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+)
 
 # soil water content
-R"""
-rdf = $swc_comp_ctr
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Content Comparison for Control")
-"""
 
-R"""
-rdf = $swc_comp_irr
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Content Comparison for Irrigation")
-"""
+draw(data(swc_comp_ctr)*
+    mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+)
 
-R"""
-rdf = $swc_comp_irst
-ggplot(filter(rdf, depth %in% c(10,80)), aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Content Comparison for Irrigation Stop")
-"""
+draw(data(swc_comp_irr)*
+    mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+)
+
+draw(data(swc_comp_irst)*
+    mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Color = (; label="Source")),
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+)
 
 # sap flow
-R"""
-rdf = $sap_comp_ctr
-ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
-    geom_point(aes(date, sfd, color="sap")) +
-    labs(title="Sap Flow Comparison for Control")
-"""
 
-R"""
-rdf = $sap_comp_ctr
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
-    labs(title="Sap Flow Comparison for Control") + theme_bw()
-"""
+draw(data(stack(dropmissing(sap_comp_ctr), Not(:date), variable_name=:Source))*
+    mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
+    scales(X = (; label="")),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
+)
 
-R"""
-rdf = $sap_comp_irr
-ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() + geom_smooth( aes(x=date, y=trans, color="trans")) +
-    geom_point(aes(date, sfd/1.8, color="sap/1.8")) + geom_smooth(aes(date, sfd/1.8, color="sap/1.8")) + theme_bw() +
-    labs(x="", title="Sap Flow Comparison for Irrigation")
-"""
+draw(data(dropmissing(sap_comp_ctr))*
+    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
+)
 
-R"""
-rdf = $sap_comp_irr
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
-    labs(title="Sap Flow Comparison for Irrigation") + theme_bw()
-"""
+sap_comp_irr.trans_sm = runmean(sap_comp_irr.trans, 14);
+sap_comp_irr.sfd_sm = runmean(sap_comp_irr.sfd, 14);
 
-R"""
-rdf = $sap_comp_irst
-ggplot(rdf, aes(x=date, y=trans, color="trans")) + geom_point() +
-    geom_point(aes(date, sfd, color="sap")) +
-    labs(title="Sap Flow Comparison for Irrigation Stop")
-"""
+sap_comp_irr_long = stack(sap_comp_irr[:, Not([:trans_sm, :sfd_sm])], Not(:date), variable_name=:Source);
+sap_comp_irr_long2 = stack(sap_comp_irr[:, Not([:trans, :sfd])], Not(:date), value_name=:value_sm, variable_name=:Source);
 
-R"""
-rdf = $sap_comp_irst
-ggplot(rdf, aes(x=trans, y=sfd)) + geom_point() + geom_smooth(method='lm') +
-    labs(title="Sap Flow Comparison for Irrigation Stop") + theme_bw()
-"""
+sap_comp_irr_long.value_sm = sap_comp_irr_long2.value_sm;
+
+draw(data(sap_comp_irr_long)*
+    (mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6)+
+    mapping(:date, :value_sm, color=:Source)*visual(Lines)),
+    scales(X = (; label="")),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
+)
+
+draw(data(dropmissing(sap_comp_irr))*
+    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
+)
+
+draw(data(stack(sap_comp_irst, Not(:date), variable_name=:Source))*
+    mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
+    scales(X = (; label="")),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Stop Scenario", titlealign = :center)
+)
+
+draw(data(dropmissing(sap_comp_irst))*
+    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Stop Scenario", titlealign = :center)
+)
+
+# compare transpiration across scenarios
+ctr_sap = get_sap(sim_ctr);
+ctr_sap.trans_sm = runmean(ctr_sap.trans, 14);
+ctr_sap.scen .= "Control";
+
+irr_sap = get_sap(sim_irr);
+irr_sap.trans_sm = runmean(irr_sap.trans, 14);
+irr_sap.scen .= "Irrigation";
+
+irst_sap = get_sap(sim_irst);
+irst_sap.trans_sm = runmean(irst_sap.trans, 14);
+irst_sap.scen .= "Irrigation Stop";
+
+sap_comp_scen = [ctr_sap; irr_sap; irst_sap];
+
+# format x-axis ticks
+ticks = ctr_sap[month.(ctr_sap.date) .== 1 .&& day.(ctr_sap.date) .== 1 .&& year.(ctr_sap.date) .< 2021, :date];
+aogticks = datetimeticks(ticks, string.(ticks));
+draw(
+    data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
+    mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
+    data(sap_comp_scen[sap_comp_scen.date.<Date("2020-01-01"), :])*
+    (mapping(:date, :trans, color=:scen)*visual(Scatter, markersize=6)+
+    mapping(:date, :trans_sm, color=:scen)*visual(Lines, linewidth=3)),
+    scales(Color = (; label="Scenario", palette = ["#E69F00","#56B4E9","#009E73"]),
+           X = (; label=""), Y= (; label="Transpiration (mm/day)")),
+    figure = (; size=(1200, 600)), axis = (; xticks=aogticks, title="Modelled Transpiration Comparison across Scenarios", titlesize=20)
+)
 
 # compare soil water potential across scenarios
 ctr_swp = get_swp(sim_ctr);
@@ -562,36 +602,47 @@ irst_swp.scen .= "Irrigation Stop";
 
 swp_comp_scen = [ctr_swp; irr_swp; irst_swp];
 
-R"""
-rdf = $swp_comp_scen
-ggplot(filter(rdf, date>="2014-01-01", date<"2020-01-01"), aes(x=date, y=SWP, color=scen)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) + theme_bw() +
-    labs(x="", y="SMP (kPa)", color="Scenario", title="Modelled Soil Water Potential Comparison across Scenarios") +
-    theme(legend.position="right",legend.text=element_text(size=12),legend.title=element_text(size=14),plot.title = element_text(hjust=0.5), strip.text=element_text(size=12, face="bold"), axis.text=element_text(size=12), axis.title=element_text(size=14)) +
-    scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
-"""
+draw(data(swp_comp_scen)*
+    mapping(:date, :SWP, color=:scen, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; palette = ["#E69F00","#56B4E9","#009E73"], label="Scenario")),
+    figure = (; size=(800, 600), title="Modelled Soil Water Potential Comparison across Scenarios", titlealign = :center)
+)
 
 
 # compare RWU depth across scenarios
 
 days, dates_out = get_dates(sim_ctr);
 
-rwu_comp = DataFrame(date=dates_out);
+ctr_rwu = DataFrame(date=dates_out);
+ctr_rwu.RWU = get_RWU_centroid(sim_ctr);
+ctr_rwu.RWU_sm = runmean(ctr_rwu.RWU, 14);
+ctr_rwu.scen .= "Control";
 
-rwu_comp.control = runmean(get_RWU_centroid(sim_ctr), 14);
-rwu_comp.irrigation = runmean(get_RWU_centroid(sim_irr), 14);
-rwu_comp.irrigation_stop = runmean(get_RWU_centroid(sim_irst), 14);
+irr_rwu = DataFrame(date=dates_out);
+irr_rwu.RWU = get_RWU_centroid(sim_irr);
+irr_rwu.RWU_sm = runmean(irr_rwu.RWU, 14);
+irr_rwu.scen .= "Irrigation";
 
-rwu_comp = stack(rwu_comp, Not(:date), variable_name="treatment", value_name="RWU");
+irst_rwu = DataFrame(date=dates_out);
+irst_rwu.RWU = get_RWU_centroid(sim_irst);
+irst_rwu.RWU_sm = runmean(irst_rwu.RWU, 14);
+irst_rwu.scen .= "Irrigation Stop";
+
+rwu_comp = [ctr_rwu; irr_rwu; irst_rwu];
+
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
+rwu_comp.RWU_sm = replace(rwu_comp.RWU_sm, NaN=>missing);
 
-R"""
-rdf = $rwu_comp
-ggplot(filter(rdf, date<"2020-01-01"), aes(x=date, y=RWU, color=treatment)) + geom_line() +
-    labs(x="", title="RWU Depth Comparison across Scenarios") + theme_bw() +
-    scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))
-"""
-
+draw(
+    data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
+    mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
+    data(rwu_comp[rwu_comp.date.<Date("2020-01-01"), :])*
+    (mapping(:date, :RWU, color=:scen)*visual(Scatter, markersize=6)+
+    mapping(:date, :RWU_sm, color=:scen)*visual(Lines, linewidth=3)),
+    scales(Color = (; label="Scenario", palette = ["#E69F00","#56B4E9","#009E73"]),
+           X = (; label=""), Y= (; label="Root Water Uptake Depth (mm)")),
+    figure = (; size=(1200, 600)), axis = (; xticks=aogticks, title="RWU Depth Comparison across Scenarios", titlesize=20)
+)
 
 # compare annual transpiration across scenarios
 ctr_yr = ann_trans(sim_ctr);
@@ -605,23 +656,34 @@ irst_yr.scen .= "Irrigation Stop";
 
 yr_comp = [ctr_yr; irr_yr; irst_yr];
 
-R"""
-rdf = $yr_comp
-ggplot(filter(rdf, year>=2003), aes(x=year, y=trans_sum, group=scen, fill=scen)) + geom_col(position="dodge") +
-    labs(title="Transpiration Comparison Across Scenarios")
-"""
+draw(data(yr_comp[yr_comp.year .>= 2003, :])*
+    mapping(:year, :trans_sum, color=:scen, dodge=:scen)*visual(BarPlot),
+    scales(Color = (; label="Scenario", palette = ["#E69F00","#56B4E9","#009E73"]),
+           X = (; label="Year"), Y= (; label="Annual Transpiration (mm)")),
+    axis = (; title="Annual Transpiration Comparison Across Scenarios")
+)
+
 
 # compare RWU against transpiration
 
-df_rwu_tran = get_sap(sim_ctr);
-df_rwu_tran.RWU = get_RWU_centroid(sim_ctr);
+ctr_rwu_tran = get_sap(sim_ctr);
+ctr_rwu_tran.RWU = get_RWU_centroid(sim_ctr);
+ctr_rwu_tran.scen .= "Control";
+
+irr_rwu_tran = get_sap(sim_irr);
+irr_rwu_tran.RWU = get_RWU_centroid(sim_irr);
+irr_rwu_tran.scen .= "Irrigation";
+
+df_rwu_tran = [ctr_rwu_tran; irr_rwu_tran];
 df_rwu_tran.month = month.(df_rwu_tran.date);
+df_rwu_tran.year = year.(df_rwu_tran.date);
 
 draw(
     data(df_rwu_tran[df_rwu_tran.month .> 5 .&& df_rwu_tran.month .< 12, :])*
-    mapping(:trans, :RWU, color=:month => nonnumeric)*visual(Scatter),
-    scales(Color = (; palette = from_continuous(:seaborn_colorblind6))),
-    axis = (; yreversed = true)
+    mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.7, markersize=8),
+    scales(Color = (; label="Month", palette = from_continuous(:seaborn_colorblind6)),
+           X = (; label="Transpiration (mm/day)"), Y= (; label="Root Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
 )
 
 # water balance modelling

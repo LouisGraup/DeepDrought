@@ -3,6 +3,7 @@
 ## and examine output against observed data
 
 using CSV, DataFrames, Dates, Statistics, RollingFunctions, RCall;
+using CairoMakie, AlgebraOfGraphics;
 using Plots; gr()
 R"""
 library(tidyverse)
@@ -403,18 +404,36 @@ swp_drt_vpd.treatment .= "roof_vpd";
 swp_vpd = [swp_drt; swp_drt_vpd];
 swp_vpd = swp_vpd[swp_vpd.date .>= Date(2024, 4, 1) .&& swp_vpd.date .< Date(2025,1,1), :];
 
+draw(
+    (data(swp_vpd)*
+    mapping(:date, :SWP => (x -> x/1000), linestyle=:depth => nonnumeric)*visual(Lines, color=:black, linewidth=1.5)+
+    data(obs_swp_pd)*
+    mapping(:date, :SWP_corr => (x -> x/1000), color=:scaffold => nonnumeric, linestyle=:depth => nonnumeric)*visual(Lines, linewidth=1.5)+
+    data(obs_lwp_pd)*
+    mapping(:date, :wp_value => (x -> x/10), color=:scaffold => nonnumeric)*visual(Scatter, markersize=12))*
+    mapping(layout=:treatment),
+    scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
+    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Soil Water Potential (SWP) with Modelled SWP")
+)
+
 R"""
 rdf1 = $swp_vpd
 rdf2 = $obs_swp_pd
 rdf3 = $obs_lwp_pd
-ggplot(rdf2, aes(date, SWP_corr/1000, color=as.factor(scaffold), linetype=as.factor(depth), group=interaction(as.factor(scaffold), as.factor(depth))))+geom_line(linewidth=1)+
+ggplot(rdf1)+geom_line(aes(x=date, y=SWP/1000, linetype=as.factor(depth)), color="black", linewidth=.8)+
+  geom_line(data=rdf2, aes(date, SWP_corr/1000, color=as.factor(scaffold), linetype=as.factor(depth), group=interaction(as.factor(scaffold), as.factor(depth))), linewidth=.8, inherit.aes=F)+
   geom_point(data=rdf3, aes(date, wp_value/10, color=as.factor(scaffold)), size=2, inherit.aes=F)+
-  geom_line(data=rdf1, aes(x=date, y=SWP/1000, linetype=as.factor(depth), color="sim"), color="black", linewidth=1, inherit.aes=F)+
   facet_wrap(~treatment, scales="free_y")+theme_bw()+labs(x="", y="SWP, LWP (MPa)", color="Scaffold", linetype="Depth (m)")+
   ggtitle("Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Soil Water Potential (SWP) with Modelled SWP")+theme(plot.title=element_text(hjust=.5))
 """
 
 WP_comp = leftjoin(obs_lwp_pd, swp_vpd[swp_vpd.depth .== .1, :], on = [:date, :treatment]);
+
+draw(data(WP_comp)*
+    mapping(:SWP => (x -> x/1000), :wp_value => (x -> x/10), color=:tree => nonnumeric, layout=:treatment)*visual(Scatter, markersize=12)+
+    mapping([0], [1]) * visual(ABLines),
+    legend=(; position = :none)
+)
 
 R"""
 rdf = $WP_comp
@@ -436,6 +455,15 @@ rwu_comp.roof_vpd = runmean(get_RWU_centroid(sim_drt_vpd), 7);
 
 rwu_comp = stack(rwu_comp, Not(:date), variable_name="treatment", value_name="RWU");
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
+
+draw(
+    data(irr[irr.year .>= 2024, :])*
+    mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
+    data(rwu_comp[rwu_comp.date .>= Date(2024, 1, 7), :])*
+    mapping(:date, :RWU, color=:treatment => sorter(["irrigation","roof","control"]) => "Scenario")*visual(Lines), 
+    figure = (; size=(800, 400)), axis = (; ylabel="RWU Depth (mm)")
+)
+
 
 R"""
 rdf = $rwu_comp
