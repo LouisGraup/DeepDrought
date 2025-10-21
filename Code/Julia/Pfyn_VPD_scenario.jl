@@ -430,16 +430,10 @@ ggplot(rdf1)+geom_line(aes(x=date, y=SWP/1000, linetype=as.factor(depth)), color
 WP_comp = leftjoin(obs_lwp_pd, swp_vpd[swp_vpd.depth .== .1, :], on = [:date, :treatment]);
 
 draw(data(WP_comp)*
-    mapping(:SWP => (x -> x/1000), :wp_value => (x -> x/10), color=:tree => nonnumeric, layout=:treatment)*visual(Scatter, markersize=12)+
+    mapping(:SWP => (x -> x/1000) => "Modelled Daily SWP (MPa)", :wp_value => (x -> x/10) => "Pre-dawn LWP (MPa)", color=:tree => nonnumeric, layout=:treatment)*visual(Scatter, markersize=12)+
     mapping([0], [1]) * visual(ABLines),
-    legend=(; position = :none)
+    scales(Color = (; legend = false))
 )
-
-R"""
-rdf = $WP_comp
-ggplot(rdf, aes(SWP/1000, wp_value/10, color=as.factor(tree)))+geom_point()+
-  geom_abline(aes(slope=1, intercept=0))+theme_bw()+guides(color="none")+facet_wrap(~treatment)
-"""
 
 # compare RWU depth across scenarios
 

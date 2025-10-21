@@ -5,9 +5,6 @@
 using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RollingFunctions, RCall;
 using CairoMakie, AlgebraOfGraphics, CategoricalArrays, Chain;
 using Plots; gr()
-R"""
-library(tidyverse)
-"""
 
 include("run_LWFB90_param.jl");
 
@@ -108,7 +105,7 @@ function swc_comp(sim, obs_swc)
 
     z_theta = get_swc(sim);
 
-    filter!(:date => >(obs_swc.date[1]), z_theta);
+    filter!(:date => >=(obs_swc.date[1]), z_theta);
 
     z_theta.src .= "sim"; # add source column
 
@@ -128,7 +125,7 @@ function swp_comp(sim, obs_swp)
 
     z_psi = get_swp(sim);
 
-    filter!(:date => >(obs_swp.date[1]), z_psi);
+    filter!(:date => >=(obs_swp.date[1]), z_psi);
 
     z_psi.src .= "sim"; # add source column
 
@@ -150,12 +147,12 @@ function sap_comp(sim, obs_sap)
 
     z_trans = get_sap(sim);
 
-    filter!(:date => >(obs_sap.date[1]), z_trans);
+    filter!(:date => >=(obs_sap.date[1]), z_trans);
     filter!(:date => <(Date(2023, 1, 1)), z_trans);
 
     obs_sap = select(obs_sap, Not(:meta));
 
-    sap_comp = leftjoin(z_trans, obs_sap, on = :date);
+    sap_comp = sort(leftjoin(z_trans, obs_sap, on = :date), :date);
 
     return sap_comp
 
@@ -391,8 +388,8 @@ met_irr[scen_irr_best, :]
 
 ## behavioral data
 # soil water content
-obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
-obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+obs_swc = CSV.read("../../Data/Pfyn/PFY_swat_ext.csv", DataFrame);
+#obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
 filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
 filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
@@ -406,8 +403,8 @@ obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
-#obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
+obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
 obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
@@ -432,15 +429,15 @@ irr = DataFrame(on=Date.(on), off=Date.(off));
 irr.year = year.(irr.on);
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false);
-sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false);
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
 # soil water content
 swc_comp_ctr = swc_comp(sim_ctr, obs_swc_ctr);
 swc_comp_irr = swc_comp(sim_irr, obs_swc_irr);
-#swc_comp_irst = swc_comp(sim_irst, obs_swc_irst);
+swc_comp_irst = swc_comp(sim_irst, obs_swc_irst);
 
 # soil water potential
 swp_comp_ctr = swp_comp(sim_ctr, obs_swp_ctr);
@@ -519,7 +516,7 @@ draw(data(swc_comp_irst)*
 
 # sap flow
 
-draw(data(stack(dropmissing(sap_comp_ctr), Not(:date), variable_name=:Source))*
+draw(data(stack(sap_comp_ctr, Not(:date), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
@@ -633,6 +630,8 @@ rwu_comp = [ctr_rwu; irr_rwu; irst_rwu];
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
 rwu_comp.RWU_sm = replace(rwu_comp.RWU_sm, NaN=>missing);
 
+med_rwu_comp = combine(groupby(dropmissing(rwu_comp[:,Not(:RWU_sm)]), :scen), :RWU .=> [median mean]);
+
 draw(
     data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
     mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
@@ -680,10 +679,32 @@ df_rwu_tran.year = year.(df_rwu_tran.date);
 
 draw(
     data(df_rwu_tran[df_rwu_tran.month .> 5 .&& df_rwu_tran.month .< 12, :])*
-    mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.7, markersize=8),
+    mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.7, markersize=8)+
+    data(med_rwu_comp[med_rwu_comp.scen .!= "Irrigation Stop",:])*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_colorblind6)),
            X = (; label="Transpiration (mm/day)"), Y= (; label="Root Water Uptake Depth (mm)")),
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
+# compare rwu against swp in each layer
+
+ctr_rwu_all = get_soil_(:RWU, sim_ctr, days_to_read_out_d=days);
+ctr_rwu_all.date = dates_out;
+ctr_rwu_all = stack(ctr_rwu_all[:,Not(:time)], Not([:date]), value_name=:RWU);
+ctr_rwu_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in ctr_rwu_all.variable]);
+select!(ctr_rwu_all, Not(:variable));
+
+ctr_swp_all = get_soil_(:psi, sim_ctr, days_to_read_out_d=days);
+ctr_swp_all.date = dates_out;
+ctr_swp_all = stack(ctr_swp_all[:,Not(:time)], Not([:date]), value_name=:SWP);
+ctr_swp_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in ctr_swp_all.variable]);
+select!(ctr_swp_all, Not(:variable));
+
+ctr_rwu_swp = leftjoin(ctr_rwu_all, ctr_swp_all, on=[:date, :depth]);
+
+draw(data(ctr_rwu_swp)*
+    mapping(:SWP, :RWU, color=:depth => (x -> -1*x))*visual(Scatter, alpha=.5, markersize=6),
+    scales(Color = (; colormap = Reverse(:viridis)))
 )
 
 # water balance modelling
