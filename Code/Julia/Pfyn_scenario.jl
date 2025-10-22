@@ -388,14 +388,14 @@ met_irr[scen_irr_best, :]
 
 ## behavioral data
 # soil water content
-obs_swc = CSV.read("../../Data/Pfyn/PFY_swat_ext.csv", DataFrame);
-#obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
-filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
+obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
+obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+#filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
+#filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
 # soil water potential
-obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
-filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
+obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
+#filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
 filter!(:date => <(Date(2024, 1, 1)), obs_swp); # filter out late dates
 
 # sap flow
@@ -429,8 +429,8 @@ irr = DataFrame(on=Date.(on), off=Date.(off));
 irr.year = year.(irr.on);
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
 sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
@@ -682,11 +682,13 @@ draw(
     mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.7, markersize=8)+
     data(med_rwu_comp[med_rwu_comp.scen .!= "Irrigation Stop",:])*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_colorblind6)),
-           X = (; label="Transpiration (mm/day)"), Y= (; label="Root Water Uptake Depth (mm)")),
+           X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
 )
 
 # compare rwu against swp in each layer
+
+days, dates_out = get_dates(sim_ctr);
 
 ctr_rwu_all = get_soil_(:RWU, sim_ctr, days_to_read_out_d=days);
 ctr_rwu_all.date = dates_out;
@@ -701,10 +703,15 @@ ctr_swp_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in ctr_swp_all.
 select!(ctr_swp_all, Not(:variable));
 
 ctr_rwu_swp = leftjoin(ctr_rwu_all, ctr_swp_all, on=[:date, :depth]);
+depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
+ctr_rwu_swp.depth_bin = cut(ctr_rwu_swp.depth .- 1, depth_bins, extend=true);
 
-draw(data(ctr_rwu_swp)*
-    mapping(:SWP, :RWU, color=:depth => (x -> -1*x))*visual(Scatter, alpha=.5, markersize=6),
-    scales(Color = (; colormap = Reverse(:viridis)))
+draw(data(ctr_rwu_swp[ctr_rwu_swp.RWU .> 0, :])*
+    mapping(:SWP, :RWU, color=:depth_bin)*visual(Scatter, alpha=.5, markersize=6),
+    scales(Color = (; label="Uptake Depth (mm)", palette = from_continuous(:viridis)),
+           X = (; label="Soil Water Potential (kPa)"), Y= (; label="Root Water Uptake (mm/day)")),
+    axis = (; title="Root Water Uptake by Depth and Soil Water Potential", titlesize=20),
+    figure = (; size=(800, 600))
 )
 
 # water balance modelling

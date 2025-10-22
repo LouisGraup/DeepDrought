@@ -406,7 +406,7 @@ swp_vpd = swp_vpd[swp_vpd.date .>= Date(2024, 4, 1) .&& swp_vpd.date .< Date(202
 
 draw(
     (data(swp_vpd)*
-    mapping(:date, :SWP => (x -> x/1000), linestyle=:depth => nonnumeric)*visual(Lines, color=:black, linewidth=1.5)+
+    mapping(:date, :SWP => (x -> x/1000), linestyle=:depth => nonnumeric)*visual(Lines, label="Model", color=:black, linewidth=1.5)+
     data(obs_swp_pd)*
     mapping(:date, :SWP_corr => (x -> x/1000), color=:scaffold => nonnumeric, linestyle=:depth => nonnumeric)*visual(Lines, linewidth=1.5)+
     data(obs_lwp_pd)*
