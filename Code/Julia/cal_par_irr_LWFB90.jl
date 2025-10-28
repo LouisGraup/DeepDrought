@@ -131,18 +131,18 @@ n = 1000; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.01, 0.025), # drainage (0, 1)
-    ("INFEXP", 0.7, 0.9), # infiltration exponent (0, 0.9)
+    ("DRAIN", 0.01, 0.018), # drainage (0, 1)
+    ("INFEXP", 0.75, 0.9), # infiltration exponent (0, 0.9)
     ("IDEPTH_m", 0.5, 0.6), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 100, 230), # soil resistance (1, 1500)
-    ("ths1", 1.0, 1.25), # multiplier on theta_sat (0.5, 1.5)
+    ("RSSA", 100, 200), # soil resistance (1, 1500)
+    ("ths1", 1.1, 1.25), # multiplier on theta_sat (0.5, 1.5)
     ("ksat1", -0.1, 0.35), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths2", 1.33, 1.4), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat2", -0.2, 0.2), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths2", 1.34, 1.39), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat2", -0.1, 0.2), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("ths3", 1.42, 1.45), # multiplier on theta_sat (0.5, 1.5)
     ("ksat3", 0.47, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
@@ -150,17 +150,17 @@ param = [
     ("FRINTLAI", 0.08, 0.14), # interception catch fraction per unit LAI (0.02, 0.2)
     ("GLMAX", 0.021, 0.025), # stomatal conductance (0.001, 0.03)
     ("CVPD", 2.6, 3), # vpd sensitivity (1, 3)
-    ("R5", 190, 240), # radiation sensitivity (50, 400)
+    ("R5", 200, 240), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
     ("PSICR", -1.05, -1.0), # critical water potential (-4, -1)
-    ("FXYLEM", 0.3, 0.5), # aboveground xylem fraction (0.2, 0.8)
+    ("FXYLEM", 0.3, 0.45), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 27.0, 30.0), # maximum plant conductivity (1, 30)
-    ("MXRTLN", 500, 2500), # maximum root length (100, 6000)
+    ("MXRTLN", 1000, 2500), # maximum root length (100, 6000)
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
-    ("MAXROOTDEPTH", -1.75, -1.35), # max rooting depth (-5, -0.5)
-    ("BETAROOT", 0.966, 0.972) # beta root coefficient (0.8, 1.0)
+    ("MAXROOTDEPTH", -1.75, -1.4), # max rooting depth (-5, -0.5)
+    ("BETAROOT", 0.969, 0.972) # beta root coefficient (0.8, 1.0)
 ];
 
 ### END USER INPUT ###

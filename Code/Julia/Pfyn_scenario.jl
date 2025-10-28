@@ -430,7 +430,7 @@ irr.year = year.(irr.on);
 
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/"; irrig=true);
 sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
@@ -484,8 +484,8 @@ draw(data(swp_comp_irst)*
 
 draw(data(swp_comp_ctr)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
-    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")), facet = (; linkyaxes = :none),
+    figure = (; size=(1200, 800), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
 )
 
 draw(data(swp_comp_irr)*
@@ -499,7 +499,7 @@ draw(data(swp_comp_irr)*
 draw(data(swc_comp_ctr)*
     mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(1200, 800), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
 )
 
 draw(data(swc_comp_irr)*
@@ -690,6 +690,8 @@ draw(
 
 days, dates_out = get_dates(sim_ctr);
 
+# control scenario
+
 ctr_rwu_all = get_soil_(:RWU, sim_ctr, days_to_read_out_d=days);
 ctr_rwu_all.date = dates_out;
 ctr_rwu_all = stack(ctr_rwu_all[:,Not(:time)], Not([:date]), value_name=:RWU);
@@ -706,13 +708,45 @@ ctr_rwu_swp = leftjoin(ctr_rwu_all, ctr_swp_all, on=[:date, :depth]);
 depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
 ctr_rwu_swp.depth_bin = cut(ctr_rwu_swp.depth .- 1, depth_bins, extend=true);
 
+ctr_rwu_swp.scenario .= "Control";
+
 draw(data(ctr_rwu_swp[ctr_rwu_swp.RWU .> 0, :])*
     mapping(:SWP, :RWU, color=:depth_bin)*visual(Scatter, alpha=.5, markersize=6),
     scales(Color = (; label="Uptake Depth (mm)", palette = from_continuous(:viridis)),
            X = (; label="Soil Water Potential (kPa)"), Y= (; label="Root Water Uptake (mm/day)")),
-    axis = (; title="Root Water Uptake by Depth and Soil Water Potential", titlesize=20),
+    axis = (; title="Daily Root Water Uptake by Depth and Soil Water Potential", titlesize=20),
     figure = (; size=(800, 600))
 )
+
+# irrigation scenario
+
+irr_rwu_all = get_soil_(:RWU, sim_irr, days_to_read_out_d=days);
+irr_rwu_all.date = dates_out;
+irr_rwu_all = stack(irr_rwu_all[:,Not(:time)], Not([:date]), value_name=:RWU);
+irr_rwu_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in irr_rwu_all.variable]);
+select!(irr_rwu_all, Not(:variable));
+
+irr_swp_all = get_soil_(:psi, sim_irr, days_to_read_out_d=days);
+irr_swp_all.date = dates_out;
+irr_swp_all = stack(irr_swp_all[:,Not(:time)], Not([:date]), value_name=:SWP);
+irr_swp_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in irr_swp_all.variable]);
+select!(irr_swp_all, Not(:variable));
+
+irr_rwu_swp = leftjoin(irr_rwu_all, irr_swp_all, on=[:date, :depth]);
+depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
+irr_rwu_swp.depth_bin = cut(irr_rwu_swp.depth .- 1, depth_bins, extend=true);
+
+irr_rwu_swp.scenario .= "Irrigation";
+
+comp_rwu_swp = [ctr_rwu_swp; irr_rwu_swp];
+
+draw(data(comp_rwu_swp[comp_rwu_swp.RWU .> 0, :])*
+    mapping(:SWP, :RWU, color=:depth_bin, layout=:scenario)*visual(Scatter, alpha=.5, markersize=6),
+    scales(Color = (; label="Uptake Depth (mm)", palette = from_continuous(:viridis)),
+           X = (; label="Soil Water Potential (kPa)"), Y= (; label="Root Water Uptake (mm/day)")), facet = (; linkxaxes = :none),
+    figure = (; size=(1600, 800), title="Daily Root Water Uptake by Depth and Soil Water Potential", titlesize=20, titlealign = :center)
+)
+
 
 # water balance modelling
 
