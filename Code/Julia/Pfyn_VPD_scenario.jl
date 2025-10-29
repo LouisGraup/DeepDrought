@@ -135,7 +135,21 @@ function get_RWU_centroid(sim)
 
     col_RWU_centroid_mm = reshape(row_RWU_centroid_mm, :);
     
-    return col_RWU_centroid_mm
+    return col_RWU_centroid_mm, RWU_percent
+end
+
+function get_eff_swp(sim)
+
+    days, dates_out = get_dates(sim);
+    swp = DataFrame(date = dates_out);
+    
+    RWU, rwu_per = get_RWU_centroid(sim); # RWU depth and percent
+
+    swp_all = get_soil_(:psi, sim, days_to_read_out_d=days); # swp
+
+    swp.swp_eff .= sum(rwu_per .* Matrix(swp_all[:, Not(:time)])', dims=1)';
+
+    return swp
 end
 
 function get_VPD(sim)
@@ -427,10 +441,31 @@ ggplot(rdf1)+geom_line(aes(x=date, y=SWP/1000, linetype=as.factor(depth)), color
   ggtitle("Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Soil Water Potential (SWP) with Modelled SWP")+theme(plot.title=element_text(hjust=.5))
 """
 
-WP_comp = leftjoin(obs_lwp_pd, swp_vpd[swp_vpd.depth .== .1, :], on = [:date, :treatment]);
+# using effective soil water potential
+swp_eff_drt = get_eff_swp(sim_drt);
+swp_eff_drt.treatment .= "roof";
+
+swp_eff_drt_vpd = get_eff_swp(sim_drt_vpd);
+swp_eff_drt_vpd.treatment .= "roof_vpd";
+
+swp_drt_comp = [swp_eff_drt; swp_eff_drt_vpd];
+swp_drt_comp = swp_drt_comp[swp_drt_comp.date .>= Date(2024, 4, 1) .&& swp_drt_comp.date .< Date(2025,1,1), :];
+
+draw(
+    (data(swp_drt_comp)*
+    mapping(:date, :swp_eff => (x -> x/1000))*visual(Lines, label="Model", color=:black, linewidth=1.5)+
+    data(obs_lwp_pd)*
+    mapping(:date, :wp_value => (x -> x/10), color=:scaffold => nonnumeric)*visual(Scatter, markersize=12))*
+    mapping(layout=:treatment),
+    scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
+    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
+)
+
+# correlation
+WP_comp = leftjoin(obs_lwp_pd, swp_drt_comp, on = [:date, :treatment]);
 
 draw(data(WP_comp)*
-    mapping(:SWP => (x -> x/1000) => "Modelled Daily SWP (MPa)", :wp_value => (x -> x/10) => "Pre-dawn LWP (MPa)", color=:tree => nonnumeric, layout=:treatment)*visual(Scatter, markersize=12)+
+    mapping(:swp_eff => (x -> x/1000) => "Modelled Daily SWP (MPa)", :wp_value => (x -> x/10) => "Pre-dawn LWP (MPa)", color=:tree => nonnumeric, layout=:treatment)*visual(Scatter, markersize=12)+
     mapping([0], [1]) * visual(ABLines),
     scales(Color = (; legend = false))
 )

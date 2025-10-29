@@ -184,7 +184,7 @@ function get_RWU_centroid(sim)
 
     col_RWU_centroid_mm = reshape(row_RWU_centroid_mm, :);
     
-    return col_RWU_centroid_mm
+    return col_RWU_centroid_mm, RWU_percent
 end
 
 function plot_monthly_water_partitioning(df_partitioning_monthly)
@@ -611,17 +611,17 @@ draw(data(swp_comp_scen)*
 days, dates_out = get_dates(sim_ctr);
 
 ctr_rwu = DataFrame(date=dates_out);
-ctr_rwu.RWU = get_RWU_centroid(sim_ctr);
+ctr_rwu.RWU, ctr_rwu_per = get_RWU_centroid(sim_ctr);
 ctr_rwu.RWU_sm = runmean(ctr_rwu.RWU, 14);
 ctr_rwu.scen .= "Control";
 
 irr_rwu = DataFrame(date=dates_out);
-irr_rwu.RWU = get_RWU_centroid(sim_irr);
+irr_rwu.RWU, = get_RWU_centroid(sim_irr);
 irr_rwu.RWU_sm = runmean(irr_rwu.RWU, 14);
 irr_rwu.scen .= "Irrigation";
 
 irst_rwu = DataFrame(date=dates_out);
-irst_rwu.RWU = get_RWU_centroid(sim_irst);
+irst_rwu.RWU, = get_RWU_centroid(sim_irst);
 irst_rwu.RWU_sm = runmean(irst_rwu.RWU, 14);
 irst_rwu.scen .= "Irrigation Stop";
 
@@ -630,7 +630,10 @@ rwu_comp = [ctr_rwu; irr_rwu; irst_rwu];
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
 rwu_comp.RWU_sm = replace(rwu_comp.RWU_sm, NaN=>missing);
 
-med_rwu_comp = combine(groupby(dropmissing(rwu_comp[:,Not(:RWU_sm)]), :scen), :RWU .=> [median mean]);
+rwu_comp.month = month.(rwu_comp.date);
+rwu_comp.year = year.(rwu_comp.date);
+rwu_comp_med = dropmissing(rwu_comp[rwu_comp.month .> 3 .&& rwu_comp.month .< 12 .&& rwu_comp.year .> 2002, Not(:RWU_sm)]);
+med_rwu_comp = combine(groupby(rwu_comp_med, :scen), :RWU .=> [median mean]);
 
 draw(
     data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
@@ -666,19 +669,20 @@ draw(data(yr_comp[yr_comp.year .>= 2003, :])*
 # compare RWU against transpiration
 
 ctr_rwu_tran = get_sap(sim_ctr);
-ctr_rwu_tran.RWU = get_RWU_centroid(sim_ctr);
+ctr_rwu_tran.RWU, = get_RWU_centroid(sim_ctr);
 ctr_rwu_tran.scen .= "Control";
 
 irr_rwu_tran = get_sap(sim_irr);
-irr_rwu_tran.RWU = get_RWU_centroid(sim_irr);
+irr_rwu_tran.RWU, = get_RWU_centroid(sim_irr);
 irr_rwu_tran.scen .= "Irrigation";
 
 df_rwu_tran = [ctr_rwu_tran; irr_rwu_tran];
 df_rwu_tran.month = month.(df_rwu_tran.date);
 df_rwu_tran.year = year.(df_rwu_tran.date);
+df_rwu_tran = df_rwu_tran[df_rwu_tran.year .> 2002, :];
 
 draw(
-    data(df_rwu_tran[df_rwu_tran.month .> 5 .&& df_rwu_tran.month .< 12, :])*
+    data(df_rwu_tran[df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 12, :])*
     mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.7, markersize=8)+
     data(med_rwu_comp[med_rwu_comp.scen .!= "Irrigation Stop",:])*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_colorblind6)),
@@ -708,6 +712,7 @@ ctr_rwu_swp = leftjoin(ctr_rwu_all, ctr_swp_all, on=[:date, :depth]);
 depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
 ctr_rwu_swp.depth_bin = cut(ctr_rwu_swp.depth .- 1, depth_bins, extend=true);
 
+ctr_rwu_swp = ctr_rwu_swp[year.(ctr_rwu_swp.date) .> 2002, :];
 ctr_rwu_swp.scenario .= "Control";
 
 draw(data(ctr_rwu_swp[ctr_rwu_swp.RWU .> 0, :])*
@@ -736,6 +741,7 @@ irr_rwu_swp = leftjoin(irr_rwu_all, irr_swp_all, on=[:date, :depth]);
 depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
 irr_rwu_swp.depth_bin = cut(irr_rwu_swp.depth .- 1, depth_bins, extend=true);
 
+irr_rwu_swp = irr_rwu_swp[year.(irr_rwu_swp.date) .> 2002, :];
 irr_rwu_swp.scenario .= "Irrigation";
 
 comp_rwu_swp = [ctr_rwu_swp; irr_rwu_swp];
@@ -747,6 +753,32 @@ draw(data(comp_rwu_swp[comp_rwu_swp.RWU .> 0, :])*
     figure = (; size=(1600, 800), title="Daily Root Water Uptake by Depth and Soil Water Potential", titlesize=20, titlealign = :center)
 )
 
+# weighted-average soil water potential
+
+ctr_rwu_swp_med = DataFrame(date=dates_out);
+ctr_rwu_swp_med.RWU, ctr_rwu_per = get_RWU_centroid(sim_ctr); # RWU depth and percent
+ctr_swp_per = get_soil_(:psi, sim_ctr, days_to_read_out_d=days); # swp
+# weighted-average swp by rwu
+ctr_rwu_swp_med.swp_med .= sum(ctr_rwu_per .* Matrix(ctr_swp_per[:, Not(:time)])', dims=1)';
+
+ctr_rwu_swp_med = leftjoin(ctr_rwu_swp_med, get_sap(sim_ctr), on=:date);
+ctr_rwu_swp_med = ctr_rwu_swp_med[ctr_rwu_swp_med.date .>= Date(2003, 1, 1), :];
+ctr_rwu_swp_med.month = month.(ctr_rwu_swp_med.date);
+
+draw(data(ctr_rwu_swp_med)*mapping(:date, :swp_med)*visual(Lines))
+
+draw(data(ctr_rwu_swp_med)*
+    mapping(:swp_med, :trans)*visual(Scatter, alpha=.5, markersize=6),
+    scales(X = (; label="Weighted-Average Soil Water Potential (kPa)"), Y= (; label="Transpiration (mm/day)")),
+    axis = (; title="Transpiration vs. Effective SWP", titlesize=16)
+)
+
+draw(data(ctr_rwu_swp_med)*
+    mapping(:swp_med, :RWU, color=:month => nonnumeric)*visual(Scatter, alpha=.5, markersize=6),
+    scales(Color = (; palette = from_continuous(:seaborn_colorblind6)),
+        X = (; label="Weighted-Average Soil Water Potential (kPa)"), Y= (; label="Weighted-Average Root Water Uptake Depth (mm)")),
+    axis = (; yreversed = true, title="Weighted-Average RWU Depth vs. SWP", titlesize=16)
+)
 
 # water balance modelling
 
