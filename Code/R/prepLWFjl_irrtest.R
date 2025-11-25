@@ -53,13 +53,15 @@ met_head = read_csv("../Julia/LWFBinput/Pfyn_irrigation_ambient/pfynwald_meteove
 met_names = colnames(met_head)
 
 # read in file with column names and skip header
-metveg = read_csv("../Julia/LWFBinput/Pfyn_irrigation_ambient/pfynwald_meteoveg.csv", skip=2, col_names=met_names, show_col_types=F)
+#metveg = read_csv("../Julia/LWFBinput/Pfyn_irrigation_ambient/pfynwald_meteoveg.csv", skip=2, col_names=met_names, show_col_types=F)
+metveg = read_csv("../Julia/LWFBinput/Pfyn_irr_stop/pfynwald_meteoveg.csv", skip=2, col_names=met_names, show_col_types=F)
 
 met = metveg[, 1:7]
 veg = metveg[, 8:11]
 
 met$prec_mmDay = meteo_Con$precip_ctrl
 met$irrig_mmDay = meteo_Con$irrig_mm
+#met$irrig_mmDay = if_else(met$dates <= "2014-01-01", meteo_Con$irrig_mm, 0) # irr stop
 
 metirr = cbind(met, veg)
 

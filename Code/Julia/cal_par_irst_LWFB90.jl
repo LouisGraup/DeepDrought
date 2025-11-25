@@ -159,7 +159,7 @@ end
 @everywhere begin
     ## parameter input and output paths
     # input
-    input_path = "LWFBinput/Pfyn_irr_stop/";
+    input_path = "LWFBinput/Pfyn_irrigiso_stop/";
     input_prefix = "pfynwald";
 
     # output
@@ -168,7 +168,7 @@ end
 
     ## simulation dates
 
-    start_date = Date(2014, 1, 1);
+    start_date = Date(2010, 1, 1);
     end_date = Date(2020, 12, 31);
 
 end
