@@ -278,90 +278,46 @@ drt_vpd_comp = met_comp(sim_drt_vpd, obs_drt_vpd);
 ctr_swp_comp = [select(ctr_comp, Not(:VWC)); obs_ext_ctr];
 irr_swp_comp = [select(irr_comp, Not(:VWC)); obs_ext_irr];
 
-R"""
-rdf = $ctr_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Potential Comparison for Control")
-"""
+# control scenario 
+draw(data(ctr_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Control Scenario", titlealign = :center))
 
-R"""
-rdf = $ctr_swp_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() +
-    labs(title="Soil Water Potential Comparison for Control Scenario", x="", y="SMP (kPa)", color="Source") +
-    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
-"""
+draw(data(ctr_swp_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Control Scenario", titlealign = :center))
 
-R"""
-rdf = $ctr_comp
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Content Comparison for Control")
-"""
+draw(data(ctr_comp)*mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Content Comparison for Control Scenario", titlealign = :center))
 
-R"""
-rdf = $irr_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Potential Comparison for Irrigation")
-"""
+# irrigation
+draw(data(irr_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Irrigation Scenario", titlealign = :center))
 
-R"""
-rdf = $irr_swp_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Potential Comparison for Irrigation")
-"""
+draw(data(irr_swp_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Irrigation Scenario", titlealign = :center))
 
-R"""
-rdf = $irr_comp
-ggplot(rdf, aes(x=date, y=VWC, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Content Comparison for Irrigation")
-"""
-
-R"""
-rdf = $irr_vpd_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) +
-    labs(title="Soil Water Potential Comparison for Irrigation VPD")
-"""
+draw(data(irr_comp)*mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Content Comparison for Irrigation Scenario", titlealign = :center))
 
 
-R"""
-rdf = $drt_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() + 
-    labs(title="Soil Water Potential Comparison for Roof") +
-    theme(legend.position=c(.1,.1), plot.title=element_text(hjust=.5))
-"""
+draw(data(irr_vpd_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Irrigation VPD Scenario", titlealign = :center))
 
-R"""
-rdf = $drt_vpd_comp
-ggplot(rdf, aes(x=date, y=SWP, color=src)) + geom_point(size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison for Roof VPD")
-"""
+# drought scenarios
 
-R"""
-rdf1 = $drt_comp
-rdf2 = $drt_vpd_comp
-ggplot(filter(rdf1, src=="sim"), aes(x=date, y=SWP, color="roof")) + geom_point(size=.5) +
-    geom_point(data=filter(rdf2, src=="sim"), aes(x=date, y=SWP, color="roof_vpd"), size=.5) +
-    facet_wrap(~depth, ncol=1) +
-    labs(title="Soil Water Potential Comparison for Drought Scenarios")
-"""
+draw(data(drt_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Roof Scenario", titlealign = :center))
 
-R"""
-rdf1 = $drt_comp
-rdf2 = $drt_vpd_comp
-ggplot(rdf1, aes(x=date, y=SWP, color="roof", linetype=as.factor(src))) + geom_line(size=.5) +
-    geom_line(data=rdf2, aes(x=date, y=SWP, color="roof_vpd", linetype=as.factor(src)), size=.5) +
-    facet_wrap(~depth, scales="free_y", ncol=1) + theme_bw() +
-    labs(title="Soil Water Potential Comparison for Drought Scenarios", x="", y="SMP (kPa)", color="Scenario", linetype="Source") + 
-    theme(plot.title=element_text(hjust=.5), legend.text=element_text(size=12),legend.title=element_text(size=12), strip.text=element_text(size=12, face="bold"),axis.text=element_text(size=12), axis.title=element_text(size=14))
-"""
+draw(data(drt_vpd_comp)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Roof VPD Scenario", titlealign = :center))
+
+draw(data(drt_comp[drt_comp.src .== "sim",:])*mapping(:date, :SWP, row=:depth => nonnumeric)*visual(Scatter, label="roof", markersize=6)+
+    data(drt_vpd_comp[drt_vpd_comp.src .== "sim",:])*mapping(:date, :SWP, row=:depth => nonnumeric)*visual(Scatter, color=:red, label="roof_vpd", markersize=6),
+    figure = (; title="Soil Water Potential Comparison for Roof Scenarios", titlealign = :center))
+
+draw(data(drt_comp)*mapping(:date, :SWP, linestyle=:src, row=:depth => nonnumeric)*visual(Lines, label="roof", linewidth=.5)+
+    data(drt_vpd_comp)*mapping(:date, :SWP, linestyle=:src, row=:depth => nonnumeric)*visual(Lines, label="roof_vpd", color=:red, linewidth=.5),
+    figure = (; title="Soil Water Potential Comparison for Roof Scenarios", titlealign = :center))
+
 
 R"""
 rdf1 = $drt_comp

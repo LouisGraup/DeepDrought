@@ -47,3 +47,14 @@ ggplot(swp_long, aes(date, SWP, color=meta))+geom_line()+
         legend.text=element_text(size=12), legend.title=element_text(size=12), 
         axis.text=element_text(size=12), axis.title=element_text(size=14))
 
+# combine VWC records into single file
+
+swc_ext = filter(swc_ext, VWC<69, VWC>10)
+
+swc = swc %>% select(-c(setup, ...1)) %>% filter(date<"2014-04-11")
+swc$meta = if_else(swc$meta == "irrigated","irrigation",swc$meta)
+
+swc_comp = rbind(swc, swc_ext)
+swc_comp$VWC = swc_comp$VWC / 100
+
+write_csv(swc_comp, "../../Data/Pfyn/Pfyn_swat.csv")

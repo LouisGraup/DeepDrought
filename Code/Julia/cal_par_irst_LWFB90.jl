@@ -19,7 +19,6 @@ end
     # behavioral data
     # soil water content and soil matric potential
     obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
-    filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
     obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
@@ -27,15 +26,16 @@ end
     # up-scaled sap flow data
     obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans11_18.csv", DataFrame);
 
-    # separate control and irrigation scenarios
-    obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-    select!(obs_swc_ctr, :date, :depth, :VWC); # remove extra columns
-    obs_swc_ctr = unstack(obs_swc_ctr, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
-    sort!(obs_swc_ctr, :date); # sort by date
+    # separate out irrigation scenario
+    obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+    filter!(:date => >=(Date(2015, 1, 1)), obs_swc_irst); # filter out early dates
+    select!(obs_swc_irst, :date, :depth, :VWC); # remove extra columns
+    obs_swc_irst = unstack(obs_swc_irst, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
+    sort!(obs_swc_irst, :date); # sort by date
 
-    obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
-    
-    obs_sap_ctr = obs_sap[obs_sap.scen .== "Control", :]; # select control treatment
+    obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+
+    obs_sap_irst = obs_sap[obs_sap.scen .== "Irrigation stop", :]; # select irrigation stop treatment
 end
 
 # objective function to compare model output to observed data
@@ -43,16 +43,12 @@ end
 
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
-    obs_40cm = dropmissing(obs[!, [:date, :VWC_40cm]]);
-    obs_60cm = dropmissing(obs[!, [:date, :VWC_60cm]]);
     obs_80cm = dropmissing(obs[!, [:date, :VWC_80cm]]);
 
     filter!(:date => >(Date(2015, 1, 1)), obs_80cm); # filter out early dates
 
     # match simulated data to available dates for each depth
     sim_10cm = sim[sim.dates .∈ [obs_10cm.date], :theta_m3m3_100mm];
-    sim_40cm = sim[sim.dates .∈ [obs_40cm.date], :theta_m3m3_400mm];
-    sim_60cm = sim[sim.dates .∈ [obs_60cm.date], :theta_m3m3_600mm];
     sim_80cm = sim[sim.dates .∈ [obs_80cm.date], :theta_m3m3_800mm];
 
     function NSE(sim, obs)
@@ -69,17 +65,13 @@ end
 
     # calculate NSE
     nse10 = NSE(sim_10cm, obs_10cm.VWC_10cm);
-    nse40 = NSE(sim_40cm, obs_40cm.VWC_40cm);
-    nse60 = NSE(sim_60cm, obs_60cm.VWC_60cm);
     nse80 = NSE(sim_80cm, obs_80cm.VWC_80cm);
 
     # calculate RMSE
     rmse10 = RMSE(sim_10cm, obs_10cm.VWC_10cm);
-    rmse40 = RMSE(sim_40cm, obs_40cm.VWC_40cm);
-    rmse60 = RMSE(sim_60cm, obs_60cm.VWC_60cm);
     rmse80 = RMSE(sim_80cm, obs_80cm.VWC_80cm);
 
-    return nse10, rmse10, nse40, rmse40, nse60, rmse60, nse80, rmse80
+    return nse10, rmse10, nse80, rmse80
 end
 
 @everywhere function obj_fun_swp(sim, obs)
@@ -162,22 +154,21 @@ end
     return z
 end
 
-
 ### BEGIN USER INPUT ###
 
 @everywhere begin
     ## parameter input and output paths
     # input
-    input_path = "LWFBinput/Pfyn_control/";
+    input_path = "LWFBinput/Pfyn_irr_stop/";
     input_prefix = "pfynwald";
 
     # output
     output_path = "LWFBcalibration/";
-    subdir_name = "cal_ctr";
+    subdir_name = "cal_irst";
 
     ## simulation dates
 
-    start_date = Date(2000, 1, 1);
+    start_date = Date(2014, 1, 1);
     end_date = Date(2020, 12, 31);
 
 end
@@ -208,12 +199,12 @@ param = [
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.03)
-    ("CVPD", 1.0, 3.0), # vpd sensitivity (1, 3)
-    ("R5", 50, 400), # radiation sensitivity (50, 400)
+    ("GLMAX", 0.001, 0.03), # stomatal conductance (0.001, 0.03)
+    ("CVPD", 1.0, 3), # vpd sensitivity (1, 3)
+    ("R5", 50, 500), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -3, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -3.0, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 100, 6000), # maximum root length (100, 6000)
@@ -242,7 +233,7 @@ param_sets = QuasiMonteCarlo.sample(nsets, lb, ub, LatinHypercubeSample());
 # output parameter sets
 param_out = DataFrame(param_sets', param_names); # transpose parameter sets to add column names
 curDate = string(Dates.format(today(), "yyyymmdd")); # save date for consistency over multi-day calibrations 
-CSV.write("LWFBcal_output/param_ctr_" * curDate * ".csv", param_out);
+CSV.write("LWFBcal_output/param_irst_" * curDate * ".csv", param_out);
 
 
 ## make output folder structure and create calibration parameter files
@@ -313,7 +304,7 @@ for i in 1:nsets
                 # apply additive factor to log10(ksat) for each soil horizon
                 soil_set.ksat_mmDay = 10 .^ (log10.(soil_set.ksat_mmDay) .+ value);
             end
-
+            
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
             # save index for later
             push!(root_dict, name => j);
@@ -331,11 +322,10 @@ for i in 1:nsets
     
     # copy folder structure to output folders
     cp(input_path, out_dir, force=true);
-    
+
     # write parameter and soil horizons files
     CSV.write(out_dir * output_prefix * "_param.csv", param_set);
     output_soil_file(soil_set, out_dir * output_prefix);
-    
 end
 
 
@@ -358,26 +348,24 @@ end_index = Dates.value(end_date - ref_date);
 ## run LWFBrook90 for each parameter set
 # using parallel processing
 @everywhere function run_calibration(i)
-    
+
     cal_dir = output_path * subdir_name * string(i) * "/";
     par_id = i
-    
+
     if root_params
         # retrieve root parameter values
         betaroot = param_sets[root_dict["BETAROOT"], par_id];
         maxroot = param_sets[root_dict["MAXROOTDEPTH"], par_id];
 
         # run model with modified root distribution
-        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = true,
-        Δz_thickness_m = "soil_discretization.csv",
-        root_distribution = (beta = betaroot, z_rootMax_m=maxroot),
-        IC_soil = (PSIM_init_kPa = -6.5,
-        delta18O_init_permil = -13.0,
-        delta2H_init_permil = -95.0));
+        model = loadSPAC(cal_dir, output_prefix, 
+        simulate_isotopes = true, simulate_irrigation = false,
+        root_distribution = (beta = betaroot, z_rootMax_m=maxroot));
 
     else
         # run model with input files
-        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = true)
+        model = loadSPAC(cal_dir, output_prefix, 
+        simulate_isotopes = true, simulate_irrigation = false)
     end
 
     # model set up
@@ -387,13 +375,13 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 14)) # skip if simulation fails
+        return (par_id, fill(0, 10)) # skip if simulation fails
     end
 
     ## retrieve model output
 
     # soil water content
-    z_theta = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = 1:end_index);
+    z_theta = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = 1:end_index);
     z_psi = get_soil_(:psi, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = 1:end_index);
 
     # add dates column
@@ -401,8 +389,8 @@ end_index = Dates.value(end_date - ref_date);
     z_theta.dates = Date.(dates_to_read_out);
     z_psi.dates = Date.(dates_to_read_out);
 
-    swc_met = obj_fun_swc(z_theta, obs_swc_ctr)
-    swp_met = obj_fun_swp(z_psi, obs_swp_ctr)
+    swc_met = obj_fun_swc(z_theta, obs_swc_irst)
+    swp_met = obj_fun_swp(z_psi, obs_swp_irst)
     
     # transpiration
     sap_comp = sap_comp(sim, obs_sap_ctr);
@@ -428,28 +416,24 @@ end
 results = pmap(i -> run_calibration(i), 1:nsets);
 
 # intialize metric dataframes
-metrics_ctr = DataFrame(scen = Int[],
+metrics_irst = DataFrame(scen = Int[],
     swc_nse10 = Float64[],
     swc_rmse10 = Float64[],
-    swc_nse40 = Float64[],
-    swc_rmse40 = Float64[],
-    swc_nse60 = Float64[],
-    swc_rmse60 = Float64[],
     swc_nse80 = Float64[],
     swc_rmse80 = Float64[],
     swp_nse10 = Float64[],
     swp_nse80 = Float64[],
     trans_cor = Float64[], 
     trans_nse = Float64[], 
-    max_trans = Float64[], 
-    ann_trans = Float64[])
+    max_trans = Float64[],
+    ann_trans = Float64[]);
 
 # loop through results
 for res in results
-    # retrieve scenario, parameter id, and metrics
+    # retrieve parameter id, and metrics
     par_id, swc, swp, sap = res;
     row = [par_id, swc..., swp..., sap...];
-    push!(metrics_ctr, row);
+    push!(metrics_irst, row);
 end
 
-CSV.write("LWFBcal_output/metrics_ctr_" * curDate * ".csv", metrics_ctr);
+CSV.write("LWFBcal_output/metrics_irst_" * curDate * ".csv", metrics_irst);

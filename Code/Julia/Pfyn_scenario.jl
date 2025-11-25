@@ -34,11 +34,10 @@ end
 
 function get_swc(sim; shape = "long")
     # retrieve soil water potential data from sim
-    days = range(sim.ODESolution.prob.tspan...);
-    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+    days, dates_out = get_dates(sim);
 
     z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = days);
-    z.date = Date.(dates_out);
+    z.date = dates_out;
 
     select!(z, Not(:time));
 
@@ -55,11 +54,10 @@ end
 
 function get_swp(sim; shape="long")
     # retrieve soil water potential data from sim
-    days = range(sim.ODESolution.prob.tspan...);
-    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
-
+    days, dates_out = get_dates(sim);
+    
     z = get_soil_(:psi, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = days);
-    z.date = Date.(dates_out);
+    z.date = dates_out;
 
     select!(z, Not(:time));
 
@@ -77,14 +75,27 @@ end
 
 function get_sap(sim)
     # retrieve soil water potential data from sim
-    days = range(sim.ODESolution.prob.tspan...);
-    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
-
+    days, dates_out = get_dates(sim);
+    
     z = get_fluxes(sim);
-    z.date = Date.(dates_out);
+    z.date = dates_out;
     z.trans = z.cum_d_tran;
     select!(z, :date, :trans);
     
+    return z
+end
+
+function get_trans_def(sim)
+    days, dates_out = get_dates(sim);
+
+    z = get_fluxes(sim);
+    z.date = dates_out;
+    z.trans = z.cum_d_tran;
+    z.pet = z.cum_d_ptran;
+    z.td = z.pet .- z.trans;
+
+    select!(z, :date, :trans, :pet, :td);
+
     return z
 end
 
@@ -187,8 +198,54 @@ function get_RWU_centroid(sim)
     return col_RWU_centroid_mm, RWU_percent
 end
 
-function get_eff_swp(sim)
+function get_REW(sim)
+    # derive relate extractable soil water based on maximum root depth
+    # for now, just use normalized SWAT over all layers
 
+    days, dates_out = get_dates(sim);
+    
+    #swat = get_states(sim);
+
+    #REW = (swat.SWAT_mm .- minimum(swat.SWAT_mm)) ./ (maximum(swat.SWAT_mm) - minimum(swat.SWAT_mm));
+
+    #return REW
+
+    # get # root zone layers from maximum rooting depth
+    max_root_depth = sim.parametrizedSPAC.pars.root_distribution.z_rootMax_m;
+
+    upper_lim = sim.parametrizedSPAC.soil_discretization.df.Upper_m;
+    lower_lim = sim.parametrizedSPAC.soil_discretization.df.Lower_m;
+
+    rz_layers = lower_lim[upper_lim .>= max_root_depth];
+    nrz = length(rz_layers);
+
+    # soil water content
+    swc = get_soil_(:theta, sim, days_to_read_out_d=days); # soil water content
+    select!(swc, Not(:time));
+    swc = swc[!, 1:nrz]; # only keep soil water content for root zone layers
+
+    # get field capacity and wilting point for available water content
+    thf = sim.ODESolution.prob.p.p_soil.p_THETAF[1:nrz]; # field capacity soil water content
+
+    # use swc to derive minimum soil water content for each layer
+    # as approximation of wilting point
+    # (more correct would be to derive swc from psi_crit using PTF)
+    swc_min = minimum.(eachcol(swc));
+
+    awc = thf .- swc_min; # available water capacity per layer
+    
+    REW_df = deepcopy(swc);
+    for i in 1:nrz
+        REW_df[!, i] = (swc[!, i] .- swc_min[i]) ./ awc[i];
+    end
+
+    REW = mean.(eachrow(REW_df));
+
+    return REW
+end
+
+function get_eff_swp(sim)
+    # derive effective soil water potential based on RWU
     days, dates_out = get_dates(sim);
     swp = DataFrame(date = dates_out);
     
@@ -199,6 +256,16 @@ function get_eff_swp(sim)
     swp.swp_eff .= sum(rwu_per .* Matrix(swp_all[:, Not(:time)])', dims=1)';
 
     return swp
+end
+
+function get_eff_swp_rd(sim)
+    # derive effective soil water potential based on root distribution
+    days, dates_out = get_dates(sim);
+    swp = DataFrame(date = dates_out);
+
+    beta = sim.parametrizedSPAC.pars.root_distribution.beta;
+    root_density = sim.parametrizedSPAC.soil_discretization.df.Rootden_;
+
 end
 
 function plot_monthly_water_partitioning(df_partitioning_monthly)
@@ -417,7 +484,7 @@ obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
+obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
 obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
@@ -444,7 +511,7 @@ irr.year = year.(irr.on);
 
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/"; irrig=true);
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
 sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
 
 ## combine observed and simulated data
@@ -644,11 +711,6 @@ rwu_comp = [ctr_rwu; irr_rwu; irst_rwu];
 rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
 rwu_comp.RWU_sm = replace(rwu_comp.RWU_sm, NaN=>missing);
 
-rwu_comp.month = month.(rwu_comp.date);
-rwu_comp.year = year.(rwu_comp.date);
-rwu_comp_med = dropmissing(rwu_comp[rwu_comp.month .> 3 .&& rwu_comp.month .< 12 .&& rwu_comp.year .> 2002, Not(:RWU_sm)]);
-med_rwu_comp = combine(groupby(rwu_comp_med, :scen), :RWU .=> [median mean]);
-
 draw(
     data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
     mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
@@ -682,28 +744,88 @@ draw(data(yr_comp[yr_comp.year .>= 2003, :])*
 
 # compare RWU against transpiration
 
-ctr_rwu_tran = get_sap(sim_ctr);
+ctr_rwu_tran = get_trans_def(sim_ctr);
 ctr_rwu_tran.RWU, = get_RWU_centroid(sim_ctr);
+ctr_rwu_tran.REW = get_REW(sim_ctr);
+ctr_rwu_tran_swp = get_eff_swp(sim_ctr);
+ctr_rwu_tran.SWP = ctr_rwu_tran_swp.swp_eff;
 ctr_rwu_tran.scen .= "Control";
 
-irr_rwu_tran = get_sap(sim_irr);
+irr_rwu_tran = get_trans_def(sim_irr);
 irr_rwu_tran.RWU, = get_RWU_centroid(sim_irr);
+irr_rwu_tran.REW = get_REW(sim_irr);
+irr_rwu_tran_swp = get_eff_swp(sim_irr);
+irr_rwu_tran.SWP = irr_rwu_tran_swp.swp_eff;
 irr_rwu_tran.scen .= "Irrigation";
 
 df_rwu_tran = [ctr_rwu_tran; irr_rwu_tran];
 df_rwu_tran.RWU = replace(df_rwu_tran.RWU, NaN=>missing);
 df_rwu_tran.month = month.(df_rwu_tran.date);
 df_rwu_tran.year = year.(df_rwu_tran.date);
-df_rwu_tran = df_rwu_tran[df_rwu_tran.year .> 2002, :];
+df_rwu_tran = df_rwu_tran[df_rwu_tran.year .> 2002 .&& df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 11, :];
 
+# apply bikini filter from Peters et al. (2018) with forcing data
+clim = get_forcing(sim_ctr);
+clim.date = Date.(clim.dates);
+clim.tmean = (clim.tmax_degC .+ clim.tmin_degC) ./ 2;
+clim.vpd = (0.61078 .* exp.(17.26939 .* clim.tmean ./ (clim.tmean .+ 237.3))) - clim.vappres_kPa;
+clim_bikini = clim[clim.tmean .> 12 .&& clim.vpd .< 1 .&& clim.prec_mmDay .< 10, :];
+
+df_rwu_tran_filt = dropmissing(df_rwu_tran[df_rwu_tran.date .∈ [clim_bikini.date], :]);
+# df_rwu_tran = df_rwu_tran[df_rwu_tran.REW .> 0.5, :]; # filter for water availability
+
+df_rwu_tran_clim = leftjoin(df_rwu_tran_filt, clim_bikini[:, [:date, :tmean, :vpd]], on=:date);
+
+# mean uptake depth
+med_rwu_comp = combine(groupby(df_rwu_tran_filt, :scen), :RWU .=> [median mean]);
+
+# RWU vs transpiration
 draw(
-    data(df_rwu_tran[df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 12, :])*
+    data(df_rwu_tran_filt)*
     mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
-    data(med_rwu_comp[med_rwu_comp.scen .!= "Irrigation Stop",:])*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
 )
+
+# colored by VPD
+draw(
+    data(df_rwu_tran_clim)*
+    mapping(:trans, :RWU, color=:vpd, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
+# Trans vs VPD colored by RWU
+draw(
+    data(df_rwu_tran_clim)*
+    mapping(:vpd, :trans, color=:SWP, layout=:scen)*visual(Scatter, alpha=.6, markersize=8),
+    #data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    #scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    #axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
+# colored by REW
+draw(
+    data(df_rwu_tran_clim)*
+    mapping(:trans, :RWU, color=:REW, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
+# RWU vs transpiration deficit
+draw(
+    data(df_rwu_tran_filt)*
+    mapping(:td, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
+           X = (; label="Transpiration Deficit (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
 
 # compare rwu against swp in each layer
 
@@ -724,7 +846,7 @@ ctr_swp_all.depth = parse.(Int, [match(r"[0-9]+", s).match for s in ctr_swp_all.
 select!(ctr_swp_all, Not(:variable));
 
 ctr_rwu_swp = leftjoin(ctr_rwu_all, ctr_swp_all, on=[:date, :depth]);
-depth_bins = [0, 70, 100, 200, 250, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
+depth_bins = [0, 70, 100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 1900, 2000];
 ctr_rwu_swp.depth_bin = cut(ctr_rwu_swp.depth .- 1, depth_bins, extend=true);
 
 ctr_rwu_swp = ctr_rwu_swp[year.(ctr_rwu_swp.date) .> 2002, :];
@@ -750,9 +872,14 @@ ctr_rwu_swp_run = hcat(map(x -> runmean(x, 7), eachcol(ctr_rwu_swp_wide[:, Not(:
 
 tickdates = Date.(["0000-01-01", "0000-04-01", "0000-07-01", "0000-10-01", "0001-01-01"]);
 areaplot(ctr_rwu_swp_wide.date, ctr_rwu_swp_run, label=reshape(unique(ctr_rwu_swp_daily.depth_bin), 1, 12),
-    xticks=(tickdates, Dates.format.(tickdates, "mm-dd")), margin=10mm, palette=palette(:viridis, 12),
+    xticks=(tickdates, Dates.format.(tickdates, "u")), margin=10mm, palette=palette(:viridis, 12),
     xlabel="Day of Year", ylabel="Root Water Uptake (mm/day)", legendtitle="RWU Depth (mm)",
     title="\nMean Daily Root Water Uptake by Depth for Control Scenario", size=(1200, 800))
+
+p1=areaplot(ctr_rwu_swp_wide.date, ctr_rwu_swp_run, label=reshape(unique(ctr_rwu_swp_daily.depth_bin), 1, 12),
+    xticks=(tickdates, Dates.format.(tickdates, "u")), margin=10mm, palette=palette(:viridis, 12),
+    xlabel="", ylabel="Root Water Uptake (mm/day)", legend=false,
+    title="\nMean Daily Root Water Uptake by Depth for Control Scenario", size=(1200, 800));
 
 # irrigation scenario
 
@@ -785,10 +912,11 @@ irr_rwu_swp_daily.date = Date.(0000, irr_rwu_swp_daily.month, irr_rwu_swp_daily.
 irr_rwu_swp_wide = unstack(irr_rwu_swp_daily[:, Not([:month, :day])], :depth_bin, :RWU_mean);
 irr_rwu_swp_run = hcat(map(x -> runmean(x, 7), eachcol(irr_rwu_swp_wide[:, Not(:date)]))...);
 
-areaplot(irr_rwu_swp_wide.date, irr_rwu_swp_run, label=reshape(unique(irr_rwu_swp_daily.depth_bin), 1, 12),
-    xticks=(tickdates, Dates.format.(tickdates, "mm-dd")), margin=10mm, palette=palette(:viridis, 12),
-    xlabel="Day of Year", ylabel="Root Water Uptake (mm/day)", legendtitle="RWU Depth (mm)",
-    title="\nMean Daily Root Water Uptake by Depth for Irrigation Scenario", size=(1200, 800))
+p2=areaplot(irr_rwu_swp_wide.date, irr_rwu_swp_run, label=reshape(unique(irr_rwu_swp_daily.depth_bin), 1, 12),
+    xticks=(tickdates, Dates.format.(tickdates, "u")), margin=10mm, palette=palette(:viridis, 12),
+    xlabel="Day of Year", ylabel="Root Water Uptake (mm/day)", legend=false,
+    title="Mean Daily Root Water Uptake by Depth for Irrigation Scenario", size=(1200, 800));
+Plots.plot(p1, p2, layout = (2,1))
 
 # scenario comparison
 
@@ -798,7 +926,7 @@ draw(data(comp_rwu_swp[comp_rwu_swp.RWU .> 0, :])*
     mapping(:SWP, :RWU, color=:depth_bin, layout=:scenario)*visual(Scatter, alpha=.5, markersize=6),
     scales(Color = (; label="Uptake Depth (mm)", palette = from_continuous(:viridis)),
            X = (; label="Soil Water Potential (kPa)"), Y= (; label="Root Water Uptake (mm/day)")), facet = (; linkxaxes = :none),
-    figure = (; size=(1600, 800), title="Daily Root Water Uptake by Depth and Soil Water Potential", titlesize=20, titlealign = :center)
+    figure = (; size=(1200, 600), title="Daily Root Water Uptake by Depth and Soil Water Potential", titlesize=20, titlealign = :center)
 )
 
 # weighted-average soil water potential

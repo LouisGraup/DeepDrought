@@ -18,22 +18,24 @@ end
 @everywhere begin
     # behavioral data
     # soil water content and soil matric potential
-    obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
-    obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+    obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
     filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
-    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc.csv", DataFrame);
-    filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
+    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
+    # up-scaled sap flow data
+    obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans11_18.csv", DataFrame);
+
     # separate out irrigation scenario
-    obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
+    obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
     select!(obs_swc_irr, :date, :depth, :VWC); # remove extra columns
     obs_swc_irr = unstack(obs_swc_irr, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs_swc_irr, :date); # sort by date
 
     obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
 
+    obs_sap_irr = obs_sap[obs_sap.scen .== "Irrigation", :]; # select irrigation treatment
 end
 
 # objective function to compare model output to observed data
@@ -103,17 +105,74 @@ end
     return nse10, nse80
 end
 
+@everywhere function obs_fun_trans(sap_comp)
+
+    # remove missing values
+    sap_comp = dropmissing(sap_comp);
+
+    function NSE(sim, obs)
+        # calculate Nash-Sutcliffe Efficiency
+        nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
+        return nse
+    end
+
+    nse = NSE(sap_comp.trans, sap_comp.Tr);
+
+    return nse
+
+end
+
+@everywhere function obs_fun_sap(sap_comp)
+
+    # remove missing values
+    sap_comp = dropmissing(sap_comp);
+
+    cc = cor(sap_comp.trans, sap_comp.Tr);
+
+    return cc
+
+end
+
+@everywhere function sap_comp(sim, obs_sap)
+    # sim is the LWFBrook90 simulation
+    # obs is the observed soil water potential data
+
+    z_trans = get_sap(sim);
+
+    filter!(:date => >=(obs_sap.date[1]), z_trans);
+    filter!(:date => <(Date(2018, 1, 1)), z_trans);
+
+    obs_sap = select(obs_sap, Not(:scen));
+
+    sap_comp = sort(leftjoin(z_trans, obs_sap, on = :date), :date);
+
+    return sap_comp
+
+end
+
+@everywhere function get_sap(sim)
+    # retrieve soil water potential data from sim
+    days, dates_out = get_dates(sim);
+    
+    z = get_fluxes(sim);
+    z.date = dates_out;
+    z.trans = z.cum_d_tran;
+    select!(z, :date, :trans);
+    
+    return z
+end
+
 ### BEGIN USER INPUT ###
 
 @everywhere begin
     ## parameter input and output paths
     # input
-    input_path_irr = "LWFBinput/Pfyn_irrigiso_ambient/";
+    input_path = "LWFBinput/Pfyn_irrigiso_ambient/";
     input_prefix = "pfynwald";
 
     # output
     output_path = "LWFBcalibration/";
-    subdir_name_irr = "cal_irr";
+    subdir_name = "cal_irr";
 
     ## simulation dates
 
@@ -131,36 +190,36 @@ n = 1000; # number of parameter sets
 
 param = [
     # hydro parameters
-    ("DRAIN", 0.01, 0.018), # drainage (0, 1)
-    ("INFEXP", 0.75, 0.9), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.5, 0.6), # infiltration depth (m) (0.05, 0.5)
+    ("DRAIN", 0.0, 1.0), # drainage (0, 1)
+    ("INFEXP", 0.0, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 0.5)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 100, 200), # soil resistance (1, 1500)
-    ("ths1", 1.1, 1.25), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat1", -0.1, 0.35), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths2", 1.34, 1.39), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat2", -0.1, 0.2), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("ths3", 1.42, 1.45), # multiplier on theta_sat (0.5, 1.5)
-    ("ksat3", 0.47, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("RSSA", 1, 1500), # soil resistance (1, 1500)
+    ("ths1", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths2", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("ths3", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.08, 0.14), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.021, 0.025), # stomatal conductance (0.001, 0.03)
-    ("CVPD", 2.6, 3), # vpd sensitivity (1, 3)
-    ("R5", 200, 240), # radiation sensitivity (50, 400)
+    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.03), # stomatal conductance (0.001, 0.03)
+    ("CVPD", 1.0, 3), # vpd sensitivity (1, 3)
+    ("R5", 50, 500), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -1.05, -1.0), # critical water potential (-4, -1)
-    ("FXYLEM", 0.3, 0.45), # aboveground xylem fraction (0.2, 0.8)
-    ("MXKPL", 27.0, 30.0), # maximum plant conductivity (1, 30)
-    ("MXRTLN", 1000, 2500), # maximum root length (100, 6000)
+    ("PSICR", -3.0, -1.0), # critical water potential (-4, -1)
+    ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
+    ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
+    ("MXRTLN", 100, 6000), # maximum root length (100, 6000)
     #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
     #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
-    ("MAXROOTDEPTH", -1.75, -1.4), # max rooting depth (-5, -0.5)
-    ("BETAROOT", 0.969, 0.972) # beta root coefficient (0.8, 1.0)
+    ("MAXROOTDEPTH", -2.0, -0.5), # max rooting depth (-5, -0.5)
+    ("BETAROOT", 0.9, 0.999) # beta root coefficient (0.8, 1.0)
 ];
 
 ### END USER INPUT ###
@@ -196,10 +255,10 @@ end
 
 # input parameter file
 
-param_file = input_path_irr * input_prefix * "_param.csv";
+param_file = input_path * input_prefix * "_param.csv";
 param0 = CSV.read(param_file, DataFrame);
 
-soil_file = input_path_irr * input_prefix * "_soil_horizons.csv";
+soil_file = input_path * input_prefix * "_soil_horizons.csv";
 soil0 = CSV.read(soil_file, DataFrame, skipto=3);
 
 # function to output soil file
@@ -267,21 +326,21 @@ for i in 1:nsets
     end
 
     # output folders
-    out_dir_irr = output_path * subdir_name_irr * string(i) * "/";
+    out_dir = output_path * subdir_name * string(i) * "/";
     
     # copy folder structure to output folders
-    cp(input_path_irr, out_dir_irr, force=true);
+    cp(input_path, out_dir, force=true);
 
     # write parameter and soil horizons files
-    CSV.write(out_dir_irr * output_prefix * "_param.csv", param_set);
-    output_soil_file(soil_set, out_dir_irr * output_prefix);
+    CSV.write(out_dir * output_prefix * "_param.csv", param_set);
+    output_soil_file(soil_set, out_dir * output_prefix);
 end
 
 
 ## set up calibration runs
 
 # dummy run for reference date
-model_temp = loadSPAC(input_path_irr, input_prefix);
+model_temp = loadSPAC(input_path, input_prefix);
 ref_date = Date(model_temp.reference_date);
 
 start_index = Dates.value(start_date - ref_date);
@@ -293,13 +352,12 @@ end_index = Dates.value(end_date - ref_date);
 @everywhere root_params = $root_params
 @everywhere start_index = $start_index
 @everywhere end_index = $end_index
-@everywhere nsets = $nsets
 
 ## run LWFBrook90 for each parameter set
 # using parallel processing
 @everywhere function run_calibration(i)
 
-    cal_dir = output_path * subdir_name_irr * string(i) * "/";
+    cal_dir = output_path * subdir_name * string(i) * "/";
     par_id = i
 
     if root_params
@@ -325,7 +383,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 8), fill(0,2)) # skip if simulation fails
+        return (par_id, fill(0, 14)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -342,7 +400,22 @@ end_index = Dates.value(end_date - ref_date);
     swc_met = obj_fun_swc(z_theta, obs_swc_irr)
     swp_met = obj_fun_swp(z_psi, obs_swp_irr)
     
-    return (par_id, swc_met, swp_met)
+    # transpiration
+    sap_comp = sap_comp(sim, obs_sap_irr);
+    sap_cor = obs_fun_sap(sap_comp);
+    sap_nse = obs_fun_trans(sap_comp);
+
+    z_trans = get_sap(sim);
+    max_trans = maximum(z_trans.trans);
+
+    # annual total
+    z_trans.year = year.(z_trans.Date);
+    z_trans_yr = combine(groupby(z_trans, :year), :trans => sum);
+    mean_ann_trans = mean(z_trans_yr.trans_sum);
+
+    tr_met = [sap_cor, sap_nse, max_trans, mean_ann_trans]
+
+    return (par_id, swc_met, swp_met, tr_met)
 
 end
 
@@ -361,13 +434,17 @@ metrics_irr = DataFrame(scen = Int[],
     swc_nse80 = Float64[],
     swc_rmse80 = Float64[],
     swp_nse10 = Float64[],
-    swp_nse80 = Float64[]);
+    swp_nse80 = Float64[],
+    trans_cor = Float64[], 
+    trans_nse = Float64[], 
+    max_trans = Float64[],
+    ann_trans = Float64[]);
 
 # loop through results
 for res in results
     # retrieve parameter id, and metrics
-    par_id, swc, swp = res;
-    row = [par_id, swc..., swp...];
+    par_id, swc, swp, sap = res;
+    row = [par_id, swc..., swp..., sap...];
     push!(metrics_irr, row);
 end
 
