@@ -37,10 +37,10 @@ ht_stp = mean(filter(site_df, BEZKM == "stop")$height_m)
 
 ## read in lai data and interpolate between observations
 
-lai_df = read.csv("../../Data/Pfyn/PFY_lai.csv")
-lai_cont = filter(lai_df, trt=="control") %>% group_by(year) %>% 
+lai_df = read.csv("../../Data/Pfyn/Pfyn_LAI04_21.csv")
+lai_cont = filter(lai_df, treatment=="control") %>% group_by(year) %>% 
   summarize_at(vars(LAI), list(mean))
-lai_irr = filter(lai_df, trt=="irrig.") %>% group_by(year) %>% 
+lai_irr = filter(lai_df, treatment=="irrigated") %>% group_by(year) %>% 
   summarize_at(vars(LAI), list(mean))
 
 # control plots
@@ -52,8 +52,8 @@ lai_cont$pred = lai_fit_c
 ggplot(lai_cont, aes(year, LAI))+geom_point()+
   geom_line(aes(year, pred), color="red")
 
-# non-linear regression has low predictive power
-# so going to use a piece-wise linear regression instead
+# non-linear regression has higher predictive power with additional years
+# so not going to use a piece-wise linear regression anymore
 LAI_pw_linear = function(year, obs) {
   
   if (year %in% obs$year) {
@@ -62,8 +62,8 @@ LAI_pw_linear = function(year, obs) {
   else if (year < obs$year[1]){
     lai = obs$LAI[1]
   }
-  else if (year > obs$year[8]){
-    lai = obs$LAI[8]
+  else if (year > obs$year[11]){
+    lai = obs$LAI[11]
   }
   else if (year > 2008 && year < 2012) {
     f = (2012 - year) / 4
@@ -89,9 +89,16 @@ LAI_pw_linear = function(year, obs) {
   LAI_pw_linear = lai
 }
 
+#lai_ext <- data.frame(year=c(2000:2025))
+#lai_ext$LAI = sapply(lai_ext$year, LAI_pw_linear, lai_cont)
+
+# extend LAI series using non-linear model
 lai_ext <- data.frame(year=c(2000:2025))
-lai_ext$LAI = sapply(lai_ext$year, LAI_pw_linear, lai_cont)
-ggplot(lai_ext, aes(year, LAI))+geom_point()
+lai_ext$lai_pred<-predict(lai_lm_c, newdata=lai_ext,type="response")
+lai_ext$lai_pred[1:4] = lai_cont$LAI[1] # assume years before irrigation are same as first year of control
+#lai_ext$lai_pred[23:26] = lai_cont$LAI[11] # assume most recent years are same as last observation
+
+ggplot(lai_ext, aes(year, lai_pred))+geom_point()
 
 # quick analysis against annual precipitation
 lai_cont = left_join(lai_cont, meteoy)
@@ -118,27 +125,27 @@ ggplot(lai_irr, aes(year, LAI))+geom_point()+
 lai_ext_irr <- data.frame(year=c(2000:2025))
 lai_ext_irr$lai_pred<-predict(lai_lm_i, newdata=lai_ext_irr,type="response")
 lai_ext_irr$lai_pred[1:4] = lai_cont$LAI[1] # assume years before irrigation are same as first year of control
-lai_ext_irr$lai_pred[20:26] = lai_irr$LAI[8] # assume most recent years are same as last observation
-lai_ext_irr = left_join(lai_ext_irr, lai_irr)
+lai_ext_irr$lai_pred[23:26] = lai_irr$LAI[11] # assume most recent years are same as last observation
+# lai_ext_irr = left_join(lai_ext_irr, lai_irr)
 # fill in years without observations with modeled regression
-lai_ext_irr$LAI[is.na(lai_ext_irr$LAI)] = lai_ext_irr$lai_pred[is.na(lai_ext_irr$LAI)]
+# lai_ext_irr$LAI[is.na(lai_ext_irr$LAI)] = lai_ext_irr$lai_pred[is.na(lai_ext_irr$LAI)]
 
-ggplot(lai_ext_irr, aes(year, LAI))+geom_point()
+ggplot(lai_ext_irr, aes(year, lai_pred))+geom_point()
 
 
 # irrigation stop plots
 # use irrigated LAI until 2014, then reduce to average of irrigated and control in final obs. year
 
-lai_ext_irrstp = select(lai_ext_irr, year, LAI) %>% rename(LAI_irr=LAI)
-lai_ext_irrstp$LAI_ctrl = lai_ext$LAI
+lai_ext_irrstp = select(lai_ext_irr, year, lai_pred) %>% rename(LAI_irr=lai_pred)
+lai_ext_irrstp$LAI_ctrl = lai_ext$lai_pred
 
 # simple piece-wise function for years after irrigation stop
 LAI_pw_irrstp = function(year, lai) {
   
-  if (year > 2013 && year < 2018) {
-    f = (2018 - year) / 5
+  if (year > 2013 && year <= 2025) {
+    f = (2025 - year) / 12
     L1 = lai$LAI_irrstp[which(lai$year == 2013)]
-    L2 = lai$LAI_irrstp[which(lai$year == 2018)]
+    L2 = lai$LAI_irrstp[which(lai$year == 2025)]
     lai_out = L1 * f + L2 * (1 - f)
   }
   else
@@ -147,12 +154,15 @@ LAI_pw_irrstp = function(year, lai) {
   LAI_pw_irrstp = lai_out
 }
 
-lai_ext_irrstp$LAI_irrstp = with(lai_ext_irrstp, ifelse(year<2014, LAI_irr, (LAI_irr+LAI_ctrl)/2))
+lai_ext_irrstp$LAI_irrstp = with(lai_ext_irrstp, ifelse(year<2014, LAI_irr, ifelse(year==2025, LAI_ctrl, (LAI_irr+LAI_ctrl)/2)))
 lai_ext_irrstp$LAI_irrstp = sapply(lai_ext_irrstp$year, LAI_pw_irrstp, lai_ext_irrstp)
+
+ggplot(lai_ext_irrstp, aes(year, LAI_irrstp))+geom_point()
 
 # compare LAI trajectories across treatments
 lai_comp = pivot_longer(lai_ext_irrstp, -year)
-ggplot(lai_comp, aes(year, value, color=name))+geom_point()
+ggplot(lai_comp, aes(year, value, color=name))+geom_point()+theme_bw()+
+  labs(x="",y="LAI", color="Scenario")
 
 # round off LAI values
 lai_ext_irrstp[,-1] = round(lai_ext_irrstp[,-1], 4)

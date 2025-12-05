@@ -41,11 +41,11 @@ end
 # objective function to compare model output to observed data
 @everywhere function obj_fun_swc(sim, obs)
 
+    obs = obs[obs.date .∈ [sim.dates], :];
+
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
     obs_80cm = dropmissing(obs[!, [:date, :VWC_80cm]]);
-
-    filter!(:date => >(Date(2015, 1, 1)), obs_80cm); # filter out early dates
 
     # match simulated data to available dates for each depth
     sim_10cm = sim[sim.dates .∈ [obs_10cm.date], :theta_m3m3_100mm];
@@ -359,13 +359,13 @@ end_index = Dates.value(end_date - ref_date);
 
         # run model with modified root distribution
         model = loadSPAC(cal_dir, output_prefix, 
-        simulate_isotopes = true, simulate_irrigation = false,
+        simulate_isotopes = true, simulate_irrigation = true,
         root_distribution = (beta = betaroot, z_rootMax_m=maxroot));
 
     else
         # run model with input files
         model = loadSPAC(cal_dir, output_prefix, 
-        simulate_isotopes = true, simulate_irrigation = false)
+        simulate_isotopes = true, simulate_irrigation = true)
     end
 
     # model set up

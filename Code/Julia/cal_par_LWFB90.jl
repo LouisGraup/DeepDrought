@@ -41,6 +41,8 @@ end
 # objective function to compare model output to observed data
 @everywhere function obj_fun_swc(sim, obs)
 
+    obs = obs[obs.date .∈ [sim.dates], :];
+    
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
     obs_40cm = dropmissing(obs[!, [:date, :VWC_40cm]]);

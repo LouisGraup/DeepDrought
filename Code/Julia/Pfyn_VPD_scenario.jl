@@ -319,6 +319,12 @@ draw(data(drt_comp)*mapping(:date, :SWP, linestyle=:src, row=:depth => nonnumeri
     figure = (; title="Soil Water Potential Comparison for Roof Scenarios", titlealign = :center))
 
 
+# check this one below
+draw(data(drt_comp)*mapping(:date, :SWP, linestyle=:src, row=:depth => nonnumeric)*visual(Lines, label="roof", linewidth=.5)+
+    data(drt_vpd_comp)*mapping(:date, :SWP, linestyle=:src, row=:depth => nonnumeric)*visual(Lines, label="roof_vpd", color=:red, linewidth=.5)+
+    data(obs_roof)*mapping(:date, :SWP, color=:treatment, row=:depth => nonnumeric)*visual(Lines, label="obs"),
+    figure = (; title="Soil Water Potential Comparison for Roof Scenarios", titlealign = :center))
+
 R"""
 rdf1 = $drt_comp
 rdf2 = $drt_vpd_comp
