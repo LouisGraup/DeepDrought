@@ -56,5 +56,6 @@ swc$meta = if_else(swc$meta == "irrigated","irrigation",swc$meta)
 
 swc_comp = rbind(swc, swc_ext)
 swc_comp$VWC = swc_comp$VWC / 100
+swc_comp$depth = swc_comp$depth * 100
 
-write_csv(swc_comp, "../../Data/Pfyn/Pfyn_swat.csv")
+#write_csv(swc_comp, "../../Data/Pfyn/Pfyn_swat.csv")
