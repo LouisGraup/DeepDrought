@@ -5,7 +5,90 @@ library(lubridate)
 library(readxl)
 library(zoo)
 
-# sap flow data from Zweifel et al. (2020)
+## common data and functions
+
+source("../../Data/Pfyn/data for Pfynwald/Pfyn_sf_helpers.R") # from Richard Peters for VPDrought
+
+sapwood_bin_size = 300
+
+# inventoried trees
+Pfyn_inv = read_excel("../../Data/Pfyn/Pfyn_DBH_2023.xlsx")
+Pfyn_inv = filter(Pfyn_inv, Plot!=0)
+
+Pfyn_inv$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, Pfyn_inv$DBH, Pfyn_inv$Treatment) # sapwood depth
+Pfyn_inv$BDD = BDD(Pfyn_inv$DBH) # bark thickness
+Pfyn_inv$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, Pfyn_inv$DBH, Pfyn_inv$SWD, Pfyn_inv$BDD)
+
+ggplot(Pfyn_inv, aes(DBH))+geom_histogram()+facet_wrap(~Treatment, scales="free_y")
+ggplot(Pfyn_inv, aes(sapwood_area))+geom_histogram()+facet_wrap(~Treatment, scales="free_y")
+ggplot(Pfyn_inv, aes(sapwood_area))+geom_histogram()+facet_wrap(~Treatment_VPD, scales="free_y")
+hist(filter(Pfyn_inv, Treatment_VPD=="Control")$sapwood_area)
+
+# group sapwood area into bins per plot and treatment and calculate proportional area
+Pfyn_inv$sapwood_area_bin = cut_width(Pfyn_inv$sapwood_area, sapwood_bin_size, boundary=0)
+Pfyn_inv_trt = Pfyn_inv %>% group_by(Treatment, sapwood_area_bin) %>% summarize(n=n()) %>% mutate(prop = n/sum(n))
+
+# sapwood area by plot
+Pfyn_inv_sum_VPD = Pfyn_inv %>% group_by(Plot, Treatment_VPD) %>% summarize(sapwood_area_total = sum(sapwood_area)) # in cm^2
+Pfyn_inv_sum = Pfyn_inv %>% group_by(Plot, Treatment) %>% summarize(sapwood_area_total = sum(sapwood_area)) # in cm^2
+
+# plot area
+# irrigation stop plot areas in m^2: p2=475, p3=450, p6=428, p7=357
+# roof area seems to be about 16x16 m = 256 m^2
+Pfyn_inv_sum_VPD$plot_area = c(1000, 475, 525, 488, 256, 256, 638, 256, 256, 428, 572, 357, 643, 744, 256, 256)
+Pfyn_inv_sum$plot_area = c(1000, 525, 475, 1000, 1000, 572, 428, 643, 357, 1000)
+
+# treatment sapwood area
+sap_area_cont_vpd = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Control")$sapwood_area_total)
+sap_area_cont = sum(filter(Pfyn_inv_sum, Treatment=="Control")$sapwood_area_total)
+sap_area_irr = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Irrigation")$sapwood_area_total)
+sap_area_drt = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Roof")$sapwood_area_total)
+sap_area_irst = sum(filter(Pfyn_inv_sum, Treatment=="Irrigation stop")$sapwood_area_total)
+
+# treatment area
+area_cont_vpd = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Control")$plot_area)
+area_cont = sum(filter(Pfyn_inv_sum, Treatment=="Control")$plot_area)
+area_irr = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Irrigation")$plot_area)
+area_drt = sum(filter(Pfyn_inv_sum_VPD, Treatment_VPD=="Roof")$plot_area)
+area_irst = sum(filter(Pfyn_inv_sum, Treatment=="Irrigation stop")$plot_area)
+
+# TreeNet metadata
+TN_ctr_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_sap_control.csv")
+TN_irr_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_sap_irrigation.csv")
+
+# calculate sapwood characteristics of measured trees
+
+sap_profile = function(df, sap_bin) {
+
+  df$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, df$tree_dbh, "Control")
+  df$BDD = BDD(df$tree_dbh)
+  df$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, df$tree_dbh, df$SWD, df$BDD)
+  df$sapwood_area_bin = cut_width(df$sapwood_area, sap_bin, boundary=0)
+  df$rad_cor = sapply(df$SWD, rad_cor) # radial profile correction
+  
+  return(df)
+}
+
+# control scenario
+TN_sf_ctr = TN_ctr_meta %>% select(tree_name, tree_dbh) %>% 
+  filter(tree_name %in% c(109, 110, 124))
+
+TN_sf_ctr = sap_profile(TN_sf_ctr, sapwood_bin_size)
+
+# irrigation stop scenario
+TN_sf_irst = TN_irr_meta %>% select(tree_name, tree_dbh) %>% 
+  filter(tree_name %in% c(274, 275, 276))
+
+TN_sf_irst = sap_profile(TN_sf_irst, sapwood_bin_size)
+
+# irrigation scenario
+TN_sf_irr = TN_irr_meta %>% select(tree_name, tree_dbh) %>% 
+  filter(tree_name %in% c(246, 247, 250))
+
+TN_sf_irr = sap_profile(TN_sf_irr, sapwood_bin_size)
+
+
+## sap flow data from Zweifel et al. (2020)
 
 sf = read_tsv("../../Data/Pfyn/pfynwald_sapflow.tab", skip=33)
 
@@ -48,363 +131,86 @@ ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sfd, color=as.factor(s
 
 # write_csv(sf_meta, "Pfyn_sap_2011_17.csv")
 
-# upscaling procedure
+## upscaling procedure
 
 # control scenario
 sf_ctr = sf_daily %>% filter(tree_id != "125", scenario=="control")
 
-# determine sapwood area bins of measured trees
-TN_sf_ctr = TN_ctr_meta %>% select(tree_name, tree_dbh) %>% 
-  filter(tree_name %in% c(109, 110, 124))
-
-TN_sf_ctr$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, TN_sf_ctr$tree_dbh, "Control")
-TN_sf_ctr$BDD = BDD(TN_sf_ctr$tree_dbh)
-TN_sf_ctr$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, TN_sf_ctr$tree_dbh, TN_sf_ctr$SWD, TN_sf_ctr$BDD)
-TN_sf_ctr$sapwood_area_bin = cut_width(TN_sf_ctr$sapwood_area, 300, boundary=0)
-
 # combine with measurements for weighting
 sf_ctr = left_join(mutate(sf_ctr, tree_id=as.numeric(tree_id)), rename(TN_sf_ctr, tree_id=tree_name))
 
-# sap flow normalized by sapwood area
-sf_ctr$sf_norm = sf_ctr$sf / sf_ctr$sapwood_area
+# sap flow normalized by sapwood area and corrected for radial profile
+sf_ctr$sf_norm = sf_ctr$sf / sf_ctr$sapwood_area * sf_ctr$rad_cor
 
 # group by size class and add inventory statistics by treatment
 sf_ctr_bin = sf_ctr %>% group_by(date, sapwood_area_bin) %>% summarize_at(vars(sf, sf_norm), list(mean))
+sf_ctr_bin = left_join(sf_ctr_bin, filter(Pfyn_inv_trt, Treatment=="Control"))
 
-sf_ctr_bin = left_join(sf_ctr_bin, filter(Pfyn_inv_trt, Treatment_VPD=="Control"))
-
-# upscale by number of trees
-sf_ctr_daily = sf_ctr_bin %>% group_by(date) %>% summarize(Tr=sum(sf*n)/area_cont)
+# upscale by sapwood area
+sf_ctr_daily = sf_ctr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
+sf_ctr_daily$Tr = sf_ctr_daily$Tr * sap_area_cont / area_cont
 
 ggplot(sf_ctr_daily, aes(date, Tr))+geom_line()
 
-# upscale by sapwood area
-sap_area_cont = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Control")$sapwood_area_total)
-
-sf_ctr_daily_sa = sf_ctr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
-sf_ctr_daily_sa$Tr = sf_ctr_daily_sa$Tr * sap_area_cont / area_cont
-
-ggplot(sf_ctr_daily_sa, aes(date, Tr))+geom_line()
-
-sf_ctr_yr = sf_ctr_daily_sa %>% mutate(year=year(date)) %>% 
+sf_ctr_yr = sf_ctr_daily %>% mutate(year=year(date)) %>% 
   group_by(year) %>% summarize(Tr=sum(Tr))
 
 # irrigation stop scenario
 sf_irst = sf_daily %>% filter(scenario=="irrigation stop")
 
-# determine sapwood area bins of measured trees
-TN_sf_irst = TN_irr_meta %>% select(tree_name, tree_dbh) %>% 
-  filter(tree_name %in% c(274, 275, 276))
-
-TN_sf_irst$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, TN_sf_irst$tree_dbh, "Irrigation stop")
-TN_sf_irst$BDD = BDD(TN_sf_irst$tree_dbh)
-TN_sf_irst$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, TN_sf_irst$tree_dbh, TN_sf_irst$SWD, TN_sf_irst$BDD)
-TN_sf_irst$sapwood_area_bin = cut_width(TN_sf_irst$sapwood_area, 300, boundary=0)
-
 # combine with measurements for weighting
 sf_irst = left_join(mutate(sf_irst, tree_id=as.numeric(tree_id)), rename(TN_sf_irst, tree_id=tree_name))
 
-# sap flow normalized by sapwood area
-sf_irst$sf_norm = sf_irst$sf / sf_irst$sapwood_area
+# sap flow normalized by sapwood area and corrected for radial profile
+sf_irst$sf_norm = sf_irst$sf / sf_irst$sapwood_area * sf_irst$rad_cor
 
 # group by size class and add inventory statistics by treatment
 sf_irst_bin = sf_irst %>% group_by(date, sapwood_area_bin) %>% summarize_at(vars(sf, sf_norm), list(mean))
+sf_irst_bin = left_join(sf_irst_bin, filter(Pfyn_inv_trt, Treatment=="Irrigation stop"))
 
-sf_irst_bin = left_join(sf_irst_bin, filter(Pfyn_inv_trt, Treatment_VPD=="Irrigation stop"))
-
-# upscale by number of trees
-area_irst = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Irrigation stop")$plot_area)
-
-sf_irst_daily = sf_irst_bin %>% group_by(date) %>% summarize(Tr=sum(sf*n)/area_irst)
+# upscale by sapwood area
+sf_irst_daily = sf_irst_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
+sf_irst_daily$Tr = sf_irst_daily$Tr * sap_area_irst / area_irst
 
 ggplot(sf_irst_daily, aes(date, Tr))+geom_line()
 
-# upscale by sapwood area
-sap_area_irst = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Irrigation stop")$sapwood_area_total)
-
-sf_irst_daily_sa = sf_irst_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
-sf_irst_daily_sa$Tr = sf_irst_daily_sa$Tr * sap_area_irst / area_irst
-
-ggplot(sf_irst_daily_sa, aes(date, Tr))+geom_line()
-
-sf_irst_yr = sf_irst_daily_sa %>% mutate(year=year(date)) %>% 
+sf_irst_yr = sf_irst_daily %>% mutate(year=year(date)) %>% 
   group_by(year) %>% summarize(Tr=sum(Tr))
 
 # irrigation scenario
 sf_irr = sf_daily %>% filter(scenario=="irrigation")
 
-# determine sapwood area bins of measured trees
-TN_sf_irr = TN_irr_meta %>% select(tree_name, tree_dbh) %>% 
-  filter(tree_name %in% c(246, 247, 250))
-
-TN_sf_irr$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, TN_sf_irr$tree_dbh, "Irrigation")
-TN_sf_irr$BDD = BDD(TN_sf_irr$tree_dbh)
-TN_sf_irr$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, TN_sf_irr$tree_dbh, TN_sf_irr$SWD, TN_sf_irr$BDD)
-TN_sf_irr$sapwood_area_bin = cut_width(TN_sf_irr$sapwood_area, 300, boundary=0)
-
 # combine with measurements for weighting
 sf_irr = left_join(mutate(sf_irr, tree_id=as.numeric(tree_id)), rename(TN_sf_irr, tree_id=tree_name))
 
-# sap flow normalized by sapwood area
-sf_irr$sf_norm = sf_irr$sf / sf_irr$sapwood_area
+# sap flow normalized by sapwood area and corrected for radial profile
+sf_irr$sf_norm = sf_irr$sf / sf_irr$sapwood_area * sf_irr$rad_cor
 
 # group by size class and add inventory statistics by treatment
 sf_irr_bin = sf_irr %>% group_by(date, sapwood_area_bin) %>% summarize_at(vars(sf, sf_norm), list(mean))
-
-sf_irr_bin = left_join(sf_irr_bin, filter(Pfyn_inv_trt, Treatment_VPD=="Irrigation"))
-
-# upscale by number of trees
-
-sf_irr_daily = sf_irr_bin %>% group_by(date) %>% summarize(Tr=sum(sf*n)/area_irr)
-
-ggplot(sf_irr_daily, aes(date, Tr))+geom_line()
+sf_irr_bin = left_join(sf_irr_bin, filter(Pfyn_inv_trt, Treatment=="Irrigation"))
 
 # upscale by sapwood area
-sap_area_irr = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Irrigation")$sapwood_area_total)
+sf_irr_daily = sf_irr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
+sf_irr_daily$Tr = sf_irr_daily$Tr * sap_area_irr / area_irr
 
-sf_irr_daily_sa = sf_irr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
-sf_irr_daily_sa$Tr = sf_irr_daily_sa$Tr * sap_area_irr / area_irr
-
-ggplot(sf_irr_daily_sa, aes(date, Tr))+geom_line()
+ggplot(sf_irr_daily, aes(date, Tr))+geom_line()
 
 sf_irr_yr = sf_irr_daily_sa %>% mutate(year=year(date)) %>% 
   group_by(year) %>% summarize(Tr=sum(Tr))
 
 # combine and output into single file
-trans_comp = rbind(mutate(sf_ctr_daily_sa, scen="Control"),mutate(sf_irst_daily_sa, scen="Irrigation stop"))
-trans_comp = rbind(trans_comp, mutate(sf_irr_daily_sa, scen="Irrigation"))
+trans_comp = rbind(mutate(sf_ctr_daily, scen="Control"), mutate(sf_irst_daily, scen="Irrigation stop"))
+trans_comp = rbind(trans_comp, mutate(sf_irr_daily, scen="Irrigation"))
 
 ggplot(trans_comp, aes(date, Tr, color=scen))+geom_line()
 
-#write_csv(trans_comp, "../../Data/Pfyn/Pfyn_trans11_18.csv")
-
-
-# sap flow data from Richard Peters
-
-setwd("../../Data/Pfyn/data for Pfynwald/")
-
-# VPDrought 2024-25 data
-
-sap_vpd = readRDS("2024/VPDrought_SF_L3_2025-02-02.RDS")
-sap_vpd25 = readRDS("VPDrought_sfden_2025-06-18.RDS")
-
-sap_vpd$Date.Time = as.POSIXct(sap_vpd$Date.Time, tz="CET", format="%Y-%m-%d %H:%M:%S")
-sap_vpd$date = as.Date(sap_vpd$Date.Time, tz="CET")
-
-ggplot(sap_vpd, aes(Date.Time, Total_Sap_Flow, color=as.factor(Tree_id)))+geom_line()+
-  facet_wrap(~Treatment)+theme_bw()+guides(color="none")
-
-sap_vpd_hourly = sap_vpd %>% filter(Total_Sap_Flow_Corr > 0) %>% 
-  mutate(datehour=floor_date(Date.Time, "1 hour")) %>% 
-  group_by(datehour, Tree_id, Treatment) %>% summarize(Total_Sap_Flow=mean(Total_Sap_Flow_Corr, na.rm=T))
-sap_vpd_hourly$date = as.Date(sap_vpd_hourly$datehour, tz="CET")
-
-#
-sap_vpd_daily = sap_vpd %>% filter(Total_Sap_Flow>0) %>% group_by(date, Tree_id, Treatment) %>% 
-  summarize(Total_Sap_Flow=mean(Total_Sap_Flow, na.rm=T))
-
-ggplot(sap_vpd_daily, aes(date, Total_Sap_Flow, color=as.factor(Tree_id)))+geom_line()+
-  facet_wrap(~Treatment)+theme_bw()+guides(color="none")
-
-sap_vpd_meta = sap_vpd_daily %>% group_by(date, Treatment) %>% 
-  summarize(Total_Sap_Flow=mean(Total_Sap_Flow, na.rm=T))
-
-ggplot(sap_vpd_meta, aes(date, Total_Sap_Flow, color=as.factor(Treatment)))+geom_line()+
-  theme_bw()+labs(x="",color="Treatment")
-
-# write_csv(sap_vpd_meta, "../Pfyn_sap_vpd.csv")
-
-# convert sap flow to transpiration for VPDrought trees
-source("Pfyn_sf_helpers.R")
-Pfyn_inv = read_excel("../Pfyn_DBH_2023.xlsx")
-Pfyn_inv = filter(Pfyn_inv, Plot!=0)
-
-## measured trees
-
-# first, retrieve dbh for each tree from tree_spec function
-tree_specs = do.call(rbind, lapply(unique(sap_vpd$Tree_id), tree_spec))
-tree_specs$meta = ifelse(grepl("irrigation",tree_specs$treat),"Irrigation","Control")
-
-# add dummy tree for bins later
-tree_specs = rbind(tree_specs, setNames(data.frame("Pinus","-999",1,"Control",0,"Control"), names(tree_specs)))
-
-# add plot # from inventory
-tree_specs$TreeNo = as.numeric(tree_specs$tree)
-tree_specs = left_join(tree_specs, select(Pfyn_inv, TreeNo, Plot))
-tree_specs$Plot = ifelse(is.na(tree_specs$Plot) & tree_specs$TreeNo != -999, 3, ifelse(tree_specs$Plot==0, 8, tree_specs$Plot))
-
-# calculate sapwood depth and bark depth using dbh
-tree_specs$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, tree_specs$dbh, tree_specs$meta)
-tree_specs$BDD = BDD(tree_specs$dbh)
-
-# finally calculate sapwood area
-tree_specs$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, tree_specs$dbh, tree_specs$SWD, tree_specs$BDD)
-tree_specs$sapwood_area_bin = cut_width(tree_specs$sapwood_area, 300, boundary=0)
-
-tree_specs = filter(tree_specs, TreeNo != -999) # remove dummy
-
-## inventoried trees
-
-Pfyn_inv$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, Pfyn_inv$DBH, Pfyn_inv$Treatment)
-Pfyn_inv$BDD = BDD(Pfyn_inv$DBH)
-Pfyn_inv$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, Pfyn_inv$DBH, Pfyn_inv$SWD, Pfyn_inv$BDD)
-
-ggplot(Pfyn_inv, aes(sapwood_area))+geom_histogram()+facet_wrap(~Plot, scales="free_y")
-hist(filter(Pfyn_inv, Treatment_VPD=="Control")$sapwood_area)
-hist(filter(Pfyn_inv, Plot==1)$sapwood_area)
-
-# group sapwood area into bins per plot and treatment and calculate proportional area
-Pfyn_inv$sapwood_area_bin = cut_width(Pfyn_inv$sapwood_area, 300, boundary=0)
-Pfyn_inv_plot = Pfyn_inv %>% group_by(Plot, Treatment_VPD, sapwood_area_bin) %>% summarize(n=n()) %>% 
-  mutate(prop = n/sum(n))
-Pfyn_inv_trt = Pfyn_inv %>% group_by(Treatment_VPD, sapwood_area_bin) %>% summarize(n=n()) %>% 
-  mutate(prop = n/sum(n))
-
-# sapwood area by plot
-Pfyn_inv_sum = Pfyn_inv %>% group_by(Plot, Treatment_VPD) %>% summarize(sapwood_area_total = sum(sapwood_area)) # in cm^2
-
-# plot area
-# irrigation stop plot areas in m^2: p2=475, p3=450, p6=428, p7=357
-# roof area seems to be about 16x16 m = 256 m^2
-Pfyn_inv_sum$plot_area = c(1000, 525, 475, 488, 256, 256, 638, 256, 256, 572, 428, 643, 357, 744, 256, 256)
-#Pfyn_inv_sum$plot_area = 1000 # m^2
-
-# sapwood area per unit of ground area
-Pfyn_inv_sum$sapwood_unit_area = Pfyn_inv_sum$sapwood_area_total / Pfyn_inv_sum$plot_area
-
-## presumably, upscale sap flow by plot (maybe treatment for better representation)
-# start with control, plot 1
-
-# first attempt, normalize sap flow by sapwood area and scale with stand sapwood area
-sap_vpd_plot = filter(sap_vpd_hourly, Tree_id %in% filter(tree_specs, Plot == 1)$tree)
-
-# append sapwood area bins and proportion of total sapwood area
-sap_vpd_plot = left_join(sap_vpd_plot, select(rename(tree_specs, Tree_id=tree), Tree_id, Plot, sapwood_area, sapwood_area_bin))
-sap_vpd_plot = left_join(sap_vpd_plot, select(Pfyn_inv_plot, Plot, sapwood_area_bin, prop))
-
-# multiply sap flow by this proportion and add trees together
-sap_vpd_plot_scaled = sap_vpd_plot %>% group_by(datehour, date, Plot) %>% summarize(Tr = sum((Total_Sap_Flow/sapwood_area)*prop, na.rm=T))
-
-# combine with plot-level information dividing by total plot area
-sap_vpd_plot_scaled = left_join(sap_vpd_plot_scaled, Pfyn_inv_sum)
-
-# multiply by total sapwood area and divide by plot area
-sap_vpd_plot_scaled$Transpiration = sap_vpd_plot_scaled$Tr * sap_vpd_plot_scaled$sapwood_unit_area
-
-# aggregate to daily
-sap_vpd_plot_daily = sap_vpd_plot_scaled %>% group_by(date) %>% summarize(Tr=sum(Transpiration))
-
-
-# second attempt, use measured trees as representative of entire distribution
-
-sap_vpd_hourly_cont = sap_vpd_hourly %>% filter(Treatment == "control")
-
-# determine number of trees each tree should represent
-Pfyn_inv_cont = filter(Pfyn_inv_trt, Treatment_VPD == "Control")
-
-# combine with sap area and group by size class
-sap_vpd_hourly_cont = left_join(sap_vpd_hourly_cont, rename(tree_specs, Tree_id=tree))
-
-sap_vpd_hourly_cont_bin = sap_vpd_hourly_cont %>% 
-  group_by(datehour, date, sapwood_area_bin) %>% summarize(Total_Sap_Flow=mean(Total_Sap_Flow))
-
-# combine with size class multiplier
-sap_vpd_hourly_cont_bin = left_join(sap_vpd_hourly_cont_bin, Pfyn_inv_cont)
-
-sap_vpd_daily_cont = sap_vpd_hourly_cont_bin %>% group_by(date) %>% 
-  summarize(Tr = sum(Total_Sap_Flow * n) / area_cont)
-
-ggplot(sap_vpd_daily_cont, aes(date, Tr))+geom_line()
-
-
-# third attempt, leverage inventory data to estimate sap flow for every tree
-
-# use daily sap flow for correlation
-sap_vpd_daily = sap_vpd_hourly %>% group_by(date, Tree_id, Treatment) %>% summarize(Q=sum(Total_Sap_Flow, na.rm=T), .groups = "drop")
-
-# combine with sapwood area
-sap_vpd_daily = left_join(sap_vpd_daily, rename(tree_specs, Tree_id=tree))
-
-# generate regression for every day and apply to every tree in plot
-
-Q_init = data.frame(date=unique(sap_vpd_daily$date), Tr=0)
-
-# function to upscale sap flow data to all trees in inventory
-UPSCALE = function(sap_in, Q_out, inv, plot_area) {
-
-  for (i in 1:length(Q_out$date)) {
-  
-    d = Q_out$date[i]
-  
-    # maybe need to exclude negative and zero flows
-    sap_day = filter(sap_in, date == d, Q > 0)
-  
-    if (length(sap_day$Q)==0) {
-      # no sap flow
-      Q_out$Tr[i] = 0
-      next
-    }
-  
-    # convert data to log-linear
-    sap_day$logQ = log10(sap_day$Q)
-    sap_day$logSA = log10(sap_day$sapwood_area)
-  
-    # logarithmic regression
-    sap_lm = lm(logQ ~ logSA, sap_day)
-  
-    # apply fitted model to inventory data
-    sap_pred = predict(sap_lm, data.frame(logSA=log10(inv$sapwood_area)))
-  
-    # fill in existing measurements
-    sap_plot = mutate(inv, Q_pred = 10^sap_pred)
-    sap_plot = left_join(sap_plot, select(sap_day, TreeNo, Q))
-    sap_plot$Q_act = if_else(is.na(sap_plot$Q), sap_plot$Q_pred, sap_plot$Q)
-  
-    # sum to plot and divide by plot area
-    Q_out$Tr[i] = sum(sap_plot$Q_act) / plot_area
-  
-  }
-
-  return(Q_out)
-}
-
-# control scenario
-#Pfyn_inv_plot1 = filter(Pfyn_inv, Plot==1)
-Pfyn_inv_cont = filter(Pfyn_inv, Treatment_VPD=="Control")
-sap_vpd_cont_daily = filter(sap_vpd_daily, Treatment == "control")
-area_cont = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Control")$plot_area)
-
-Q_cont_daily = UPSCALE(sap_vpd_cont_daily, Q_init, Pfyn_inv_cont, area_cont)
-
-ggplot(Q_cont_daily, aes(date, Tr))+geom_line()+theme_bw()+
-  labs(x="",y="Transpiration (mm/day)", title="Upscaled Transpiration from Sap Flow for Pfynwald Control Scenario in Plot 1")
-
-sum(Q_cont_daily$Tr)
-
-# irrigation scenario
-Pfyn_inv_irr = filter(Pfyn_inv, Treatment_VPD=="Irrigation")
-sap_vpd_irr_daily = filter(sap_vpd_daily, Treatment == "irrigation")
-area_irr = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Irrigation")$plot_area)
-
-Q_irr_daily = UPSCALE(sap_vpd_irr_daily, Q_init, Pfyn_inv_irr, area_irr)
-
-ggplot(Q_irr_daily, aes(date, Tr))+geom_line()+theme_bw()+
-  labs(x="",y="Transpiration (mm/day)", title="Upscaled Transpiration from Sap Flow for Pfynwald Irrigation Scenario in Plot 1")
-
-# roof scenario
-Pfyn_inv_drt = filter(Pfyn_inv, Treatment_VPD=="Roof")
-sap_vpd_drt_daily = filter(sap_vpd_daily, Treatment == "roof")
-area_drt = sum(filter(Pfyn_inv_sum, Treatment_VPD=="Roof")$plot_area)
-
-Q_drt_daily = UPSCALE(sap_vpd_drt_daily, Q_init, Pfyn_inv_drt, area_drt)
-
-ggplot(filter(Q_drt_daily, Tr<2), aes(date, Tr))+geom_line()+theme_bw()+
-  labs(x="",y="Transpiration (mm/day)", title="Upscaled Transpiration from Sap Flow for Pfynwald Roof Scenario in Plot 1")
+#write_csv(trans_comp, "../../Data/Pfyn/Pfyn_trans_2011_17.csv")
 
 
 # 2021 - 2022 data
 
-sap = readRDS("2021-2022/PFY_sfd_cleaned.Rds")
+sap = readRDS("../../Data/Pfyn/data for Pfynwald/2021-2022/PFY_sfd_cleaned.Rds")
 sap$tree = factor(sap$tree)
 
 # remove outliers
@@ -435,7 +241,7 @@ ggplot(sap_daily, aes(date, sfd, color=tree))+geom_line()+
 ggplot(sap_daily, aes(date, sfd, color=tree))+geom_line()+
   facet_wrap(~meta)+theme_bw()+theme(legend.position="none")+
   labs(x="", y="Mean Daily Sap Flux Density")
-  
+
 # filter out outliers
 sap_daily_test = sap_daily %>% filter(!(tree=="Pfynwald_Irr_Stop_02_16_ch6" & date > "2021-05-15" & date < "2021-06-01"))
 sap_daily_test = na.omit(sap_daily_test)
@@ -457,33 +263,137 @@ ggplot(sap_daily_meta, aes(date, sfd, color=meta))+geom_line()+
 sap_ctr = filter(sap_daily_test, meta=="Control")
 sap_ctr$tree_id = if_else(sap_ctr$tree=="Pfynwald_Control_02_15_ch6", 109, 124)
 
-TN_sap_ctr = TN_ctr_meta %>% select(tree_name, tree_dbh) %>% 
-  filter(tree_name %in% c(109, 124))
-
-TN_sap_ctr$SWD = mapply(function(dbh, treat) {SWD(dbh, treat)}, TN_sap_ctr$tree_dbh, "Control")
-TN_sap_ctr$BDD = BDD(TN_sap_ctr$tree_dbh)
-TN_sap_ctr$sapwood_area = mapply(function(dbh, swd, bdd){calculate_sapwood_area(dbh, swd, bdd)}, TN_sap_ctr$tree_dbh, TN_sap_ctr$SWD, TN_sap_ctr$BDD)
-TN_sap_ctr$sapwood_area_bin = cut_width(TN_sap_ctr$sapwood_area, 300, boundary=0)
-
 # combine with measurements for weighting
-sap_ctr = left_join(sap_ctr, rename(TN_sap_ctr, tree_id=tree_name))
+sap_ctr = left_join(sap_ctr, rename(TN_sf_ctr, tree_id=tree_name))
 
 # add inventory statistics by treatment
-sap_ctr = left_join(sap_ctr, filter(Pfyn_inv_trt, Treatment_VPD=="Control"))
+sap_ctr = left_join(sap_ctr, filter(Pfyn_inv_trt, Treatment=="Control"))
 
 # upscale by sapwood area
-sap_ctr_daily = sap_ctr %>% group_by(date) %>% summarize(Tr=sum(sfd*prop))
+sap_ctr_daily = sap_ctr %>% group_by(date) %>% summarize(Tr=sum(sfd*rad_cor*prop))
 sap_ctr_daily$Tr = sap_ctr_daily$Tr * sap_area_cont / area_cont / 1000
 
 ggplot(sap_ctr_daily, aes(date, Tr))+geom_line()
 
 
+## VPDrought 2024-25 data
+
+#sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_SF_L3_2025-02-02.RDS")
+sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_sfden_2025-06-18.RDS")
+
+sap_vpd$Date.Time = as.POSIXct(sap_vpd$Date.Time, tz="CET", format="%Y-%m-%d %H:%M:%S")
+sap_vpd$date = as.Date(sap_vpd$Date.Time, tz="CET")
+
+ggplot(sap_vpd, aes(Date.Time, Total_Sap_Flow_kg_h, color=as.factor(Tree_id)))+geom_line()+
+  facet_wrap(~Treatment)+theme_bw()+guides(color="none")
+
+sap_vpd_hourly = sap_vpd %>% filter(Total_Sap_Flow_kg_h > 0) %>% 
+  mutate(datehour=floor_date(Date.Time, "1 hour")) %>% 
+  group_by(datehour, Tree_id, Treatment) %>% summarize(Total_Sap_Flow=mean(Total_Sap_Flow_kg_h, na.rm=T))
+sap_vpd_hourly$date = as.Date(sap_vpd_hourly$datehour, tz="CET")
+
+#
+sap_vpd_daily = sap_vpd %>% filter(Total_Sap_Flow>0) %>% group_by(date, Tree_id, Treatment) %>% 
+  summarize(Total_Sap_Flow=mean(Total_Sap_Flow, na.rm=T))
+
+ggplot(sap_vpd_daily, aes(date, Total_Sap_Flow, color=as.factor(Tree_id)))+geom_line()+
+  facet_wrap(~Treatment)+theme_bw()+guides(color="none")
+
+sap_vpd_meta = sap_vpd_daily %>% group_by(date, Treatment) %>% 
+  summarize(Total_Sap_Flow=mean(Total_Sap_Flow, na.rm=T))
+
+ggplot(sap_vpd_meta, aes(date, Total_Sap_Flow, color=as.factor(Treatment)))+geom_line()+
+  theme_bw()+labs(x="",color="Treatment")
+
+# write_csv(sap_vpd_meta, "../../Data/Pfyn/Pfyn_sap_vpd.csv")
+
+## upscale sap flow to transpiration for VPDrought trees
+
+sapwood_bin_size = 150 # higher sample size allows finer resolution
+# re-summarize inventory data
+Pfyn_inv$sapwood_area_bin = cut_width(Pfyn_inv$sapwood_area, sapwood_bin_size, boundary=0)
+Pfyn_inv_VPDtrt = Pfyn_inv %>% group_by(Treatment_VPD, sapwood_area_bin) %>% summarize(n=n()) %>% mutate(prop = n/sum(n))
+
+# first, retrieve dbh for each tree from tree_spec function
+tree_specs = do.call(rbind, lapply(unique(sap_vpd$Tree_id), tree_spec))
+tree_specs$meta = ifelse(grepl("irrigation",tree_specs$treat),"Irrigation","Control")
+
+# add dummy tree for bins later
+tree_specs = rbind(tree_specs, setNames(data.frame("Pinus","-999",1,"Control",0,"Control"), names(tree_specs)))
+
+# add plot # from inventory
+tree_specs$TreeNo = as.numeric(tree_specs$tree)
+tree_specs = left_join(tree_specs, select(Pfyn_inv, TreeNo, Plot))
+tree_specs$Plot = ifelse(is.na(tree_specs$Plot) & tree_specs$TreeNo != -999, 3, ifelse(tree_specs$Plot==0, 8, tree_specs$Plot))
+
+# add sapwood information
+tree_specs = sap_profile(rename(tree_specs, tree_dbh=dbh), sapwood_bin_size)
+
+tree_specs = filter(tree_specs, TreeNo != -999) # remove dummy
+
+tree_specs_ctr = filter(tree_specs, treat == "control")
+tree_specs_irr = filter(tree_specs, treat == "irrigation")
+tree_specs_drt = filter(tree_specs, treat == "roof")
+
+## upscale sap flow
+
+# first attempt, normalize sap flow by sapwood area and scale with stand sapwood area
+
+# function to scale up sap flow
+UPSCALE = function(sap, trees, sap_area, plot_area) {
+  
+  # append sapwood area bins
+  sap = left_join(sap, select(rename(trees, Tree_id=tree), Tree_id, meta, sapwood_area, sapwood_area_bin))
+  
+  # derive sap flux density per unit sapwood area
+  sap$Sap_Flux_Density = sap$Total_Sap_Flow / sap$sapwood_area
+  
+  # average sap flux density for trees in each bin
+  sap_bin = sap %>% group_by(datehour, date, meta, sapwood_area_bin) %>% summarize_at(vars(Sap_Flux_Density), list(mean))
+  
+  # append sapwood area proportion
+  sap_bin = left_join(sap_bin, select(rename(Pfyn_inv_VPDtrt, meta=Treatment_VPD), sapwood_area_bin, prop))
+  
+  # multiply sap flux density by proportion and add trees together
+  sap_scaled = sap_bin %>% group_by(datehour, date) %>% summarize(Tr = sum(Sap_Flux_Density*prop, na.rm=T))
+  
+  # multiply by total sapwood area and divide by plot area
+  sap_scaled$Trans = sap_scaled$Tr * sap_area / plot_area
+  
+  # aggregate to daily
+  sap_daily = sap_scaled %>% group_by(date) %>% summarize(Tr=sum(Trans))
+  
+  return(sap_daily)
+  
+}
+
+# control
+sap_vpd_ctr = filter(sap_vpd_hourly, Tree_id %in% tree_specs_ctr$tree)
+sap_vpd_ctr_daily = UPSCALE(sap_vpd_ctr, tree_specs_ctr, sap_area_cont_vpd, area_cont_vpd)
+
+ggplot(sap_vpd_ctr_daily, aes(date, Tr))+geom_line()
+sum(sap_vpd_ctr_daily$Tr)
+
+# irrigation
+sap_vpd_irr = filter(sap_vpd_hourly, Tree_id %in% tree_specs_irr$tree)
+sap_vpd_irr_daily = UPSCALE(sap_vpd_irr, tree_specs_irr, sap_area_irr, area_irr)
+
+ggplot(sap_vpd_irr_daily, aes(date, Tr))+geom_line()
+sum(sap_vpd_irr_daily$Tr)
+
+# roof
+sap_vpd_drt = filter(sap_vpd_hourly, Tree_id %in% tree_specs_drt$tree)
+sap_vpd_drt_daily = UPSCALE(sap_vpd_ctr, tree_specs_ctr, sap_area_drt, area_drt)
+
+ggplot(sap_vpd_drt_daily, aes(date, Tr))+geom_line()
+
+
 # older data
 
-file_list = list.files("older/sap flow/", "*.RDS")
+file_list = list.files("../../Data/Pfyn/data for Pfynwald/older/sap flow/", "*.RDS")
 
 # import individual files into list
-sap_list = sapply(file_list, function(x) readRDS(paste0("older/sap flow/", x)))
+sap_list = sapply(file_list, function(x) readRDS(paste0("../../Data/Pfyn/data for Pfynwald/older/sap flow/", x)))
 
 # get tree IDs from file names
 tree_ids = gsub(".*_([0-9]+)\\.RDS$", "\\1", file_list)
@@ -508,18 +418,42 @@ sap_daily_df = sap_df %>% mutate(datehour=floor_date(timestamp, "1 hour")) %>%
 ggplot(sap_daily_df, aes(date, sfd, color=as.factor(TreeID)))+geom_line()+
   facet_wrap(~TreeID)+theme_bw()+guides(color="none")
 
-# write_csv(sap_daily, "older/sap flow/Pfyn_sap_old.csv")
+# write_csv(sap_daily_df, "../../Data/Pfyn/data for Pfynwald/older/sap flow/Pfyn_sap_old.csv")
+
+# upscaling
+
+# control scenario
+sap_ctr = sap_daily_df %>% filter(TreeID %in% c("110", "124"))
+
+# combine with measurements for weighting
+sap_ctr = left_join(mutate(sap_ctr, TreeID=as.numeric(TreeID)), rename(TN_sf_ctr, TreeID=tree_name))
+sap_ctr = left_join(sap_ctr, filter(Pfyn_inv_trt, Treatment=="Control"))
+
+# upscale by sapwood area
+sap_ctr_daily = sap_ctr %>% group_by(date) %>% summarize(Tr=sum(sfd/sapwood_area*rad_cor*prop))
+sap_ctr_daily$Tr = sap_ctr_daily$Tr * sap_area_cont / area_cont
+
+ggplot(sap_ctr_daily, aes(date, Tr))+geom_line()
+
+# irrigation scenario
+sap_irr = sap_daily_df %>% filter(TreeID %in% c("246", "247", "250"))
+
+# combine with measurements for weighting
+sap_irr = left_join(mutate(sap_irr, TreeID=as.numeric(TreeID)), rename(TN_sf_irr, TreeID=tree_name))
+sap_irr = left_join(sap_irr, filter(Pfyn_inv_trt, Treatment=="Irrigation"))
+
+# upscale by sapwood area
+sap_irr_daily = sap_irr %>% group_by(date) %>% summarize(Tr=sum(sfd/sapwood_area*rad_cor*prop))
+sap_irr_daily$Tr = sap_irr_daily$Tr * sap_area_irr / area_irr
+
+ggplot(sap_irr_daily, aes(date, Tr))+geom_line()
+
 
 
 # TreeNet data
 
-setwd("../TreeNet")
-
-TN_ctr = read_csv("tn_timeseries_Pfyn_sap_control.csv")
-TN_irr = read_csv("tn_timeseries_Pfyn_sap_irrigation.csv")
-
-TN_ctr_meta = read_csv("tn_metadata_Pfyn_sap_control.csv")
-TN_irr_meta = read_csv("tn_metadata_Pfyn_sap_irrigation.csv")
+TN_ctr = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_sap_control.csv")
+TN_irr = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_sap_irrigation.csv")
 
 # process raw data with TREX
 library(TREX)

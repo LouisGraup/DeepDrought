@@ -135,18 +135,15 @@ end
 
 end
 
-@everywhere function sap_comp(sim, obs_sap)
+@everywhere function sap_combine(sim, obs_sap)
     # sim is the LWFBrook90 simulation
     # obs is the observed soil water potential data
 
     z_trans = get_sap(sim);
 
-    filter!(:date => >=(obs_sap.date[1]), z_trans);
-    filter!(:date => <(Date(2018, 1, 1)), z_trans);
-
-    obs_sap = select(obs_sap, Not(:scen));
-
-    sap_comp = sort(leftjoin(z_trans, obs_sap, on = :date), :date);
+    z_trans = z_trans[z_trans.date .∈ [obs_sap.date], :];
+    
+    sap_comp = leftjoin(z_trans, obs_sap[:, Not(:scen)], on = :date);
 
     return sap_comp
 
@@ -154,10 +151,11 @@ end
 
 @everywhere function get_sap(sim)
     # retrieve soil water potential data from sim
-    days, dates_out = get_dates(sim);
+    days = range(sim.ODESolution.prob.tspan...);
+    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
     
     z = get_fluxes(sim);
-    z.date = dates_out;
+    z.date = Date.(dates_out);
     z.trans = z.cum_d_tran;
     select!(z, :date, :trans);
     
@@ -389,7 +387,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 14)) # skip if simulation fails
+        return (par_id, fill(0, 8), fill(0, 2), fill(0, 4)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -407,7 +405,7 @@ end_index = Dates.value(end_date - ref_date);
     swp_met = obj_fun_swp(z_psi, obs_swp_ctr)
     
     # transpiration
-    sap_comp = sap_comp(sim, obs_sap_ctr);
+    sap_comp = sap_combine(sim, obs_sap_ctr);
     sap_cor = obs_fun_sap(sap_comp);
     sap_nse = obs_fun_trans(sap_comp);
     
@@ -415,11 +413,11 @@ end_index = Dates.value(end_date - ref_date);
     max_trans = maximum(z_trans.trans);
 
     # annual total
-    z_trans.year = year.(z_trans.Date);
+    z_trans.year = year.(z_trans.date);
     z_trans_yr = combine(groupby(z_trans, :year), :trans => sum);
     mean_ann_trans = mean(z_trans_yr.trans_sum);
 
-    tr_met = [sap_cor, sap_nse, max_trans, mean_ann_trans]
+    tr_met = [sap_cor, sap_nse, max_trans, mean_ann_trans];
 
     return (par_id, swc_met, swp_met, tr_met)
 
@@ -430,7 +428,7 @@ end
 results = pmap(i -> run_calibration(i), 1:nsets);
 
 # intialize metric dataframes
-metrics_ctr = DataFrame(scen = Int[],
+metrics = DataFrame(scen = Int[],
     swc_nse10 = Float64[],
     swc_rmse10 = Float64[],
     swc_nse40 = Float64[],
@@ -451,7 +449,7 @@ for res in results
     # retrieve scenario, parameter id, and metrics
     par_id, swc, swp, sap = res;
     row = [par_id, swc..., swp..., sap...];
-    push!(metrics_ctr, row);
+    push!(metrics, row);
 end
 
-CSV.write("LWFBcal_output/metrics_ctr_" * curDate * ".csv", metrics_ctr);
+CSV.write("LWFBcal_output/metrics_ctr_" * curDate * ".csv", metrics);
