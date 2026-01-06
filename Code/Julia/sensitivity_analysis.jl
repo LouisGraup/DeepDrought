@@ -21,22 +21,41 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> 0.75 .&& 
-               met.swc_nse40 .> 0.7 .&&
-               met.swc_nse60 .> 0.8 .&&
+    #= return met[met.swc_nse10 .> 0.6 .&& 
+               met.swc_nse40 .> 0.6 .&&
+               met.swc_nse60 .> 0.75 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.9 .&&
-               met.swp_nse10 .> 0.75 .&&
-               met.swp_nse80 .> 0.75, :]
+               met.swc_nse80 .> 0.8 .&&
+               met.swp_nse10 .> 0.5 .&&
+               #met.swp_nse80 .> 0.0, :]
+               met.swp_nse80 .> 0.5 .&&
+               met.trans_nse .> 0.3 .&&
+               met.trans_cor .> 0.5 .&&
+               met.max_trans .< 2, :] =#
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> 0.55 .&& 
-               met.swc_nse40 .> 0.4 .&&
-               met.swc_nse60 .> 0.35 .&&
-               #met.swc_nse80 .> 0, :]
-               met.swc_nse80 .> 0.35 .&&
-               met.swp_nse10 .> 0.25 .&&
-               met.swp_nse80 .> 0.25, :] =#
+    #= return met[met.swc_nse10 .> 0.0 .&& 
+               met.swc_nse40 .> -0.1 .&&
+               met.swc_nse60 .> -0.1 .&&
+               #met.swc_nse80 .> 0.5, :]
+               met.swc_nse80 .> -0.3 .&&
+               met.swp_nse10 .> -0.3 .&&
+               #met.swp_nse80 .> 0.0, :]
+               met.swp_nse80 .> -0.7 .&&
+               met.trans_nse .> -0.3 .&&
+               met.trans_cor .> 0.5 .&&
+               met.max_trans .< 4, :] =#
+
+    # irr stop metrics
+    return met[met.swc_nse10 .> 0.7 .&& 
+               #met.swc_nse80 .> 0.5, :]
+               met.swc_nse80 .> 0.7 .&&
+               met.swp_nse10 .> 0.55 .&&
+               #met.swp_nse80 .> 0.0, :]
+               met.swp_nse80 .> 0.7 .&&
+               met.trans_nse .> 0.4 .&&
+               met.trans_cor .> 0.5 .&&
+               met.max_trans .< 3, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -158,17 +177,34 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20251031.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20251031.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20251031.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20251031.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260103.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260103.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260103.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260103.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260103.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260103.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
 met_irr = filter_error(met_irr);
+met_irst = filter_error(met_irst);
 
+# exploratory
 density_plot(met_ctr)
 density_plot(met_irr)
+
+density(met_irst.swc_nse10, label="NSE10")
+density!(met_irst.swc_nse80, label="NSE80")
+
+# trans density plots
+met_pl = met_irst;
+
+density(met_pl.trans_cor, label="Corr Coef")
+density!(met_pl.trans_nse, label="NSE")
+
+density(met_pl.max_trans)
+density(met_pl.ann_trans)
+
 
 # add combined metrics
 met_comb!(met_ctr);
@@ -177,28 +213,40 @@ met_comb!(met_irr);
 # filter metrics for behavioral runs
 met_ctr_good = behavioral_met(met_ctr);
 met_irr_good = behavioral_met(met_irr);
+met_irst_good = behavioral_met(met_irst);
 
 println("$(size(met_ctr_good, 1)) behavioral parameter sets out of total $(size(met_ctr, 1)) in control scenario.")
 println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(met_irr, 1)) in irrigation scenario.")
+println("$(size(met_irst_good, 1)) behavioral parameter sets out of total $(size(met_irst, 1)) in irrigation stop scenario.")
 
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
-describe(met_irr_good)
+describe(met_irst_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
 met_plot(met_irr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
+met_plot(met_irst_good, :swc_nse10, :swc_nse80)
 
 met_plot(met_ctr_good, :swp_nse10, :swp_nse80)
 met_plot(met_irr_good, :swp_nse10, :swp_nse80)
+met_plot(met_irst_good, :swp_nse10, :swp_nse80)
 
 met_plot(met_ctr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse80])
 met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse80])
+met_plot(met_irst_good, [:swc_nse10, :swc_nse80], [:swp_nse10, :swp_nse80])
+
+met_plot(met_irst_good, [:trans_cor, :max_trans], [:trans_nse, :ann_trans])
 
 # compare metrics across type
 met_plot(met_ctr_good, :swc_nse_com, :swp_nse_com)
 met_plot(met_irr_good, :swc_nse_com, :swp_nse_com)
+
+met_plot(met_ctr_good, [:swp_nse10, :swp_nse80], [:trans_nse, :trans_nse])
+met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:trans_nse, :trans_nse])
+
+met_plot(met_irst_good, [:swc_nse10, :swc_nse80], [:trans_nse, :trans_nse])
 
 # compare metrics across scenarios
 scatter(met_ctr.swc_nse10, met_irr.swc_nse10, xlabel="NSE10 Control", ylabel="NSE10 Irrigation", legend=false)
@@ -230,16 +278,18 @@ par_irr_best
 
 
 # parameter relationships
-par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="met_com");
+par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="trans_cor");
 par_plots_irr = par_plot(par_irr, met_irr, met_y="swp_nse80");
+par_plots_irst = par_plot(par_irst, met_irst, met_y="trans_nse");
 
-plot(par_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_irst..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
 ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
+ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_ctr..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irst..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 

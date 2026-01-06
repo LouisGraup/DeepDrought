@@ -25,7 +25,7 @@ end
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
     # up-scaled sap flow data
-    obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans11_18.csv", DataFrame);
+    obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans_2011_17.csv", DataFrame);
 
     # separate out irrigation scenario
     obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
@@ -33,7 +33,7 @@ end
     obs_swc_irr = unstack(obs_swc_irr, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs_swc_irr, :date); # sort by date
 
-    obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
+    obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
 
     obs_sap_irr = obs_sap[obs_sap.scen .== "Irrigation", :]; # select irrigation treatment
 end
@@ -192,7 +192,7 @@ param = [
     # hydro parameters
     ("DRAIN", 0.0, 1.0), # drainage (0, 1)
     ("INFEXP", 0.0, 0.9), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 0.5)
+    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 1.0)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
@@ -200,19 +200,25 @@ param = [
     ("RSSA", 1, 1500), # soil resistance (1, 1500)
     ("ths1", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
     ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha1", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar1", 0.9, 1.1), # multiplier on npar (0.9, 1.1)
     ("ths2", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
     ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha2", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar2", 0.9, 1.1), # multiplier on npar (0.9, 1.1)
     ("ths3", 0.5, 1.5), # multiplier on theta_sat (0.5, 1.5)
     ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha3", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar3", 0.9, 1.1), # multiplier on npar (0.9, 1.1)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
     ("GLMAX", 0.001, 0.03), # stomatal conductance (0.001, 0.03)
-    ("CVPD", 1.0, 3), # vpd sensitivity (1, 3)
-    ("R5", 50, 500), # radiation sensitivity (50, 400)
+    ("CVPD", 1.0, 3.0), # vpd sensitivity (1, 3)
+    ("R5", 50, 400), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -3.0, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -4, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 100, 6000), # maximum root length (100, 6000)
@@ -313,6 +319,26 @@ for i in 1:nsets
                 soil_set.ksat_mmDay = 10 .^ (log10.(soil_set.ksat_mmDay) .+ value);
             end
             
+        elseif contains(name, "alpha")
+            if soil_par_count > 1
+                # apply multiplier to alpha_perMeter for specific soil horizon
+                k = parse(Int, name[end]); # extract horizon number from name
+                soil_set.alpha_perMeter[k] = soil_set.alpha_perMeter[k] * value;
+            else
+                # apply multiplier to alpha_perMeter for each soil horizon
+                soil_set.alpha_perMeter = soil_set.alpha_perMeter * value;
+            end
+        
+        elseif contains(name, "npar")
+            if soil_par_count > 1
+                # apply multiplier to npar_ for specific soil horizon
+                k = parse(Int, name[end]); # extract horizon number from name
+                soil_set.npar_[k] = soil_set.npar_[k] * value;
+            else
+                # apply multiplier to npar_ for each soil horizon
+                soil_set.npar_ = soil_set.npar_ * value;
+            end
+        
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
             # save index for later
             push!(root_dict, name => j);
