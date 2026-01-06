@@ -1,0 +1,231 @@
+scaffold,treatment,tree_id,predawn,midday,date
+7,control,617,7.3,16,2022-10-19
+7,control,617,7.800000000000001,12,2022-10-19
+7,control,622,8,15.3,2022-10-19
+7,control,622,7.800000000000001,14.299999999999999,2022-10-19
+7,control,623,7,14.8,2022-10-19
+8,stop irrigation,735,7.3,15,2022-10-19
+8,stop irrigation,736,7,14,2022-10-19
+8,stop irrigation,742,7.800000000000001,14,2022-10-19
+8,stop irrigation,743,6.5,15.8,2022-10-19
+8,stop irrigation,734,7,15,2022-10-19
+2,stop irrigation,276,9.8,13,2022-10-20
+2,stop irrigation,276,10,13.200000000000001,2022-10-20
+2,stop irrigation,275,11,13.799999999999999,2022-10-20
+2,stop irrigation,274,9,14,2022-10-20
+2,stop irrigation,274,8.100000000000001,13.5,2022-10-20
+5,stop irrigation,421,7,12.8,2022-10-20
+5,stop irrigation,421,8,12.9,2022-10-20
+5,stop irrigation,420,8.100000000000001,12,2022-10-20
+5,stop irrigation,419,8,14,2022-10-20
+5,stop irrigation,415,7.199999999999999,12,2022-10-20
+701,control,604,6.5,12,2023-09-01
+701,control,604,7.5,11,2023-09-01
+701,control,600,7,10.5,2023-09-01
+701,control,600,4.5,11,2023-09-01
+701,control,597,5.5,8.5,2023-09-01
+8,stop irrigation,734,4,9.5,2023-09-01
+8,stop irrigation,735,6.5,8,2023-09-01
+8,stop irrigation,736,7,9.5,2023-09-01
+8,stop irrigation,742,8,10.5,2023-09-01
+8,stop irrigation,743,7.5,10.5,2023-09-01
+901,irrigation,755,5,8,2023-09-01
+901,irrigation,756,6,11,2023-09-01
+901,irrigation,756,7,12,2023-09-01
+901,irrigation,757,6,11.5,2023-09-01
+901,irrigation,754,5,6.5,2023-09-01
+701,control,604,6.5,7,2023-09-22
+701,control,604,5,6,2023-09-22
+701,control,600,5.5,9,2023-09-22
+701,control,600,4.5,10,2023-09-22
+701,control,597,5,6.5,2023-09-22
+8,stop irrigation,734,5,4,2023-09-22
+8,stop irrigation,735,5,7,2023-09-22
+8,stop irrigation,736,3,9.5,2023-09-22
+8,stop irrigation,742,2.5,9,2023-09-22
+8,stop irrigation,743,4,9.5,2023-09-22
+901,irrigation,755,4,10,2023-09-22
+901,irrigation,756,4.5,9.5,2023-09-22
+901,irrigation,756,4,8,2023-09-22
+901,irrigation,757,2,8,2023-09-22
+901,irrigation,754,4.5,7.5,2023-09-22
+701,control,604,11,16,2023-10-11
+701,control,604,11,17,2023-10-11
+701,control,600,13,18,2023-10-11
+701,control,600,12,17.5,2023-10-11
+701,control,597,9.5,14,2023-10-11
+8,stop irrigation,734,10,14,2023-10-11
+8,stop irrigation,735,8.5,16.5,2023-10-11
+8,stop irrigation,736,9,13.5,2023-10-11
+8,stop irrigation,742,7.5,17.5,2023-10-11
+8,stop irrigation,743,7.5,13,2023-10-11
+901,irrigation,755,6.5,11,2023-10-11
+901,irrigation,756,7,10.5,2023-10-11
+901,irrigation,756,6.5,11,2023-10-11
+901,irrigation,757,7.5,8,2023-10-11
+901,irrigation,754,7,10,2023-10-11
+701,control,604,5,5.5,2023-10-26
+701,control,604,5,6,2023-10-26
+701,control,600,6.5,5,2023-10-26
+701,control,600,5.5,5.5,2023-10-26
+701,control,597,6,6,2023-10-26
+8,stop irrigation,734,5.5,6,2023-10-26
+8,stop irrigation,735,5,4.5,2023-10-26
+8,stop irrigation,736,4.5,6.5,2023-10-26
+8,stop irrigation,742,6,6,2023-10-26
+8,stop irrigation,743,5,5,2023-10-26
+901,irrigation,755,2.5,2.5,2023-10-26
+901,irrigation,756,4.5,5,2023-10-26
+901,irrigation,756,3.5,4,2023-10-26
+901,irrigation,757,4,4.5,2023-10-26
+901,irrigation,754,3,4.5,2023-10-26
+701,control,604,5,6.5,2024-05-16
+701,control,604,4,8.5,2024-05-16
+701,control,600,5,9.5,2024-05-16
+701,control,600,4.5,8,2024-05-16
+701,control,597,5,10.5,2024-05-16
+8,stop irrigation,734,4,8.5,2024-05-16
+8,stop irrigation,735,4,9.5,2024-05-16
+8,stop irrigation,736,5,9.5,2024-05-16
+8,stop irrigation,742,4,8,2024-05-16
+8,stop irrigation,743,3,8,2024-05-16
+901,irrigation,755,4,8,2024-05-16
+901,irrigation,756,5,9.5,2024-05-16
+901,irrigation,756,5,9,2024-05-16
+901,irrigation,757,5,10,2024-05-16
+901,irrigation,754,4.5,8.5,2024-05-16
+WO_Scaf,control,650,3,7,2024-06-13
+WO_Scaf,control,655,3.5,8,2024-06-13
+WO_Scaf,control,656,3,5,2024-06-13
+WO_Scaf,stop irrigation,716,2.5,4,2024-06-13
+WO_Scaf,stop irrigation,731,3,5,2024-06-13
+WO_Scaf,stop irrigation,733,3,5,2024-06-13
+WO_Scaf,irrigation,839,3,5,2024-06-13
+WO_Scaf,irrigation,841,2.5,5,2024-06-13
+WO_Scaf,irrigation,842,3.5,6,2024-06-13
+WO_Scaf,irrigation,844,3,5,2024-06-13
+701,control,604,8,10,2024-06-14
+701,control,604,6.5,11,2024-06-14
+701,control,600,8,11,2024-06-14
+701,control,600,5,11.5,2024-06-14
+701,control,597,7,9.5,2024-06-14
+8,stop irrigation,734,7.5,12,2024-06-14
+8,stop irrigation,735,7,11.5,2024-06-14
+8,stop irrigation,736,5,11,2024-06-14
+8,stop irrigation,742,6.5,9.5,2024-06-14
+8,stop irrigation,743,4,11,2024-06-14
+901,irrigation,755,6,10.5,2024-06-14
+901,irrigation,756,7,9.5,2024-06-14
+901,irrigation,756,7,9,2024-06-14
+901,irrigation,757,6.5,9.5,2024-06-14
+901,irrigation,754,6,12,2024-06-14
+WO_Scaf,control,650,7,8,2024-07-05
+WO_Scaf,control,655,7.5,8.5,2024-07-05
+WO_Scaf,control,656,7,8,2024-07-05
+WO_Scaf,stop irrigation,716,12,16,2024-07-05
+WO_Scaf,stop irrigation,731,13,17,2024-07-05
+WO_Scaf,stop irrigation,733,12,14,2024-07-05
+WO_Scaf,stop irrigation,737,13,16,2024-07-05
+WO_Scaf,irrigation,839,10,13,2024-07-05
+WO_Scaf,irrigation,841,10,12,2024-07-05
+WO_Scaf,irrigation,842,10.5,13,2024-07-05
+WO_Scaf,irrigation,844,10.5,13,2024-07-05
+701,control,604,7.5,12,2024-07-06
+701,control,604,8.5,14,2024-07-06
+701,control,600,8,14,2024-07-06
+701,control,600,8,13.5,2024-07-06
+701,control,597,9,15,2024-07-06
+8,stop irrigation,734,8,13,2024-07-06
+8,stop irrigation,735,8,12,2024-07-06
+8,stop irrigation,736,8.5,14,2024-07-06
+8,stop irrigation,742,8,13,2024-07-06
+8,stop irrigation,743,8,14,2024-07-06
+901,irrigation,755,6.5,11.5,2024-07-06
+901,irrigation,756,7,11,2024-07-06
+901,irrigation,756,6.5,12,2024-07-06
+901,irrigation,757,7,11,2024-07-06
+901,irrigation,754,6.5,11,2024-07-06
+WO_Scaf,control,650,10.5,18,2024-08-15
+WO_Scaf,control,655,11,20,2024-08-15
+WO_Scaf,control,656,10,17,2024-08-15
+WO_Scaf,stop irrigation,716,8,14,2024-08-15
+WO_Scaf,stop irrigation,731,8,14,2024-08-15
+WO_Scaf,stop irrigation,733,9,15,2024-08-15
+WO_Scaf,stop irrigation,737,9,15,2024-08-15
+WO_Scaf,irrigation,841,5,16,2024-08-15
+WO_Scaf,irrigation,842,5,16,2024-08-15
+WO_Scaf,irrigation,844,4,13,2024-08-15
+701,control,604,10,17,2024-08-16
+701,control,604,10,17.5,2024-08-16
+701,control,600,11,17,2024-08-16
+701,control,600,10,16,2024-08-16
+701,control,597,10.5,10.5,2024-08-16
+8,stop irrigation,734,8,17.5,2024-08-16
+8,stop irrigation,735,9,18,2024-08-16
+8,stop irrigation,736,9,17,2024-08-16
+8,stop irrigation,742,8,18,2024-08-16
+8,stop irrigation,743,8,20,2024-08-16
+901,irrigation,755,5,14.5,2024-08-16
+901,irrigation,756,4,14.5,2024-08-16
+901,irrigation,756,5,16,2024-08-16
+901,irrigation,757,5.5,12.5,2024-08-16
+901,irrigation,754,3,15.5,2024-08-16
+701,control,604,5,12,2025-06-12
+701,control,604,4.9,12,2025-06-12
+701,control,600,8,8.9,2025-06-12
+701,control,600,7,8.9,2025-06-12
+701,control,600,6.8,8.9,2025-06-12
+701,control,597,8,9,2025-06-12
+701,control,597,5.6,9,2025-06-12
+8,stop irrigation,734,7.3,8.9,2025-06-12
+8,stop irrigation,734,8,8.9,2025-06-12
+8,stop irrigation,735,8,8,2025-06-12
+8,stop irrigation,736,8.2,9,2025-06-12
+8,stop irrigation,742,9,8,2025-06-12
+8,stop irrigation,743,7.6,9.7,2025-06-12
+901,irrigation,755,7.1,7.5,2025-06-12
+901,irrigation,756,6.5,8.9,2025-06-12
+901,irrigation,756,7.8,8.9,2025-06-12
+901,irrigation,757,7.3,9.6,2025-06-12
+901,irrigation,757,7.2,9.6,2025-06-12
+901,irrigation,754,7.3,8.9,2025-06-12
+WO_Scaf,control,650,9,14,2025-06-12
+WO_Scaf,control,650,9,12,2025-06-12
+WO_Scaf,control,655,9,9.2,2025-06-12
+WO_Scaf,control,656,9,6.5,2025-06-12
+WO_Scaf,control,657,9,6,2025-06-12
+WO_Scaf,stop irrigation,716,8,10,2025-06-12
+WO_Scaf,stop irrigation,731,8,5.4,2025-06-12
+WO_Scaf,stop irrigation,731,8,7.2,2025-06-12
+WO_Scaf,stop irrigation,731,8,5.6,2025-06-12
+WO_Scaf,stop irrigation,730,8,14,2025-06-12
+WO_Scaf,stop irrigation,730,8,12,2025-06-12
+WO_Scaf,stop irrigation,730,8,10,2025-06-12
+WO_Scaf,stop irrigation,737,8,10,2025-06-12
+WO_Scaf,irrigation,841,7,9.2,2025-06-12
+WO_Scaf,irrigation,842,7,5,2025-06-12
+WO_Scaf,irrigation,840,7,6.8,2025-06-12
+701,control,604,3,14,2025-07-14
+701,control,600,4,8,2025-07-14
+701,control,597,4,14.5,2025-07-14
+8,stop irrigation,734,2.5,8,2025-07-14
+8,stop irrigation,735,2,5.5,2025-07-14
+8,stop irrigation,736,3.5,7,2025-07-14
+8,stop irrigation,742,2,6.5,2025-07-14
+8,stop irrigation,743,2.5,8.5,2025-07-14
+901,irrigation,755,3.5,7,2025-07-14
+901,irrigation,756,3.5,10.5,2025-07-14
+901,irrigation,757,3,5.5,2025-07-14
+901,irrigation,754,5.5,10,2025-07-14
+WO_Scaf,control,650,4,10.5,2025-07-14
+WO_Scaf,control,655,4,9.5,2025-07-14
+WO_Scaf,control,656,3,5,2025-07-14
+WO_Scaf,control,657,4,9,2025-07-14
+WO_Scaf,control,652,3,5,2025-07-14
+WO_Scaf,stop irrigation,716,2.5,5,2025-07-14
+WO_Scaf,stop irrigation,730,3,7,2025-07-14
+WO_Scaf,stop irrigation,731,2.5,6,2025-07-14
+WO_Scaf,stop irrigation,737,3,7.5,2025-07-14
+WO_Scaf,irrigation,841,3,5,2025-07-14
+WO_Scaf,irrigation,842,3,6,2025-07-14
+WO_Scaf,irrigation,840,3,7,2025-07-14

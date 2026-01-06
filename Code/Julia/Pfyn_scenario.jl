@@ -2,7 +2,7 @@
 ## for all Pfynwald scenarios
 ## and examine output against observed data
 
-using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RollingFunctions, RCall;
+using CSV, DataFrames, DataFramesMeta, Dates, Statistics, RollingFunctions;
 using CairoMakie, AlgebraOfGraphics, CategoricalArrays, Chain;
 using Measures, Plots; gr()
 
@@ -161,7 +161,7 @@ function sap_comp(sim, obs_sap)
     filter!(:date => >=(obs_sap.date[1]), z_trans);
     filter!(:date => <(Date(2023, 1, 1)), z_trans);
 
-    obs_sap = select(obs_sap, Not(:meta));
+    obs_sap = select(obs_sap, Not(:scen));
 
     sap_comp = sort(leftjoin(z_trans, obs_sap, on = :date), :date);
 
@@ -342,6 +342,7 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             # "ETa" => :black,
             # "P2" => :darkblue,
             "Precipitation" => :black,
+            "Irrigation" => :brown
             # "Swat" => :brown
         ]);
 
@@ -354,7 +355,8 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             :Esnow => "Snow sublimation",
             :R => "Runoff",
             :D => "Drainage",
-            :Precip => "Precipitation");
+            :Precip => "Precipitation",
+            :Irrig => "Irrigation");
     
     df_part_yearly_forMakie = @chain df_part_yr begin
         stack(Not([:year, :nrow, :date]))
@@ -374,13 +376,13 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
             stack = :variable => "Water fluxes",
             color = :variable => "") *
         # bar plot of fluxes
-        data(@subset(df_part_yearly_forMakie, :variable .!= "Precipitation")) * visual(BarPlot) +
+        data(@subset(df_part_yearly_forMakie, :variable .∉ (["Precipitation","Irrigation"],))) * visual(BarPlot) +
         mapping(
             :year => "",
             :value => "Water flux per year (mm)",
             color = :variable => "") *
         # line plot of precip input
-        data(@subset(df_part_yearly_forMakie, :variable .== "Precipitation")) * visual(Lines)
+        data(@subset(df_part_yearly_forMakie, :variable .∈ (["Precipitation","Irrigation"],))) * visual(Lines)
         
     aog_draw = draw(aog_yearly, scales(Color = (; palette = color_palette)))
         
@@ -422,6 +424,8 @@ function obj_fun_swc(sim, obs)
     obs = unstack(obs, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs, :date); # sort by date
 
+    obs = obs[obs.date .∈ [z.date], :];
+
     # separate observed data into different depths and remove missing values
     obs_10cm = dropmissing(obs[!, [:date, :VWC_10cm]]);
     obs_80cm = dropmissing(obs[!, [:date, :VWC_80cm]]);
@@ -449,7 +453,7 @@ function obs_fun_sap(sap_comp)
     # remove missing values
     sap_comp = dropmissing(sap_comp);
 
-    cc = cor(sap_comp.trans, sap_comp.sfd);
+    cc = cor(sap_comp.trans, sap_comp.Tr);
 
     return cc
 
@@ -458,19 +462,22 @@ end
 # calibration results
 met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250814.csv", DataFrame);
 met_irr = CSV.read("LWFBcal_output/metrics_irr_20250814.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20251222.csv", DataFrame);
 par_ctr = CSV.read("LWFBcal_output/param_ctr_20250814.csv", DataFrame);
 par_irr = CSV.read("LWFBcal_output/param_irr_20250814.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20251222.csv", DataFrame);
 
 par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
 par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
+par_irst_best = par_irst[met_irst_good.scen[findmax(met_irst_good.trans_nse)[2]], :];
 
 met_ctr[scen_ctr_best, :]
 met_irr[scen_irr_best, :]
 
 ## behavioral data
 # soil water content
-obs_swc = CSV.read("../../Data/Pfyn/PFY_swat.csv", DataFrame);
-obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
+obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
+#obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
 #filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
 #filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
@@ -480,20 +487,31 @@ obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
 filter!(:date => <(Date(2024, 1, 1)), obs_swp); # filter out late dates
 
 # sap flow
-obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
+#obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
+obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans_2011_17.csv", DataFrame);
+
+# leaf water potential data
+obs_lwp = CSV.read("../../Data/Pfyn/Insitu_lwp.csv", DataFrame);
+
+# isotope data
+obs_soil_iso = CSV.read("../../Data/Pfyn/Pfyn_insitu_soil_iso.csv", DataFrame);
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
-obs_swc_irr = obs_swc[obs_swc.meta .== "irrigated", :]; # select irrigation treatment
+obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
 obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
-obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
+obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
 obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
 
-obs_sap_ctr = obs_sap[obs_sap.meta .== "Control", :]; # select control treatment
-obs_sap_irr = obs_sap[obs_sap.meta .== "Irrigation", :]; # select irrigation treatment
-obs_sap_irst = obs_sap[obs_sap.meta .== "Irrigation Stop", :]; # select irrigation stop treatment
+obs_sap_ctr = obs_sap[obs_sap.scen .== "Control", :]; # select control treatment
+obs_sap_irr = obs_sap[obs_sap.scen .== "Irrigation", :]; # select irrigation treatment
+obs_sap_irst = obs_sap[obs_sap.scen .== "Irrigation stop", :]; # select irrigation stop treatment
+
+obs_lwp_ctr = obs_lwp[obs_lwp.treatment .== "control", :]; # select control treatment
+obs_lwp_irr = obs_lwp[obs_lwp.treatment .== "irrigation", :]; # select irrigation treatment
+obs_lwp_irst = obs_lwp[obs_lwp.treatment .== "stop irrigation", :]; # select irrigation stop treatment
 
 # irrigation dates
 on = ["2003-06-19", "2004-05-15", "2005-04-23", "2006-05-06", "2007-05-04", "2008-05-15", 
@@ -510,9 +528,9 @@ irr = DataFrame(on=Date.(on), off=Date.(off));
 irr.year = year.(irr.on);
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/");
-sim_irst = run_LWFB90_param(par_ctr_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/");
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
+sim_irst = run_LWFB90_param(par_irst_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
 
 ## combine observed and simulated data
 # soil water content
@@ -560,7 +578,7 @@ end
 draw(data(swp_comp_irst)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Irrigation Stop Scenario", titlealign = :center)
 )
 
 draw(data(swp_comp_ctr)*
@@ -572,7 +590,7 @@ draw(data(swp_comp_ctr)*
 draw(data(swp_comp_irr)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Irrigation Scenario", titlealign = :center)
 )
 
 # soil water content
@@ -586,13 +604,13 @@ draw(data(swc_comp_ctr)*
 draw(data(swc_comp_irr)*
     mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Irrigation Scenario", titlealign = :center)
 )
 
 draw(data(swc_comp_irst)*
     mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Color = (; label="Source")),
-    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Irrigation Stop Scenario", titlealign = :center)
 )
 
 # sap flow
@@ -606,6 +624,13 @@ draw(data(stack(sap_comp_ctr, Not(:date), variable_name=:Source))*
 draw(data(dropmissing(sap_comp_ctr))*
     mapping(:trans, :sfd)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
+)
+
+
+draw(data(stack(sap_comp_irr, Not(:date), variable_name=:Source))*
+    mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
+    scales(X = (; label="")),
+    figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
 )
 
 sap_comp_irr.trans_sm = runmean(sap_comp_irr.trans, 14);
@@ -635,7 +660,7 @@ draw(data(stack(sap_comp_irst, Not(:date), variable_name=:Source))*
 )
 
 draw(data(dropmissing(sap_comp_irst))*
-    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    mapping(:trans, :Tr)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Stop Scenario", titlealign = :center)
 )
 
@@ -670,20 +695,57 @@ draw(
 
 # compare soil water potential across scenarios
 ctr_swp = get_swp(sim_ctr);
-ctr_swp.scen .= "Control";
+ctr_swp.treatment .= "control";
 
 irr_swp = get_swp(sim_irr);
-irr_swp.scen .= "Irrigation";
+irr_swp.treatment .= "irrigation";
 
 irst_swp = get_swp(sim_irst);
-irst_swp.scen .= "Irrigation Stop";
+irst_swp.treatment .= "stop irrigation";
 
 swp_comp_scen = [ctr_swp; irr_swp; irst_swp];
 
 draw(data(swp_comp_scen)*
-    mapping(:date, :SWP, color=:scen, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    mapping(:date, :SWP, color=:treatment, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; palette = ["#E69F00","#56B4E9","#009E73"], label="Scenario")),
     figure = (; size=(800, 600), title="Modelled Soil Water Potential Comparison across Scenarios", titlealign = :center)
+)
+
+# compare against leaf water potential
+swp_comp_scen = swp_comp_scen[swp_comp_scen.date .>= Date(2022, 4, 1) .&& swp_comp_scen.date .< Date(2025,1,1), :];
+
+draw(
+    (data(swp_comp_scen)*
+    mapping(:date, :SWP => (x -> x/1000), color=:depth => nonnumeric)*visual(Lines, linewidth=1.5)+
+    data(obs_lwp)*
+    mapping(:date, :predawn => (x -> -1*x/10))*visual(Scatter, markersize=12))*
+    mapping(layout=:treatment),
+    scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
+    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Soil Water Potential (SWP)")
+)
+
+# using effective soil water potential
+
+ctr_eff_swp = get_eff_swp(sim_ctr);
+ctr_eff_swp.treatment .= "control";
+
+irr_eff_swp = get_eff_swp(sim_irr);
+irr_eff_swp.treatment .= "irrigation";
+
+irst_eff_swp = get_eff_swp(sim_irst);
+irst_eff_swp.treatment .= "stop irrigation";
+
+eff_swp_comp = [ctr_eff_swp; irr_eff_swp; irst_eff_swp];
+eff_swp_comp = eff_swp_comp[eff_swp_comp.date .>= Date(2022, 4, 1) .&& eff_swp_comp.date .< Date(2025,1,1), :];
+
+draw(
+    ((data(eff_swp_comp)*
+    mapping(:date, :swp_eff => (x -> x/1000), color=:treatment)*visual(Lines, linewidth=1.5)+
+    data(obs_lwp[obs_lwp.date .< Date(2025, 1, 1), :])*
+    mapping(:date, :predawn => (x -> -1*x/10))*visual(Scatter, markersize=12))*
+    mapping(layout=:treatment)),
+    scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
+    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
 )
 
 
@@ -973,9 +1035,9 @@ draw(data(comp_rwu_swp_eff)*
 
 # water balance modelling
 
-sim_ctr_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/", new_folder=false, watbal=true);
-sim_irr_wb = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irrigation_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false, watbal=true);
-sim_irst_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2023, 12, 31), "LWFBinput/Pfyn_irr_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false, watbal=true);
+sim_ctr_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/", new_folder=false, watbal=true);
+sim_irr_wb = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false, watbal=true, irrig=true);
+sim_irst_wb = run_LWFB90_param(par_irst_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false, watbal=true, irrig=true);
 
 # water partitioning
 
