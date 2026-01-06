@@ -168,6 +168,20 @@ ggplot(lai_comp, aes(year, value, color=name))+geom_point()+theme_bw()+
 lai_ext_irrstp[,-1] = round(lai_ext_irrstp[,-1], 4)
 #write_csv(lai_ext_irrstp, "../../Data/Pfyn/LAI_ext.csv")
 
+# plot comparison of regressions with observations
+lai_df$treatment = if_else(lai_df$treatment=="irrigated", "Irrigation", "Control")
+lai_obs = lai_df %>% group_by(year, treatment) %>% summarize_at(vars(LAI), list(mean=mean, sd=sd))
+
+colnames(lai_ext_irrstp) = c("year", "Irrigation", "Control", "Irrigation stop")
+lai_comp = pivot_longer(lai_ext_irrstp, -year)
+
+ggplot(filter(lai_comp, year>2003, year<2023), aes(year, value, color=name))+geom_line()+
+  geom_point(data=lai_obs, aes(year, mean, color=treatment), size=2, inherit.aes=F)+
+  geom_errorbar(data=lai_obs, aes(x=year, ymin=mean-sd, ymax=mean+sd, color=treatment), width=.5, inherit.aes=F)+
+  labs(x="Year", y="LAI", color="Treatment")+theme_bw()+
+  theme(legend.position="inside", legend.position.inside=c(.9,.9))
+
+
 ## read in soil and root data
 
 soil_df = read.csv("../../Data/Pfyn/soil_hydraulic.csv")

@@ -121,13 +121,13 @@ ggplot(filter(sf_daily, scenario!="irrigation"), aes(date, sfd, color=as.factor(
   facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()
 
 # group by scenario
-sf_meta = sf_daily %>% filter(tree_id != "125") %>% group_by(date, scenario) %>% summarize(sfd=mean(sfd, na.rm=T))
+sf_meta = sf_daily %>% filter(tree_id != "125") %>% group_by(date, scenario) %>% summarize(sf=mean(sf, na.rm=T))
 sf_meta$year = year(sf_meta$date)
 
-ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sfd, color=as.factor(scenario)))+geom_line()+
+ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sf, color=as.factor(scenario)))+geom_line()+
   facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()+
   theme(legend.position="inside",legend.position.inside=c(.1,.95))+
-  labs(x="", y="Mean Daily Sap Flux [kg/h]", color="Scenario")
+  labs(x="", y="Mean Daily Sap Flow [kg/h]", color="Scenario")
 
 # write_csv(sf_meta, "Pfyn_sap_2011_17.csv")
 
@@ -149,6 +149,7 @@ sf_ctr_bin = left_join(sf_ctr_bin, filter(Pfyn_inv_trt, Treatment=="Control"))
 # upscale by sapwood area
 sf_ctr_daily = sf_ctr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
 sf_ctr_daily$Tr = sf_ctr_daily$Tr * sap_area_cont / area_cont
+sf_ctr_daily$Tr_rm = rollmean(sf_ctr_daily$Tr, 14, fill=NA) # rolling mean
 
 ggplot(sf_ctr_daily, aes(date, Tr))+geom_line()
 
@@ -171,6 +172,7 @@ sf_irst_bin = left_join(sf_irst_bin, filter(Pfyn_inv_trt, Treatment=="Irrigation
 # upscale by sapwood area
 sf_irst_daily = sf_irst_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
 sf_irst_daily$Tr = sf_irst_daily$Tr * sap_area_irst / area_irst
+sf_irst_daily$Tr_rm = rollmean(sf_irst_daily$Tr, 14, fill=NA) # rolling mean
 
 ggplot(sf_irst_daily, aes(date, Tr))+geom_line()
 
@@ -193,20 +195,44 @@ sf_irr_bin = left_join(sf_irr_bin, filter(Pfyn_inv_trt, Treatment=="Irrigation")
 # upscale by sapwood area
 sf_irr_daily = sf_irr_bin %>% group_by(date) %>% summarize(Tr=sum(sf_norm*prop))
 sf_irr_daily$Tr = sf_irr_daily$Tr * sap_area_irr / area_irr
+sf_irr_daily$Tr_rm = rollmean(sf_irr_daily$Tr, 14, fill=NA) # rolling mean
 
 ggplot(sf_irr_daily, aes(date, Tr))+geom_line()
 
-sf_irr_yr = sf_irr_daily_sa %>% mutate(year=year(date)) %>% 
+sf_irr_yr = sf_irr_daily %>% mutate(year=year(date)) %>% 
   group_by(year) %>% summarize(Tr=sum(Tr))
 
 # combine and output into single file
 trans_comp = rbind(mutate(sf_ctr_daily, scen="Control"), mutate(sf_irst_daily, scen="Irrigation stop"))
 trans_comp = rbind(trans_comp, mutate(sf_irr_daily, scen="Irrigation"))
 
-ggplot(trans_comp, aes(date, Tr, color=scen))+geom_line()
+ggplot(trans_comp, aes(date, Tr, color=scen))+geom_line()+theme_bw()+
+  labs(x="", y="Transpiration (mm/day)", color="Treatment")
+
+tr_plot = merge(seq(as.Date("2011-01-01"), as.Date("2017-12-31"), by=1), c("Control","Irrigation","Irrigation stop"))
+colnames(tr_plot) = c("date","scen")
+tr_plot = left_join(tr_plot, trans_comp)
+
+ggplot()+geom_rect(data=filter(irr, year %in% c(2011, 2012, 2013, 2016, 2017)), aes(xmin=on, xmax=off, ymin=-Inf, ymax=Inf), alpha=.5, fill="lightblue")+
+  geom_point(data=tr_plot, aes(date, Tr, color=scen), inherit.aes=F)+
+  geom_line(data=tr_plot, aes(date, Tr_rm, color=scen), linewidth=1.1, inherit.aes=F)+
+  labs(x="", y="Transpiration (mm/day)", color="Treatment")+theme_bw()+
+  scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))+
+  ggtitle("Upscaled Transpiration from Sap Flow Data in Pfynwald")+
+  theme(legend.position="inside", legend.position.inside=c(.57,.82), plot.title=element_text(hjust=.5, size=16),
+        axis.text.x=element_text(size=12), axis.title.y=element_text(size=12), axis.text.y=element_text(size=12), 
+        legend.text=element_text(size=12), legend.title=element_text(size=14))
 
 #write_csv(trans_comp, "../../Data/Pfyn/Pfyn_trans_2011_17.csv")
 
+# difference between control and irrigation stop
+ctr_irst_comp = inner_join(rename(sf_ctr_daily, ctr=Tr), rename(sf_irst_daily, irst=Tr))
+ctr_irst_comp$year = year(ctr_irst_comp$date)
+
+ctr_irst_comp$diff = ctr_irst_comp$irst - ctr_irst_comp$ctr
+
+ggplot(ctr_irst_comp, aes(date, diff))+geom_line()+geom_hline(yintercept=0)+
+  facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()
 
 # 2021 - 2022 data
 
