@@ -4,6 +4,7 @@ library(tidyverse)
 library(lubridate)
 
 swc =  read_csv("../../Data/Pfyn/Pfyn_swat.csv")
+swc$VWC = swc$VWC * (1 - 0.62)
 
 swp = read_csv("../../Data/Pfyn/PFY_swpc_corr.csv")
 swp$meta = if_else(swp$meta=="irrigated", "irrigation", swp$meta)
@@ -13,14 +14,16 @@ swp_long$depth = ifelse(swp_long$depth == "SWP_10cm", 10, 80)
 sw_comp = inner_join(swp_long, swc)
 
 ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+facet_grid(meta~depth)
+ggplot(sw_comp, aes(VWC, SWP))+geom_point()+facet_grid(meta~depth)
+
 
 # PTF constants
-ths10 = .4138
+ths10 = .4138*(1-0.62) # correct for gravel content
 alpha10 = 8.1650
 n10 = 1.1769
 m10 = 1 - 1 / n10
 
-ths80 = .3839
+ths80 = .3839*(1-0.62) # correct for gravel content
 alpha80 = 6.005
 n80 = 1.2223
 m80 = 1 - 1 / n80
@@ -39,13 +42,17 @@ ggplot(sw_comp, aes(SWP, SWP_MvG))+geom_point()+facet_grid(meta~depth)+
 ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+
   geom_point(aes(log10(-10*SWP_MvG), VWC), color="red")+facet_grid(meta~depth)
 
+ggplot(sw_comp, aes(VWC, SWP))+geom_point()+
+  geom_point(aes(VWC, SWP_MvG), color="red")+facet_grid(meta~depth)
+
+
 # test parameters
-thst10 = .5
+thst10 = .2
 alphat10 = 6
 nt10 = 1.2
 mt10 = 1 - 1 / nt10
 
-thst80 = .5
+thst80 = .2
 alphat80 = 5
 nt80 = 1.22
 mt80 = 1 - 1 / nt80
@@ -59,11 +66,17 @@ ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+
   geom_point(aes(log10(-10*SWP_test), VWC), color="blue")+
   facet_grid(meta~depth)+xlim(1, 5)
 
+ggplot(sw_comp, aes(VWC, SWP))+geom_point()+
+  geom_point(aes(VWC, SWP_MvG), color="red")+
+  geom_point(aes(VWC, SWP_test), color="blue")+
+  facet_grid(meta~depth)
+
+
 
 # basic sensitivity
-vwc = seq(.2, 1, .01)
+vwc = seq(.2, 0.5, .01)
 
-n = seq(1.1, 1.3, .02)
+n = seq(1.16, 1.3, .02)
 for (i in 1:length(n)) {
   
   m = 1 - 1 / n[i]
@@ -77,6 +90,7 @@ for (i in 1:length(n)) {
 }
 
 ggplot(out_n, aes(log10(-10*swp), vwc, group=n, color=n))+geom_line()
+ggplot(out_n, aes(vwc, swp, group=n, color=n))+geom_line()
 
 
 alp = seq(6, 12, .2)
@@ -92,4 +106,5 @@ for (i in 1:length(alp)) {
 }
 
 ggplot(out_a, aes(log10(-10*swp), vwc, group=a, color=a))+geom_line()
+ggplot(out_a, aes(vwc, swp, group=a, color=a))+geom_line()
 

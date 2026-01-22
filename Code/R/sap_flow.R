@@ -113,15 +113,13 @@ sf_daily = sf_long %>% mutate(datehour=floor_date(datetime, "1 hour")) %>%
 sf_daily = na.omit(sf_daily)
 
 ggplot(sf_daily, aes(date, sf, color=as.factor(tree_id)))+geom_line(alpha=.8)+guides(color="none")+
-  facet_wrap(~scenario, ncol=1)+theme_bw()+labs(x="",y="Mean Daily Sap Flux [kg/h]", color="Tree ID")
+  facet_wrap(~scenario, ncol=1)+theme_bw()+labs(x="",y="Mean Daily Sap Flux [kg/day]", color="Tree ID")
 
-ggplot(filter(sf_daily, scenario!="irrigation"), aes(date, sfd, color=as.factor(scenario)))+
-  stat_summary(geom="line", fun=mean)+
-  stat_summary(geom="ribbon", alpha=.3)+
-  facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()
+ggplot(filter(sf_daily, scenario!="irrigation", tree_id!="125"), aes(date, sf, color=as.factor(scenario)))+
+  stat_summary(geom="line", fun=mean)+theme_bw()+labs(x="", y="Mean Daily Sap Flow [kg/day]", color="Scenario")
 
 # group by scenario
-sf_meta = sf_daily %>% filter(tree_id != "125") %>% group_by(date, scenario) %>% summarize(sf=mean(sf, na.rm=T))
+sf_meta = sf_daily %>% filter(tree_id != "125", tree_id!="274") %>% group_by(date, scenario) %>% summarize(sf=mean(sf, na.rm=T))
 sf_meta$year = year(sf_meta$date)
 
 ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sf, color=as.factor(scenario)))+geom_line()+
@@ -157,7 +155,7 @@ sf_ctr_yr = sf_ctr_daily %>% mutate(year=year(date)) %>%
   group_by(year) %>% summarize(Tr=sum(Tr))
 
 # irrigation stop scenario
-sf_irst = sf_daily %>% filter(scenario=="irrigation stop")
+sf_irst = sf_daily %>% filter(scenario=="irrigation stop", tree_id != "274")
 
 # combine with measurements for weighting
 sf_irst = left_join(mutate(sf_irst, tree_id=as.numeric(tree_id)), rename(TN_sf_irst, tree_id=tree_name))
@@ -306,6 +304,7 @@ ggplot(sap_ctr_daily, aes(date, Tr))+geom_line()
 
 #sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_SF_L3_2025-02-02.RDS")
 sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_sfden_2025-06-18.RDS")
+#sap_vpd25 = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_SF_L3_2025-12-01.RDS")
 
 sap_vpd$Date.Time = as.POSIXct(sap_vpd$Date.Time, tz="CET", format="%Y-%m-%d %H:%M:%S")
 sap_vpd$date = as.Date(sap_vpd$Date.Time, tz="CET")
@@ -319,8 +318,8 @@ sap_vpd_hourly = sap_vpd %>% filter(Total_Sap_Flow_kg_h > 0) %>%
 sap_vpd_hourly$date = as.Date(sap_vpd_hourly$datehour, tz="CET")
 
 #
-sap_vpd_daily = sap_vpd %>% filter(Total_Sap_Flow>0) %>% group_by(date, Tree_id, Treatment) %>% 
-  summarize(Total_Sap_Flow=mean(Total_Sap_Flow, na.rm=T))
+sap_vpd_daily = sap_vpd_hourly %>% filter(Total_Sap_Flow>0) %>% group_by(date, Tree_id, Treatment) %>% 
+  summarize(Total_Sap_Flow=sum(Total_Sap_Flow, na.rm=T))
 
 ggplot(sap_vpd_daily, aes(date, Total_Sap_Flow, color=as.factor(Tree_id)))+geom_line()+
   facet_wrap(~Treatment)+theme_bw()+guides(color="none")
@@ -363,7 +362,7 @@ tree_specs_drt = filter(tree_specs, treat == "roof")
 
 ## upscale sap flow
 
-# first attempt, normalize sap flow by sapwood area and scale with stand sapwood area
+# normalize sap flow by sapwood area and scale with stand sapwood area
 
 # function to scale up sap flow
 UPSCALE = function(sap, trees, sap_area, plot_area) {
@@ -413,6 +412,12 @@ sap_vpd_drt_daily = UPSCALE(sap_vpd_ctr, tree_specs_ctr, sap_area_drt, area_drt)
 
 ggplot(sap_vpd_drt_daily, aes(date, Tr))+geom_line()
 
+
+trans_vpd_comp = rbind(mutate(sap_vpd_ctr_daily, scen="Control"), mutate(sap_vpd_irr_daily, scen="Irrigation"))
+#trans_vpd_comp = rbind(trans_vpd_comp, mutate(sap_vpd_drt_daily, scen="Roof"))
+
+ggplot(trans_vpd_comp, aes(date, Tr, color=scen))+geom_line()+theme_bw()+
+  labs(x="", y="Transpiration (mm/day)", color="Treatment")
 
 # older data
 
