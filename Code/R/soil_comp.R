@@ -1,6 +1,7 @@
 
 library(lubridate)
 library(tidyverse)
+library(readxl)
 
 VPD = read_csv("../../Data/Pfyn/PFY_VPD_swp_swc.csv")
 VPD$depth = VPD$depth * -1
@@ -36,8 +37,9 @@ ggplot(filter(swc, meta=="irrigation", date>="2022-01-01", depth %in% c(0.1,0.8)
 swp_long$scen = if_else(swp_long$meta=="control", "Control", 
                 if_else(swp_long$meta=="irrigated", "Irrigation", "Irrigation stop"))
 swp_long$depth = swp_long$depth * 100
+irr = read_csv("../../Data/Pfyn/irrigation.csv")
 
-ggplot()+geom_rect(data=filter(irr, year > 2014, year<2025), aes(xmin=on, xmax=off, ymin=-Inf, ymax=Inf), alpha=.5, fill="lightblue")+
+ggplot()+geom_rect(data=filter(irr, year > 2014, year<2025), aes(x=dates, width=1, ymin=-Inf, ymax=Inf), alpha=.5, fill="lightblue")+
   geom_line(data=swp_long, aes(date, SWP, color=scen), linewidth=0.8)+
   facet_wrap(~depth, scales="free_y", ncol=1)+
   theme_bw()+labs(x="", y="SMP (kPa)", color="Scenario")+
@@ -103,4 +105,31 @@ swc_comp$depth = swc_comp$depth * 100
 #write_csv(swc_comp, "../../Data/Pfyn/Pfyn_swat.csv")
 
 
+# compare SWP against Lorenz data
+
+SWP20_LW = read_excel("../../Data/Pfyn/SWP_Pfynwald_LW.xlsx", sheet=1)
+SWP80_LW = read_excel("../../Data/Pfyn/SWP_Pfynwald_LW.xlsx", sheet=2)
+
+SWP20_LW$date = as.Date(SWP20_LW$`TO_CHAR(M.MEAS_DATE,'DD.MM.YYY`, format="%d.%m.%Y %H:%M")
+SWP80_LW$date = as.Date(SWP80_LW$`TO_CHAR(M.MEAS_DATE,'DD.MM.YYY`, format="%d.%m.%Y %H:%M")
+
+SWP20_LW$depth = 10
+SWP80_LW$depth = 80
+
+SWP_LW = rbind(select(SWP20_LW, date, VALUE, depth), select(SWP80_LW, date, VALUE, depth))
+
+SWP_LW$VALUE[SWP_LW$VALUE == -9999999] = NA
+
+declab = read_csv("N:/prj/Soil/Projekte/Pfynwald/Pfynwald_KM/1_Decent_lab_data/filtered/PFY_hh_all_filtered_2025-10-23.csv")
+
+# hourly SWP from decent lab
+dec_SWP = declab %>% filter(para == "SWP", meta=="control") %>% rename(SWP=value, datetime=hour) %>% 
+  select(-c(para, sensor, meta, plot, yr, mo)) %>% mutate(date = as.Date(datetime))
+
+dec_SWP = dec_SWP %>% group_by(date, depth) %>% summarize(SWP=mean(SWP, na.rm=T))
+
+ggplot(filter(dec_SWP, date<="2022-10-01"), aes(date, SWP, color="DecentLab"))+geom_line(linewidth=.8)+
+  geom_line(data=SWP_LW, aes(date, VALUE, color="LoWa Network"), linewidth=.8)+
+  facet_wrap(~depth, ncol=1)+theme_bw()+labs(x="")+
+  theme(legend.position="inside", legend.position.inside=c(.1,.2))
 

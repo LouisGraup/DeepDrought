@@ -8,7 +8,7 @@ library(humidity)
 
 
 start_date <- as.POSIXct("2024-01-01 00:00:00", tz="GMT")
-end_date <- as.POSIXct("2025-08-01 00:00:00", tz="GMT")
+end_date <- as.POSIXct("2026-01-01 00:00:00", tz="GMT")
 
 conn <- db_connect('grauplou', rstudioapi::askForPassword("Database password"), db_host = 'pgdblwf', db_name = 'lwf')
 
@@ -69,7 +69,7 @@ meteo.daily = meteo.wide %>% group_by(dates, treatment) %>%
   summarize(VPD=mean(VPD), tmax=max(TA), tmin=min(TA), tmean=mean(TA),
             Es=mean(Es), Ea=mean(Ea))
 
-#write_csv(meteo.daily, "../../Data/Pfyn/meteo/Pfyn_micro_clim_0124_0725.csv")
+#write_csv(meteo.daily, "../../Data/Pfyn/meteo/Pfyn_micro_clim_0124_1225.csv")
 
 # drop roof scenario and aggregate into vpd and control scenarios
 #meteo.daily = filter(meteo.daily, treatment != "roof")
@@ -93,7 +93,7 @@ meteo.vpd = meteo.scen %>% filter(scen == "vpd") %>% select(-c(scen, VPD, Es)) %
   rename(vappres = Ea)
 
 # fill in missing dates
-date_seq = seq.Date(from=as.Date("2024-01-01"), to=as.Date("2025-07-31"), by=1)
+date_seq = seq.Date(from=as.Date("2024-01-01"), to=as.Date("2025-12-31"), by=1)
 
 meteo.vpd = left_join(data.frame(dates=date_seq), meteo.vpd)
 meteo.vpd[549:550, 2:5] = meteo.ctr[549:550, 2:5]
@@ -122,7 +122,7 @@ meteovar.daily = meteovar.df %>% group_by(dates) %>%
 meteo_Pfyn_VPD = left_join(meteovar.daily, meteo.vpd)
 meteo_Pfyn_Con = left_join(meteovar.daily, meteo.ctr)
 
-#write_csv(meteo_Pfyn_VPD, "../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_VPD.csv")
-#write_csv(meteo_Pfyn_Con, "../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_Control.csv")
+#write_csv(meteo_Pfyn_VPD, "../../Data/Pfyn/meteo/Pfyn_meteo0124_1225_insitu_VPD.csv")
+#write_csv(meteo_Pfyn_Con, "../../Data/Pfyn/meteo/Pfyn_meteo0124_1225_insitu_Control.csv")
 
 dbDisconnect(conn)

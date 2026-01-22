@@ -75,26 +75,22 @@ meteo_roof_vpd = meteo_VPD %>% rename(prec = precip_roof) %>%
 
 
 # site data for tree heights
-
 site_df = read_csv("../../Data/Pfyn/siteproperties.csv")
 ht_cont = mean(filter(site_df, BEZKM == "control")$height_m)
 ht_irr = mean(filter(site_df, BEZKM == "irrigation")$height_m)
 ht_stp = mean(filter(site_df, BEZKM == "stop")$height_m)
 
 # modeled LAI data from prepLWFjl.R
-
 LAI_df = read_csv("../../Data/Pfyn/LAI_ext.csv")
-LAI_df = LAI_df[1:25,]
 
 # soil data
-
 soil_df = read_csv("../../Data/Pfyn/soil_hydraulic.csv")
 
 
 ## use LWFBrook90R to prepare input files for julia version
 
 # options common to all scenarios
-opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-12-31"), 
+opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2025-12-31"), 
                         root_method="soilvar", budburst_method="Menzel", 
                         leaffall_method="vonWilpert", lai_method="Coupmodel")
 
@@ -103,23 +99,23 @@ opt = set_optionsLWFB90(startdate=as.Date("2000-01-01"), enddate=as.Date("2024-1
 # control scenario
 par_c = set_paramLWFB90(maxlai=LAI_df$LAI_ctrl, winlaifrac=.6, height=ht_cont, height_ini=ht_cont, 
                         coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_cont, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont, soil=soil_df)
 #extend_meteoveg(meteo_cont, "Pfyn_control")
 
 # drought scenarios use same parameters as control
 
 # drought scenario under ambient climate
-generate_LWFBrook90jl_Input("Pfyn_drought_ambient","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_roof_con, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_drought_ambient","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_roof_con, soil=soil_df)
 #extend_meteoveg(meteo_roof_con, "Pfyn_drought_ambient")
 
 # drought scenario under manipulated VPD
-generate_LWFBrook90jl_Input("Pfyn_drought_VPD","pfynwald",".", options_b90=opt, param_b90=par_c, climate=filter(meteo_roof_vpd, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_drought_VPD","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_roof_vpd, soil=soil_df)
 #extend_meteoveg(meteo_roof_vpd, "Pfyn_drought_VPD")
 
 # irrigation stop scenario
 par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
                            coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=filter(meteo_irrstp, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
 #extend_meteoveg(meteo_irrstp, "Pfyn_irrigiso_stop")
 
 # irrigation scenarios use same parameters
@@ -127,11 +123,11 @@ par_ir = set_paramLWFB90(maxlai=LAI_df$LAI_irr, winlaifrac=.6, height=ht_irr, he
                          coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 
 # irrigation under ambient climate
-generate_LWFBrook90jl_Input("Pfyn_irrigiso_ambient","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=filter(meteo_irr_con, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_ambient","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_con, soil=soil_df)
 #extend_meteoveg(meteo_irr_con, "Pfyn_irrigiso_ambient")
 
 # irrigation under manipulated VPD
-generate_LWFBrook90jl_Input("Pfyn_irrigiso_VPD","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=filter(meteo_irr_vpd, dates<"2025-01-01"), soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_VPD","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_vpd, soil=soil_df)
 #extend_meteoveg(meteo_irr_vpd, "Pfyn_irrigiso_VPD")
 
 

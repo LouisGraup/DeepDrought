@@ -36,11 +36,11 @@ dbDisconnect(con)
 ## Sierre and Sion precipitation from MeteoSwiss
 ## Sierre has automatic and historical manual measurements
 
-Sion = read.table("../../Data/MeteoSwiss/Sion/order_129912_data.txt", sep=";", header=T, skip=2)
+Sion_hist = read.table("../../Data/MeteoSwiss/Sion/ogd-smn_sio_d_historical.csv", sep=";", header=T)
 Sierre = read.table("../../Data/MeteoSwiss/Sierre/order_130615_data.txt", sep=";", header=T, skip=2)
 Sierre_hist = read.table("../../Data/MeteoSwiss/Sierre/ogd-nime_sre_d_historical.csv", sep=";", header=T)
 
-Sion$dates = as.Date(as.character(Sion$time), format="%Y%m%d")
+Sion_hist$dates = as.Date(Sion_hist$reference_timestamp, format="%d.%m.%Y %H:%M")
 Sierre$dates = as.Date(as.character(Sierre$time), format="%Y%m%d")
 Sierre_hist$dates = as.Date(Sierre_hist$reference_timestamp, format="%d.%m.%Y %H:%M")
 
@@ -53,16 +53,16 @@ Sierre_hist = Sierre_hist %>% rename(precip=rre150d0, stn=station_abbr) %>%
 
 ## first, Sion data for long-term meteo inputs
 
-meteoLWF = Sion %>%
+meteoLWF = Sion_hist %>%
   mutate( tmin = tre200dn,
-          tmax = tre200jx,
+          tmax = tre200dx,
           tmean = tre200d0,
           prec_Sion = rka150d0,
           relhum = ure200d0,
           globrad = ((24*60*60)/1000000)*gre000d0, # convert from W/m2 to MJ/day/m2
           windspeed = fkl010d0) %>%
   select(dates, globrad, tmax, tmin, tmean, windspeed, relhum, prec_Sion) %>% 
-  filter(dates<as.Date("2024-01-01"))
+  filter(dates>=as.Date("2000-01-01"), dates<as.Date("2024-01-01"))
 
 # derive actual vapor pressure
 meteoLWF$Es = SVP.ClaCla(meteoLWF$tmean+273.15) # saturation vapor pressure hPa
@@ -86,8 +86,8 @@ meteoLWF = select(meteoLWF, -c(prec_Sion, precip_Sierre, precip_Sierre_hist))
 
 ## last, in-situ data from 2024
 
-meteo_ins_VPD = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_VPD.csv")
-meteo_ins_Con = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_0725_insitu_Control.csv")
+meteo_ins_VPD = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_1225_insitu_VPD.csv")
+meteo_ins_Con = read_csv("../../Data/Pfyn/meteo/Pfyn_meteo0124_1225_insitu_Control.csv")
 
 # VPD is reduced VPD from manipulation experiment, also includes changes in temp
 meteoLWF_Con = rbind(meteoLWF, rename(meteo_ins_Con, precip_ctrl=precip))
@@ -155,7 +155,7 @@ on = c("2003-06-19", "2004-05-15", "2005-04-23", "2006-05-06", "2007-05-04", "20
 off = c("2003-10-21", "2004-10-26", "2005-10-04", "2006-10-25", "2007-10-02", "2008-10-14",
         "2009-10-12", "2010-10-01", "2011-10-16", "2012-10-02", "2013-09-23", "2014-10-01",
         "2015-10-05", "2016-09-26", "2017-10-09", "2018-09-27", "2019-10-15", "2020-10-19",
-        "2021-10-11", "2022-10-21", "2023-10-18", "2024-10-24", "2025-07-31")
+        "2021-10-11", "2022-10-21", "2023-10-18", "2024-10-24", "2025-09-16")
 
 irr = data.frame(on=as.Date(on), off=as.Date(off))
 irr$year = year(irr$on)
