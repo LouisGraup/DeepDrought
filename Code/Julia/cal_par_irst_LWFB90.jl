@@ -20,20 +20,25 @@ end
     # soil water content and soil matric potential
     obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
 
-    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
+    obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
+    filter!(:date => >=(Date(2016, 1, 1)), obs_swp); # filter out early dates
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
     # up-scaled sap flow data
     obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans_2011_17.csv", DataFrame);
 
     # separate out irrigation scenario
-    obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+    obs_swc_irst = obs_swc[obs_swc.meta .== "stop", :]; # select irrigation stop treatment
     filter!(:date => >=(Date(2015, 1, 1)), obs_swc_irst); # filter out early dates
     select!(obs_swc_irst, :date, :depth, :VWC); # remove extra columns
     obs_swc_irst = unstack(obs_swc_irst, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs_swc_irst, :date); # sort by date
 
-    obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+    obs_swp_irst = obs_swp[obs_swp.meta .== "stop", :]; # select irrigation stop treatment
+    select!(obs_swp_irst, :date, :depth, :SWP); # remove extra columns
+    obs_swp_irst = unstack(obs_swp_irst, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
+    sort!(obs_swp_irst, :date); # sort by date
+
 
     obs_sap_irst = obs_sap[obs_sap.scen .== "Irrigation stop", :]; # select irrigation stop treatment
 end
@@ -174,7 +179,7 @@ end
 
 ## define calibration parameter sets
 
-n = 1000; # number of parameter sets
+n = 500; # number of parameter sets
 
 # define prior parameter ranges
 
@@ -208,7 +213,7 @@ param = [
     ("R5", 50, 400), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -4, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -4.0, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 100, 6000), # maximum root length (100, 6000)

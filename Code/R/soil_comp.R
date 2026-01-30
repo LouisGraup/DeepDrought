@@ -7,7 +7,6 @@ VPD = read_csv("../../Data/Pfyn/PFY_VPD_swp_swc.csv")
 VPD$depth = VPD$depth * -1
 
 swc = read_csv("../../Data/Pfyn/Pfyn_swat.csv")
-swc$VWC = swc$VWC * (1-0.62) # correct for gravel content
 
 swp = read_csv("../../Data/Pfyn/PFY_swpc_corr.csv")
 
@@ -93,14 +92,20 @@ ggplot()+geom_line(data=filter(trans, scen=="Irrigation stop"), aes(date, Tr))+
 
 # combine VWC records into single file
 
-swc_ext = filter(swc_ext, VWC<69, VWC>10)
+swc = read_csv("../../Data/Pfyn/PFY_swat.csv")
+swc_ext = read_csv("../../Data/Pfyn/PFY_swat_ext.csv")
+swc_ext = filter(swc_ext, VWC >= 0.03)
+swc_ext$VWC[18834] = NA
+swc_ext = na.omit(swc_ext)
 
-swc = swc %>% select(-c(setup, ...1)) %>% filter(date<"2014-04-11")
+swc = swc %>% select(-c(setup, ...1)) %>% filter(date<"2015-01-01")
 swc$meta = if_else(swc$meta == "irrigated","irrigation",swc$meta)
+swc$VWC = swc$VWC/100 * (1 - 0.62) # correct for gravel content
+
+ggplot(filter(swc, depth %in% c(10, 80)), aes(date, VWC))+geom_line()+geom_line(data=filter(swc_ext, meta!="stop"), aes(date, VWC, color="Ext"))+
+  facet_wrap(depth~meta, ncol=1)
 
 swc_comp = rbind(swc, swc_ext)
-swc_comp$VWC = swc_comp$VWC / 100
-swc_comp$depth = swc_comp$depth * 100
 
 #write_csv(swc_comp, "../../Data/Pfyn/Pfyn_swat.csv")
 

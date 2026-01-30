@@ -21,7 +21,8 @@ end
     obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
     filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
-    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
+    obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
+    filter!(:date => >=(Date(2016, 1, 1)), obs_swp); # filter out early dates
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
     # up-scaled sap flow data
@@ -33,7 +34,10 @@ end
     obs_swc_irr = unstack(obs_swc_irr, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs_swc_irr, :date); # sort by date
 
-    obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
+    obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
+    select!(obs_swp_irr, :date, :depth, :SWP); # remove extra columns
+    obs_swp_irr = unstack(obs_swp_irr, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
+    sort!(obs_swp_irr, :date); # sort by date
 
     obs_sap_irr = obs_sap[obs_sap.scen .== "Irrigation", :]; # select irrigation treatment
 end
@@ -184,7 +188,7 @@ end
 
 ## define calibration parameter sets
 
-n = 1000; # number of parameter sets
+n = 500; # number of parameter sets
 
 # define prior parameter ranges
 

@@ -21,7 +21,8 @@ end
     obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
     filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
 
-    obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
+    obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
+    filter!(:date => >=(Date(2016, 1, 1)), obs_swp); # filter out early dates
     filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
 
     # up-scaled sap flow data
@@ -34,6 +35,9 @@ end
     sort!(obs_swc_ctr, :date); # sort by date
 
     obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
+    select!(obs_swp_ctr, :date, :depth, :SWP); # remove extra columns
+    obs_swp_ctr = unstack(obs_swp_ctr, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
+    sort!(obs_swp_ctr, :date); # sort by date
     
     obs_sap_ctr = obs_sap[obs_sap.scen .== "Control", :]; # select control treatment
 end
@@ -185,7 +189,7 @@ end
 
 ## define calibration parameter sets
 
-n = 1000; # number of parameter sets
+n = 500; # number of parameter sets
 
 # define prior parameter ranges
 

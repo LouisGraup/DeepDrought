@@ -3,11 +3,9 @@
 library(tidyverse)
 library(lubridate)
 
-setwd("../../Data/Pfyn")
-
 # dendrometer data from Zweifel et al. (2020)
 
-den = read_tsv("pfynwald_dendro.tab", skip=43)
+den = read_tsv("../../Data/Pfyn/pfynwald_dendro.tab", skip=43)
 
 # lengthen data frame and separate column names into multiple variables
 den_long = den %>% pivot_longer(cols=-1, names_to=c(".value", "tree_id","scenario"), 
@@ -95,11 +93,10 @@ ggplot(filter(den_plot, year>2012, year<2016), aes(date, TWD_pd, color=as.factor
 # write_csv(den_meta, "Pfyn_twd_2011_17.csv")
 
 
-
 # VPDrought 2024 data
 
-TN_dendro = read_csv("TreeNet/tn_timeseries_Pfyn_dendro.csv")
-TN_meta = read_csv("TreeNet/tn_metadata_Pfyn_dendro.csv")
+TN_dendro = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_dendro.csv")
+TN_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_dendro.csv")
 
 # select only VPDrought trees
 TN_vpd_meta = TN_meta %>% filter(series_start=="2023-08-01")
@@ -172,11 +169,56 @@ ggplot(filter(TN_vpden_meta, date>="2024-05-01", date<"2024-11-01"), aes(date, t
   labs(x="", y="Normalized Pre-dawn TWD")+guides(color="none")
 
 
-# older data from Richard
+# organize full TreeNet data set
+TN = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_dendro_2010_25.csv")
+TN25 = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_dendro_2025.csv")
+TN_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_dendro_2010_25.csv")
 
-den_con = readRDS("data for Pfynwald/older/dendro/PFY_DR-TWD.RDS")
-den_irr = readRDS("data for Pfynwald/older/dendro/PFY_WE-TWD.RDS")
+TN_meta$meta = TN_meta$site_subplot
 
-den_con = den_con %>% select(-c(frost, flags, version)) %>% na.omit()
-den_irr = den_irr %>% select(-c(frost, flags, version)) %>% na.omit()
+# combine with 2025 L2 data
+TN = filter(TN, ts < TN25$ts[1])
+TN = rbind(TN, TN25)
 
+# formatting
+TN$date = as.Date(TN$ts)
+TN$hour = hour(TN$ts)
+
+TN = TN %>% filter(frost == FALSE) %>% 
+  select(-c(frost, flags, gro_start, gro_end)) %>% 
+  left_join(select(TN_meta, series_id, tree_name, meta))
+
+TN = filter(TN, meta %in% c("Control", "Irr_Stop", "Irrigation"), tree_name!=250)
+
+ggplot(filter(TN, date>="2025-01-01"), aes(ts, value, color=as.factor(tree_name)))+geom_line()+
+  facet_wrap(~meta)+guides(color="none")
+
+# aggregate to daily with pre-dawn
+TN_pd = TN %>% filter(hour <= 6) %>% 
+  group_by(date, tree_name, meta) %>% summarize(twd_pd=min(twd, na.rm=T))
+
+# aggregate to daily with mid-day
+TN_md = TN %>% filter(hour >= 12, hour <= 17) %>% 
+  group_by(date, tree_name, meta) %>% summarize(twd_md=max(twd, na.rm=T))
+
+TN_daily = full_join(TN_pd, TN_md)
+
+# calculate maximum daily shrinkage
+TN_daily$MDS = TN_daily$twd_md - TN_daily$twd_pd
+
+# calculate 99th percentile MDS over entire time series
+TN_mds = TN_daily %>% mutate(month=month(date)) %>% 
+  filter(month>4, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
+  group_by(tree_name) %>% summarize(mds_max = quantile(MDS, .99))
+
+# join max MDS to daily data frame
+TN_daily = left_join(TN_daily, TN_mds)
+
+# normalize pre-dawn TWD and MDS with max MDS
+TN_daily$twd_pdn = TN_daily$twd_pd / TN_daily$mds_max
+TN_daily$MDS_norm = TN_daily$MDS / TN_daily$mds_max
+
+ggplot(TN_daily, aes(date, twd_pdn, color=as.factor(tree_name)))+geom_line()+
+  facet_wrap(~meta, ncol=1)+guides(color="none")+theme_bw()
+
+#write_csv(TN_daily, "../../Data/Pfyn/TreeNet/Pfyn_twd_2010_25.csv")

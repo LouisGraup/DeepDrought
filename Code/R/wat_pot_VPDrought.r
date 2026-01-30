@@ -3,7 +3,34 @@
 
 library(lubridate)
 library(tidyverse)
+library(readxl)
 
+# leaf water potential in 2025 needs treatment information
+LWP25 = read_excel("../../Data/Pfyn/wp_pfynwald_2025.xlsx")
+
+# use TreeNet metadata and inventory 
+TN_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_dendro_2025.csv")
+TN_meta = rename(TN_meta, meta=site_subplot, tree=tree_name)
+Pfyn_inv = read_excel("../../Data/Pfyn/Pfyn_DBH_2023.xlsx")
+Pfyn_inv = rename(Pfyn_inv, tree=TreeNo)
+
+LWP25 = left_join(LWP25, select(TN_meta, tree, meta))
+LWP25 = left_join(LWP25, select(Pfyn_inv, tree, Treatment_VPD))
+
+LWP25$meta = ifelse(is.na(LWP25$meta), LWP25$Treatment_VPD, LWP25$meta)
+LWP25$meta = ifelse(LWP25$meta == "Buffer", "Control", LWP25$meta)
+LWP25$meta = with(LWP25, case_when(tree==382 ~ "Irrigation",
+                                   tree==412 ~ "Control",
+                                   tree==787 ~ "Irrigation_vpd",
+                                   tree==816 ~ "Irrigation_vpd",
+                                   tree==837 ~ "Irrigation_vpd",
+                                   tree==979 ~ "Control",
+                                   .default = meta))
+LWP25 = select(LWP25, -Treatment_VPD)
+
+write_csv(LWP25, "../../Data/Pfyn/PFY_lwp25.csv")
+
+# 2024 leaf water potential data
 LWP = read_csv("../../Data/Pfyn/PFY_lwp.csv")
 LWP$date = as.Date(LWP$MESSTIME)
 LWP$treatment = case_when(LWP$treat2=="irrigated"~"irrigation",

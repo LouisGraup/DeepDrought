@@ -73,7 +73,26 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
                     # apply additive factor to log10(ksat) for each soil horizon
                     soil0.ksat_mmDay = 10 .^ (log10.(soil0.ksat_mmDay) .+ value);
                 end
-
+            elseif contains(name, "alpha")
+                if soil_par_count > 1
+                    # apply multiplier to alpha_perMeter for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.alpha_perMeter[k] = soil0.alpha_perMeter[k] * value;
+                else
+                    # apply multiplier to alpha_perMeter for each soil horizon
+                    soil0.alpha_perMeter = soil0.alpha_perMeter * value;
+                end
+        
+            elseif contains(name, "npar")
+                if soil_par_count > 1
+                    # apply multiplier to npar_ for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.npar_[k] = soil0.npar_[k] * value;
+                else
+                    # apply multiplier to npar_ for each soil horizon
+                    soil0.npar_ = soil0.npar_ * value;
+                end
+        
             elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
                 # root parameters are present
                 global root_pars = true;

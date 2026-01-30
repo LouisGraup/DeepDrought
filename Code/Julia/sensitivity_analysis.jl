@@ -47,13 +47,13 @@ function behavioral_met(met)
                met.max_trans .< 4, :] =#
 
     # irr stop metrics
-    return met[met.swc_nse10 .> 0.7 .&& 
+    return met[met.swc_nse10 .> 0.3 .&& 
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.7 .&&
-               met.swp_nse10 .> 0.55 .&&
+               met.swc_nse80 .> 0.3 .&&
+               met.swp_nse10 .> 0.1 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.7 .&&
-               met.trans_nse .> 0.4 .&&
+               met.swp_nse80 .> 0.1 .&&
+               met.trans_nse .> -1.0 .&&
                met.trans_cor .> 0.5 .&&
                met.max_trans .< 3, :]
 end
@@ -177,12 +177,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260103.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260103.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260103.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260103.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260103.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260103.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260106.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260106.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260106.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260106.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260106.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260106.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -280,16 +280,16 @@ par_irr_best
 # parameter relationships
 par_plots_ctr = par_plot(par_ctr, met_ctr, met_y="trans_cor");
 par_plots_irr = par_plot(par_irr, met_irr, met_y="swp_nse80");
-par_plots_irst = par_plot(par_irst, met_irst, met_y="trans_nse");
+par_plots_irst = par_plot(par_irst, met_irst, met_y="swp_nse10");
 
-plot(par_plots_irst..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots_irst..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 
 # calculate K-S statistic to determine sensitive parameters
 ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irst..., size=(1000,1000), layout=(4,5), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irst..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
