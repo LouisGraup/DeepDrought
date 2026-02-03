@@ -20,6 +20,7 @@ end
     # soil water content and soil matric potential
     obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
     filter!(:date => >=(Date(2004, 1, 1)), obs_swc); # filter out early dates
+    filter!(:date => <(Date(2021, 1, 1)), obs_swc); # filter out late dates
 
     obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
     filter!(:date => >=(Date(2016, 1, 1)), obs_swp); # filter out early dates
@@ -27,6 +28,10 @@ end
 
     # up-scaled sap flow data
     obs_sap = CSV.read("../../Data/Pfyn/Pfyn_trans_2011_17.csv", DataFrame);
+
+    # isotope data
+    obs_soil_iso = CSV.read("../../Data/Pfyn/Pfyn_insitu_soil_iso.csv", DataFrame);
+    obs_xy_iso = CSV.read("../../Data/Pfyn/Pfyn_insitu_xylem_iso.csv", DataFrame);
 
     # separate control and irrigation scenarios
     obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -40,6 +45,14 @@ end
     sort!(obs_swp_ctr, :date); # sort by date
     
     obs_sap_ctr = obs_sap[obs_sap.scen .== "Control", :]; # select control treatment
+
+    obs_soil_iso_ctr = obs_soil_iso[obs_soil_iso.treatment .== "control", :]; # select control treatment
+    obs_soil_iso_ctr = select(obs_soil_iso_ctr, :date, :depth, :d18O); # remove extra columns
+    obs_soil_iso_ctr = unstack(obs_soil_iso_ctr, :date, :depth, :d18O); # reshape data
+    rename!(obs_soil_iso_ctr, [:date, :d18O_40cm, :d18O_20cm, :d18O_5cm]); # rename columns
+
+    obs_xy_iso_ctr = obs_xy_iso[obs_xy_iso.treatment .== "control", :]; # select control treatment
+    select!(obs_xy_iso_ctr, :date, :d18O); # remove extra columns
 end
 
 # objective function to compare model output to observed data
@@ -139,6 +152,52 @@ end
 
 end
 
+@everywhere function obj_fun_soil_iso(sim, obs)
+
+    # separate observed data into different depths and remove missing values
+    obs_5cm = dropmissing(obs[!, [:date, :d18O_5cm]]);
+    obs_20cm = dropmissing(obs[!, [:date, :d18O_20cm]]);
+    obs_40cm = dropmissing(obs[!, [:date, :d18O_40cm]]);
+    
+    # match simulated data to available dates for each depth
+    sim_5cm = sim[sim.dates .∈ [obs_5cm.date], :d18O_permil_50mm];
+    sim_20cm = sim[sim.dates .∈ [obs_20cm.date], :d18O_permil_200mm];
+    sim_40cm = sim[sim.dates .∈ [obs_40cm.date], :d18O_permil_400mm];
+
+    function RMSE(sim, obs)
+        # calculate Root Mean Square Error
+        rmse = sqrt(sum((obs .- sim).^2) / length(obs))
+        return rmse
+    end
+
+    # calculate RMSE
+    rmse5 = RMSE(sim_5cm, obs_5cm.d18O_5cm);
+    rmse20 = RMSE(sim_20cm, obs_20cm.d18O_20cm);
+    rmse40 = RMSE(sim_40cm, obs_40cm.d18O_40cm);
+
+    return rmse5, rmse20, rmse40
+end
+
+@everywhere function obj_fun_xy_iso(sim, obs)
+
+    # remove missing values
+    obs = dropmissing(obs);
+
+    # match simulated data to available dates
+    sim_xy = sim[sim.date .∈ [obs.date], :XYLEM_d18O];
+
+    function RMSE(sim, obs)
+        # calculate Root Mean Square Error
+        rmse = sqrt(sum((obs .- sim).^2) / length(obs))
+        return rmse
+    end
+
+    # calculate RMSE
+    rmse = RMSE(sim_xy, obs.d18O);
+
+    return rmse
+end
+
 @everywhere function sap_combine(sim, obs_sap)
     # sim is the LWFBrook90 simulation
     # obs is the observed soil water potential data
@@ -154,7 +213,7 @@ end
 end
 
 @everywhere function get_sap(sim)
-    # retrieve soil water potential data from sim
+    # retrieve transpiration from sim
     days = range(sim.ODESolution.prob.tspan...);
     dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
     
@@ -166,6 +225,17 @@ end
     return z
 end
 
+@everywhere function get_xy_iso(sim)
+    # retrieve xylem isotope data from sim
+    days = range(sim.ODESolution.prob.tspan...);
+    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+    
+    z = get_states(sim);
+    z.date = Date.(dates_out);
+    select!(z, :date, :XYLEM_d18O, :XYLEM_d2H);
+    
+    return z
+end
 
 ### BEGIN USER INPUT ###
 
@@ -181,8 +251,8 @@ end
 
     ## simulation dates
 
-    start_date = Date(2000, 1, 1);
-    end_date = Date(2020, 12, 31);
+    start_date = Date(2002, 1, 1);
+    end_date = Date(2024, 12, 31);
 
 end
 
@@ -223,12 +293,12 @@ param = [
     ("R5", 50, 400), # radiation sensitivity (50, 400)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -4, -1.0), # critical water potential (-4, -1)
+    ("PSICR", -3, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction (0.2, 0.8)
     ("MXKPL", 1.0, 30.0), # maximum plant conductivity (1, 30)
     ("MXRTLN", 100, 6000), # maximum root length (100, 6000)
-    #("VXYLEM_mm", 1.0, 100.0), # xylem volume (1, 100)
-    #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient (1, 100)
+    ("VXYLEM_mm", 5.0, 80.0), # xylem volume (5, 80)
+    ("DISPERSIVITY_mm", 30.0, 50.0), # dispersivity coefficient (30, 50)
     ("MAXROOTDEPTH", -2.0, -0.5), # max rooting depth (-5, -0.5)
     ("BETAROOT", 0.9, 0.999) # beta root coefficient (0.8, 1.0)
 ];
@@ -413,7 +483,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 8), fill(0, 2), fill(0, 4)) # skip if simulation fails
+        return (par_id, fill(0, 8), fill(0, 2), fill(0, 4), fill(0, 4)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -422,14 +492,25 @@ end_index = Dates.value(end_date - ref_date);
     z_theta = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = 1:end_index);
     z_psi = get_soil_(:psi, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = 1:end_index);
 
+    # isotopes
+    z_soil_iso = get_soil_(:d18O, sim, depths_to_read_out_mm = [50, 200, 400], days_to_read_out_d = 1:end_index);
+    z_xy_iso = get_xy_iso(sim);
+
     # add dates column
     dates_to_read_out = LWFBrook90.RelativeDaysFloat2DateTime.(1:end_index,sim.parametrizedSPAC.reference_date);
     z_theta.dates = Date.(dates_to_read_out);
     z_psi.dates = Date.(dates_to_read_out);
+    z_soil_iso.dates = Date.(dates_to_read_out);
 
     swc_met = obj_fun_swc(z_theta, obs_swc_ctr)
     swp_met = obj_fun_swp(z_psi, obs_swp_ctr)
     
+    # isotopes
+    iso_soil_met = obj_fun_soil_iso(z_soil_iso, obs_soil_iso_ctr);
+    iso_xy_rmse = obj_fun_xy_iso(z_xy_iso, obs_xy_iso_ctr);
+
+    iso_met = [iso_soil_met..., iso_xy_rmse];
+
     # transpiration
     sap_comp = sap_combine(sim, obs_sap_ctr);
     sap_cor = obs_fun_sap(sap_comp);
@@ -445,7 +526,7 @@ end_index = Dates.value(end_date - ref_date);
 
     tr_met = [sap_cor, sap_nse, max_trans, mean_ann_trans];
 
-    return (par_id, swc_met, swp_met, tr_met)
+    return (par_id, swc_met, swp_met, iso_met, tr_met)
 
 end
 
@@ -465,6 +546,10 @@ metrics = DataFrame(scen = Int[],
     swc_rmse80 = Float64[],
     swp_nse10 = Float64[],
     swp_nse80 = Float64[],
+    iso_rmse5 = Float64[],
+    iso_rmse20 = Float64[],
+    iso_rmse40 = Float64[],
+    iso_rmse_xy = Float64[],
     trans_cor = Float64[], 
     trans_nse = Float64[], 
     max_trans = Float64[], 
@@ -473,8 +558,8 @@ metrics = DataFrame(scen = Int[],
 # loop through results
 for res in results
     # retrieve scenario, parameter id, and metrics
-    par_id, swc, swp, sap = res;
-    row = [par_id, swc..., swp..., sap...];
+    par_id, swc, swp, iso, sap = res;
+    row = [par_id, swc..., swp..., iso..., sap...];
     push!(metrics, row);
 end
 

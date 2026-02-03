@@ -85,6 +85,40 @@ function get_sap(sim)
     return z
 end
 
+function get_soil_iso(sim; shape = "long")
+    # retrieve soil water potential data from sim
+    days, dates_out = get_dates(sim);
+
+    z = get_soil_([:d18O, :d2H], sim, depths_to_read_out_mm = [50, 200, 400], days_to_read_out_d = days);
+    z.date = dates_out;
+
+    select!(z, Not(:time));
+
+    if shape=="long"
+        # reshape data
+        z_long = stack(z, Not(:date), variable_name = "var", value_name="value");
+        z_long.iso = map(x -> occursin("d18O", x) ? "d18O" : "d2H", z_long.var);
+        z_long.depth = parse.(Int, replace.(z_long.var, r".*_([0-9]+)mm$" => s"\1")) .÷ 10; # convert depth to cm from var name
+        select!(z_long, Not(:var));
+        z_long = unstack(z_long, [:date, :depth], :iso, :value);
+        return z_long
+    else
+        return z
+    end
+    
+end
+
+function get_xy_iso(sim)
+    # retrieve xylem isotope data from sim
+    days, dates_out = get_dates(sim);
+
+    z = get_states(sim, days_to_read_out_d = days);
+    z.date = Date.(dates_out);
+    select!(z, :date, :XYLEM_d18O, :XYLEM_d2H);
+    
+    return z
+end
+
 function get_trans_def(sim)
     days, dates_out = get_dates(sim);
 
@@ -154,7 +188,7 @@ end
 
 function sap_comp(sim, obs_sap)
     # sim is the LWFBrook90 simulation
-    # obs is the observed soil water potential data
+    # obs is the observed sap flow data
 
     z_trans = get_sap(sim);
 
@@ -495,6 +529,10 @@ obs_lwp = CSV.read("../../Data/Pfyn/Insitu_lwp.csv", DataFrame);
 
 # isotope data
 obs_soil_iso = CSV.read("../../Data/Pfyn/Pfyn_insitu_soil_iso.csv", DataFrame);
+obs_xy_iso = CSV.read("../../Data/Pfyn/Pfyn_insitu_xylem_iso.csv", DataFrame);
+
+soil_iso_depth_dict = Dict("0-10" => 5, "10-30" => 20, "30-50" => 40);
+obs_soil_iso.depth = [soil_iso_depth_dict[d] for d ∈ obs_soil_iso.depth];
 
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
@@ -513,19 +551,16 @@ obs_lwp_ctr = obs_lwp[obs_lwp.treatment .== "control", :]; # select control trea
 obs_lwp_irr = obs_lwp[obs_lwp.treatment .== "irrigation", :]; # select irrigation treatment
 obs_lwp_irst = obs_lwp[obs_lwp.treatment .== "stop irrigation", :]; # select irrigation stop treatment
 
+obs_soil_iso_ctr = obs_soil_iso[obs_soil_iso.treatment .== "control", :]; # select control treatment
+obs_soil_iso_irr = obs_soil_iso[obs_soil_iso.treatment .== "irrigation", :]; # select irrigation treatment
+obs_soil_iso_irst = obs_soil_iso[obs_soil_iso.treatment .== "irrigation stop", :]; # select irrigation stop treatment
+
+obs_xy_iso_ctr = obs_xy_iso[obs_xy_iso.treatment .== "control", :]; # select control treatment
+obs_xy_iso_irr = obs_xy_iso[obs_xy_iso.treatment .== "irrigation", :]; # select irrigation treatment
+obs_xy_iso_irst = obs_xy_iso[obs_xy_iso.treatment .== "irrigation stop", :]; # select irrigation stop treatment
+
 # irrigation dates
-on = ["2003-06-19", "2004-05-15", "2005-04-23", "2006-05-06", "2007-05-04", "2008-05-15", 
-       "2009-05-14", "2010-06-17", "2011-05-14", "2012-05-11", "2013-05-17", "2014-05-19",
-       "2015-05-12", "2016-05-30", "2017-05-16", "2018-05-08", "2019-05-17", "2020-05-26",
-       "2021-05-18", "2022-05-11", "2023-05-15", "2024-05-26", "2025-04-30"];
-
-off = ["2003-10-21", "2004-10-26", "2005-10-04", "2006-10-25", "2007-10-02", "2008-10-14",
-        "2009-10-12", "2010-10-01", "2011-10-16", "2012-10-02", "2013-09-23", "2014-10-01",
-        "2015-10-05", "2016-09-26", "2017-10-09", "2018-09-27", "2019-10-15", "2020-10-19",
-        "2021-10-11", "2022-10-21", "2023-10-18", "2024-10-24", "2025-07-31"];
-
-irr = DataFrame(on=Date.(on), off=Date.(off));
-irr.year = year.(irr.on);
+irr = CSV.read("../../Data/Pfyn/irrigation.csv", DataFrame);
 
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
@@ -662,6 +697,26 @@ draw(data(stack(sap_comp_irst, Not(:date), variable_name=:Source))*
 draw(data(dropmissing(sap_comp_irst))*
     mapping(:trans, :Tr)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Stop Scenario", titlealign = :center)
+)
+
+# soil isotopes
+
+draw(data(filter!(:date => >(Date(2023,6,1)), get_soil_iso(sim_ctr)))*
+    mapping(:date, :d18O, row=:depth => nonnumeric)*visual(Lines, color=:blue)+
+    data(obs_soil_iso_ctr)*
+    mapping(:date, :d18O, row=:depth => nonnumeric)*visual(Scatter, markersize=8),
+    scales(X = (; label=""), Y= (; label="Soil δ18O (‰ VSMOW)")),
+    figure = (; size=(800, 600), title="Observed Soil Water δ18O for Control Scenario", titlealign = :center)
+)
+
+# xylem isotopes
+
+draw(data(filter!(:date => >(Date(2023,6,1)), get_xy_iso(sim_ctr)))*
+    mapping(:date, :XYLEM_d18O)*visual(Lines, color=:green)+
+    data(obs_xy_iso_ctr)*
+    mapping(:date, :d18O)*visual(Scatter, markersize=8),
+    scales(X = (; label=""), Y= (; label="Xylem δ18O (‰ VSMOW)")),
+    figure = (; size=(800, 600), title="Observed Xylem δ18O for Control Scenario", titlealign = :center)
 )
 
 # compare transpiration across scenarios
