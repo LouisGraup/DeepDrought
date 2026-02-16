@@ -4,14 +4,10 @@ library(tidyverse)
 library(lubridate)
 
 swc =  read_csv("../../Data/Pfyn/Pfyn_swat.csv")
-swc$VWC = swc$VWC * (1 - 0.62)
 
-swp = read_csv("../../Data/Pfyn/PFY_swpc_corr.csv")
-swp$meta = if_else(swp$meta=="irrigated", "irrigation", swp$meta)
-swp_long = swp %>% pivot_longer(-c(meta, date), names_to="depth", values_to="SWP")
-swp_long$depth = ifelse(swp_long$depth == "SWP_10cm", 10, 80)
+swp = read_csv("../../Data/Pfyn/Pfyn_swp.csv")
 
-sw_comp = inner_join(swp_long, swc)
+sw_comp = inner_join(swp, swc)
 
 ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+facet_grid(meta~depth)
 ggplot(sw_comp, aes(VWC, SWP))+geom_point()+facet_grid(meta~depth)
@@ -108,3 +104,46 @@ for (i in 1:length(alp)) {
 ggplot(out_a, aes(log10(-10*swp), vwc, group=a, color=a))+geom_line()
 ggplot(out_a, aes(vwc, swp, group=a, color=a))+geom_line()
 
+
+# optimization
+library(nloptr)
+
+SWP_MvG_opt = function(p, SWC, SWP_obs) {
+  
+  ths = p[1] * (1 - 0.62)
+  alpha = p[2]
+  n = p[3]
+  m = 1 - 1 / n
+  
+  SWP_MvG = 9.81 * (-1 / alpha) * ((SWC / ths) ^ (-1 / m) - 1) ^ (1 / n)
+  
+  RMSE = sqrt(sum((SWP_MvG - SWP_obs)^2, na.rm=T)/length(SWP_obs))
+  
+  if (RMSE==0)
+    return(10000)
+  else
+    return(RMSE)
+}
+
+SW_opt = filter(sw_comp, meta=="stop", depth==10)
+x0 = c(.42, 8.165, 1.1769)
+x0 = c(.38, 6.005, 1.2223)
+
+opts <- list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel"=1.0e-8, "maxeval"=100000)
+out = nloptr(x0, SWP_MvG_opt, lb=c(0.1, 2, 1), ub=c(0.6, 18, 3), opts=opts, SWC=SW_opt$VWC, SWP_obs=SW_opt$SWP)
+
+ths_opt = out$solution[1] * ( 1 - 0.62)
+alpha_opt = out$solution[2]
+n_opt = out$solution[3]
+m_opt = 1 - 1 / n_opt
+
+SW_opt$SWP_opt = 9.81 * (-1 / alpha_opt) * ((SW_opt$VWC / ths_opt) ^ (-1 / m_opt) - 1) ^ (1 / n_opt)
+
+ggplot(SW_opt, aes(log10(-10*SWP), VWC))+geom_point()+
+  geom_point(aes(log10(-10*SWP_MvG), VWC), color="red")+
+  geom_point(aes(log10(-10*SWP_opt), VWC), color="blue")
+
+
+ggplot(SW_opt, aes(VWC, SWP))+geom_point()+
+  geom_point(aes(VWC, SWP_MvG), color="red")+
+  geom_point(aes(VWC, SWP_opt), color="blue")
