@@ -21,21 +21,21 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> -10.0 .&& 
-               met.swc_nse40 .> -10.0 .&&
-               met.swc_nse60 .> -10.0 .&&
+    #= return met[met.swc_nse10 .> -5.0 .&& 
+               met.swc_nse40 .> -5.0 .&&
+               met.swc_nse60 .> -5.0 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> -10.0 .&&
-               met.swp_nse10 .> -10.0 .&&
+               met.swc_nse80 .> -5.0 .&&
+               met.swp_nse10 .> -5.0 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> -10.0 .&&
-               met.trans_nse .> -5.0 .&&
+               met.swp_nse80 .> -5.0 .&&
+               met.trans_nse .> -2.0 .&&
                met.trans_cor .> 0.3 .&&
                met.max_trans .< 2 .&& 
-               met.iso_rmse5 .< 10.0 .&&
-               met.iso_rmse20 .< 10.0 .&&
-               met.iso_rmse40 .< 10.0 .&&
-               met.iso_rmse_xy .< 10.0, :]
+               met.iso_rmse5 .< 8.0 .&&
+               met.iso_rmse20 .< 5.0 .&&
+               met.iso_rmse40 .< 5.0 .&&
+               met.iso_rmse_xy .< 5.0, :] =#
 
     # irrigation metrics
     #= return met[met.swc_nse10 .> -10.0 .&& 
@@ -43,31 +43,31 @@ function behavioral_met(met)
                met.swc_nse60 .> -10.0 .&&
                #met.swc_nse80 .> 0.5, :]
                met.swc_nse80 .> -10.0 .&&
-               met.swp_nse10 .> -10.0 .&&
+               met.swp_nse10 .> -1.0 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> -10.0 .&&
+               met.swp_nse80 .> -1.0 .&&
                met.trans_nse .> -5.0 .&&
                met.trans_cor .> 0.3 .&&
                met.max_trans .< 4 .&& 
-               met.iso_rmse5 .< 10.0 .&&
-               met.iso_rmse20 .< 10.0 .&&
-               met.iso_rmse40 .< 10.0 .&&
-               met.iso_rmse_xy .< 10.0, :] =#
+               met.iso_rmse5 .< 4.0 .&&
+               met.iso_rmse20 .< 4.0 .&&
+               met.iso_rmse40 .< 4.0 .&&
+               met.iso_rmse_xy .< 4.0, :] =#
 
     # irr stop metrics
-    #= return met[met.swc_nse10 .> 0.3 .&& 
+    return met[met.swc_nse10 .> -1.0 .&& 
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.3 .&&
-               met.swp_nse10 .> 0.1 .&&
+               met.swc_nse80 .> -1.0 .&&
+               met.swp_nse10 .> -1.0 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.1 .&&
+               met.swp_nse80 .> -1.0 .&&
                met.trans_nse .> -1.0 .&&
                met.trans_cor .> 0.5 .&&
                met.max_trans .< 4 .&& 
-               met.iso_rmse5 .< 10.0 .&&
-               met.iso_rmse20 .< 10.0 .&&
-               met.iso_rmse40 .< 10.0 .&&
-               met.iso_rmse_xy .< 10.0, :] =#
+               met.iso_rmse5 .< 6.0 .&&
+               met.iso_rmse20 .< 3.0 .&&
+               met.iso_rmse40 .< 3.0 .&&
+               met.iso_rmse_xy .< 3.0, :]
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -189,12 +189,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260211.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260211.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260106.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260211.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260211.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260106.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260216.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260216.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260216.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260216.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260216.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260216.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -301,7 +301,7 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irst..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
