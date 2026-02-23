@@ -537,7 +537,7 @@ obs_soil_iso.depth = [soil_iso_depth_dict[d] for d ∈ obs_soil_iso.depth];
 # separate control and irrigation scenarios
 obs_swc_ctr = obs_swc[obs_swc.meta .== "control", :]; # select control treatment
 obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation treatment
-obs_swc_irst = obs_swc[obs_swc.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+obs_swc_irst = obs_swc[obs_swc.meta .== "stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
 obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
@@ -563,9 +563,9 @@ obs_xy_iso_irst = obs_xy_iso[obs_xy_iso.treatment .== "irrigation stop", :]; # s
 irr = CSV.read("../../Data/Pfyn/irrigation.csv", DataFrame);
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
-sim_irst = run_LWFB90_param(par_irst_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
+sim_irst = run_LWFB90_param(par_irst_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
 
 ## combine observed and simulated data
 # soil water content
@@ -610,7 +610,7 @@ end
 ## plot observed and simulated data using ggplot
 
 # soil water potential
-draw(data(swp_comp_irst)*
+draw(data(swp_comp_irst[swp_comp_irst.SWP .> -2000, :])*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
     figure = (; size=(800, 600), title="Soil Water Potential Comparison for Irrigation Stop Scenario", titlealign = :center)
