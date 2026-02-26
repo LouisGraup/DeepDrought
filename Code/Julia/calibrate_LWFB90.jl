@@ -86,31 +86,41 @@ n = 200; # number of parameter sets
 
 # define prior parameter ranges
 
-param = [
+param = [ # store unmodified parameter ranges here for posterity
     # hydro parameters
-    #("DRAIN", 0.0, 1.0), # drainage
-    #("BYPAR", 0.0, 1.0), # bypass flow
+    ("DRAIN", 0.0, 1.0), # drainage (0, 1)
+    ("INFEXP", 0.0, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 1.0)
     # meteo parameters
-    ("ALB", 0.1, 0.3), # surface albedo
+    #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
+    #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    #("RSSA", 1.0, 1500.0), # soil resistance
-    ("ths", 0.8, 1.5), # multiplier on theta_sat
-    ("ksat", -0.5, 0.5), # additive factor on log10(k_sat)
+    ("RSSA", 20, 1500), # soil resistance (20, 1500)
+    ("ths1", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha1", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
+    ("ths2", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha2", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
+    ("ths3", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha3", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
     # plant parameters
-    ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI
-    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI
-    ("GLMAX", 0.001, 0.03), # stomatal conductance
-    ("CVPD", 1.0, 3.0), # vpd sensitivity
-    ("R5", 50, 400), # radiation sensitivity
-    ("T1", 5, 15), # low temperature threshold
-    ("T2", 20, 35), # high temperature threshold
-    ("PSICR", -4.0, -1.0), # critical water potential
-    ("FXYLEM", 0.2, 0.8), # aboveground xylem fraction
-    ("MXKPL", 1.0, 30.0), # maximum plant conductivity
-    #("VXYLEM_mm", 1.0, 100.0), # xylem volume
-    #("DISPERSIVITY_mm", 1.0, 100.0), # dispersivity coefficient
-    ("MAXROOTDEPTH", -5.0, -0.5), # max rooting depth
-    ("BETAROOT", 0.8, 1.0) # beta root coefficient
+    #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
+    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.02)
+    ("CVPD", 0.5, 3.0), # vpd sensitivity (0.5, 3)
+    ("R5", 50, 200), # radiation sensitivity (50, 200)
+    #("T1", 6, 12), # low temperature threshold (5, 15)
+    #("T2", 20, 35), # high temperature threshold (20, 35)
+    ("PSICR", -3.0, -1.0), # critical water potential (-3, -1)
+    ("FXYLEM", 0.1, 0.5), # aboveground xylem fraction (0.1, 0.5)
+    ("MXKPL", 7.0, 30.0), # maximum plant conductivity (7, 30)
+    ("MXRTLN", 2000, 4000), # maximum root length (2000, 4000)
+    ("VXYLEM_mm", 5.0, 80.0), # xylem volume (5, 80)
+    ("DISPERSIVITY_mm", 30.0, 50.0), # dispersivity coefficient (30, 50)
+    ("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
+    ("BETAROOT", 0.9, 0.999) # beta root coefficient (0.9, 0.999)
 ];
 
 ### END USER INPUT ###
