@@ -35,14 +35,14 @@ end
 
     # separate out irrigation scenario
     obs_swc_irst = obs_swc[obs_swc.meta .== "stop", :]; # select irrigation stop treatment
-    filter!(:date => >=(Date(2015, 1, 1)), obs_swc_irst); # filter out early dates
+    filter!(:date => >=(Date(2016, 1, 1)), obs_swc_irst); # filter out early dates
     select!(obs_swc_irst, :date, :depth, :VWC); # remove extra columns
     obs_swc_irst = unstack(obs_swc_irst, :date, :depth, :VWC, renamecols=x->Symbol("VWC_$(x)cm")); # reshape data
     sort!(obs_swc_irst, :date); # sort by date
 
     obs_swp_irst = obs_swp[obs_swp.meta .== "stop", :]; # select irrigation stop treatment
-    select!(obs_swp_irst, :date, :depth, :SWP); # remove extra columns
-    obs_swp_irst = unstack(obs_swp_irst, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
+    select!(obs_swp_irst, :date, :depth, :SWPt); # remove extra columns
+    obs_swp_irst = unstack(obs_swp_irst, :date, :depth, :SWPt, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
     sort!(obs_swp_irst, :date); # sort by date
 
     obs_sap_irst = obs_sap[obs_sap.scen .== "Irrigation stop", :]; # select irrigation stop treatment
@@ -250,7 +250,7 @@ end
 
 ## define calibration parameter sets
 
-n = 1000; # number of parameter sets
+n = 500; # number of parameter sets
 
 # define prior parameter ranges
 
@@ -263,16 +263,22 @@ param = [
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 20, 1500), # soil resistance (20, 1500)
-    ("ths1", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("RSSA", 20, 1000), # soil resistance (20, 1000)
+    ("ths1", 0.15, 0.6), # theta_sat (0.15, 0.6)
+    ("thr1", 0.0, 0.1), # theta_res (0.0, 0.1)
     ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha1", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
-    ("ths2", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("alpha1", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar1", 1.15, 1.3), # n (1.15, 1.3)
+    ("ths2", 0.15, 0.6), # theta_sat (0.15, 0.6)
+    ("thr2", 0.0, 0.1), # theta_res (0.0, 0.1)
     ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha2", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
-    ("ths3", 0.3, 1.5), # multiplier on theta_sat (0.5, 1.5)
+    ("alpha2", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar2", 1.15, 1.3), # n (1.15, 1.3)
+    ("ths3", 0.15, 0.6), # theta_sat (0.15, 0.6)
+    ("thr3", 0.0, 0.1), # theta_res (0.0, 0.1)
     ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha3", 0.7, 1.3), # multiplier on alpha (0.7, 1.3)
+    ("alpha3", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar3", 1.15, 1.3), # n (1.15, 1.3)
     # plant parameters
     #("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
@@ -281,10 +287,10 @@ param = [
     ("R5", 50, 200), # radiation sensitivity (50, 200)
     #("T1", 6, 12), # low temperature threshold (5, 15)
     #("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -3.0, -1.0), # critical water potential (-3, -1)
+    ("PSICR", -2.0, -1.0), # critical water potential (-3, -1)
     ("FXYLEM", 0.1, 0.5), # aboveground xylem fraction (0.1, 0.5)
     ("MXKPL", 7.0, 30.0), # maximum plant conductivity (7, 30)
-    ("MXRTLN", 2000, 4000), # maximum root length (2000, 4000)
+    #("MXRTLN", 2000, 4000), # maximum root length (2000, 4000)
     ("VXYLEM_mm", 5.0, 80.0), # xylem volume (5, 80)
     ("DISPERSIVITY_mm", 30.0, 50.0), # dispersivity coefficient (30, 50)
     ("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
@@ -364,42 +370,52 @@ for i in 1:nsets
 
         if contains(name, "ths")
             if soil_par_count > 1
-                # apply multiplier to ths_volfrac for specific soil horizon
+                # apply ths_volfrac for specific soil horizon
                 k = parse(Int, name[end]); # extract horizon number from name
-                soil_set.ths_volFrac[k] = soil_set.ths_volFrac[k] * value;
+                soil_set.ths_volFrac[k] = round(value, sigdigits=3);
             else
-                # apply multiplier to ths_volfrac for each soil horizon
-                soil_set.ths_volFrac = soil_set.ths_volFrac * value;
+                # apply ths_volfrac for each soil horizon
+                soil_set.ths_volFrac = round.(value, sigdigits=3);
+            end
+
+        elseif contains(name, "thr")
+            if soil_par_count > 1
+                # apply thr_volfrac for specific soil horizon
+                k = parse(Int, name[end]); # extract horizon number from name
+                soil_set.thr_volFrac[k] = round(value, sigdigits=3);
+            else
+                # apply thr_volfrac for each soil horizon
+                soil_set.thr_volFrac = round.(value, sigdigits=3);
             end
 
         elseif contains(name, "ksat")
             if soil_par_count > 1
                 # apply additive factor to log10(ksat) for specific soil horizon
                 k = parse(Int, name[end]); # extract horizon number from name
-                soil_set.ksat_mmDay[k] = 10 .^ (log10.(soil_set.ksat_mmDay[k]) .+ value);
+                soil_set.ksat_mmDay[k] = round(10 .^ (log10.(soil_set.ksat_mmDay[k]) .+ value), sigdigits=5);
             else
                 # apply additive factor to log10(ksat) for each soil horizon
-                soil_set.ksat_mmDay = 10 .^ (log10.(soil_set.ksat_mmDay) .+ value);
+                soil_set.ksat_mmDay = round.(10 .^ (log10.(soil_set.ksat_mmDay) .+ value), sigdigits=5);
             end
-            
+
         elseif contains(name, "alpha")
             if soil_par_count > 1
                 # apply multiplier to alpha_perMeter for specific soil horizon
                 k = parse(Int, name[end]); # extract horizon number from name
-                soil_set.alpha_perMeter[k] = soil_set.alpha_perMeter[k] * value;
+                soil_set.alpha_perMeter[k] = round(soil_set.alpha_perMeter[k] * value, sigdigits=4);
             else
                 # apply multiplier to alpha_perMeter for each soil horizon
-                soil_set.alpha_perMeter = soil_set.alpha_perMeter * value;
+                soil_set.alpha_perMeter = round.(soil_set.alpha_perMeter * value, sigdigits=4);
             end
         
         elseif contains(name, "npar")
             if soil_par_count > 1
-                # apply multiplier to npar_ for specific soil horizon
+                # apply npar_ for specific soil horizon
                 k = parse(Int, name[end]); # extract horizon number from name
-                soil_set.npar_[k] = soil_set.npar_[k] * value;
+                soil_set.npar_[k] = round(value, sigdigits=5);
             else
-                # apply multiplier to npar_ for each soil horizon
-                soil_set.npar_ = soil_set.npar_ * value;
+                # apply npar_ for each soil horizon
+                soil_set.npar_ = round.(value, sigdigits=5);
             end
         
         elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
@@ -410,7 +426,7 @@ for i in 1:nsets
         else
             # get index of parameter name in file
             idx = findall(param_set.param_id .== name)[1];
-            param_set.x[idx] = value;
+            param_set.x[idx] = round(value, sigdigits=4);
         end
     end
 
@@ -419,10 +435,11 @@ for i in 1:nsets
     
     # copy folder structure to output folders
     cp(input_path, out_dir, force=true);
-
+    
     # write parameter and soil horizons files
     CSV.write(out_dir * output_prefix * "_param.csv", param_set);
     output_soil_file(soil_set, out_dir * output_prefix);
+    
 end
 
 
@@ -451,8 +468,8 @@ end_index = Dates.value(end_date - ref_date);
 
     if root_params
         # retrieve root parameter values
-        betaroot = param_sets[root_dict["BETAROOT"], par_id];
-        maxroot = param_sets[root_dict["MAXROOTDEPTH"], par_id];
+        betaroot = round(param_sets[root_dict["BETAROOT"], par_id], sigdigits=4);
+        maxroot = round(param_sets[root_dict["MAXROOTDEPTH"], par_id], sigdigits=4);
 
         # run model with modified root distribution
         model = loadSPAC(cal_dir, output_prefix, 

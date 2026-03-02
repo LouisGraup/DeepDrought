@@ -8,9 +8,10 @@ swc =  read_csv("../../Data/Pfyn/Pfyn_swat.csv")
 swp = read_csv("../../Data/Pfyn/Pfyn_swp.csv")
 
 sw_comp = inner_join(swp, swc)
+sw_comp = filter(sw_comp, date>="2016-01-01", date < "2025-01-01")
 
-ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+facet_grid(meta~depth)
-ggplot(sw_comp, aes(VWC, SWP))+geom_point()+facet_grid(meta~depth)
+ggplot(sw_comp, aes(log10(-10*SWPt), VWC))+geom_point()+facet_grid(meta~depth)
+ggplot(sw_comp, aes(VWC, SWPt))+geom_point()+facet_grid(meta~depth)
 
 
 # PTF constants
@@ -32,13 +33,13 @@ sw_comp$SWP_MvG = if_else(sw_comp$depth == 10,
                           9.81 * (-1 / alpha80) * ((sw_comp$VWC / ths80) ^ (-1 / m80) - 1) ^ (1 / n80))
 
 # compare predicted SWP to measured
-ggplot(sw_comp, aes(SWP, SWP_MvG))+geom_point()+facet_grid(meta~depth)+
+ggplot(sw_comp, aes(SWPt, SWP_MvG))+geom_point()+facet_grid(meta~depth)+
   geom_abline(slope=1, intercept=0)
 
-ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+
+ggplot(sw_comp, aes(log10(-10*SWPt), VWC))+geom_point()+
   geom_point(aes(log10(-10*SWP_MvG), VWC), color="red")+facet_grid(meta~depth)
 
-ggplot(sw_comp, aes(VWC, SWP))+geom_point()+
+ggplot(sw_comp, aes(VWC, SWPt))+geom_point()+
   geom_point(aes(VWC, SWP_MvG), color="red")+facet_grid(meta~depth)
 
 
@@ -57,12 +58,12 @@ sw_comp$SWP_test = if_else(sw_comp$depth == 10,
                           9.81 * (-1 / alphat10) * ((sw_comp$VWC / thst10) ^ (-1 / mt10) - 1) ^ (1 / nt10),
                           9.81 * (-1 / alphat80) * ((sw_comp$VWC / thst80) ^ (-1 / mt80) - 1) ^ (1 / nt80))
 
-ggplot(sw_comp, aes(log10(-10*SWP), VWC))+geom_point()+
+ggplot(sw_comp, aes(log10(-10*SWPt), VWC))+geom_point()+
   geom_point(aes(log10(-10*SWP_MvG), VWC), color="red")+
   geom_point(aes(log10(-10*SWP_test), VWC), color="blue")+
   facet_grid(meta~depth)+xlim(1, 5)
 
-ggplot(sw_comp, aes(VWC, SWP))+geom_point()+
+ggplot(sw_comp, aes(VWC, SWPt))+geom_point()+
   geom_point(aes(VWC, SWP_MvG), color="red")+
   geom_point(aes(VWC, SWP_test), color="blue")+
   facet_grid(meta~depth)
@@ -125,12 +126,12 @@ SWP_MvG_opt = function(p, SWC, SWP_obs) {
     return(RMSE)
 }
 
-SW_opt = filter(sw_comp, meta=="stop", depth==10)
+SW_opt = filter(sw_comp, meta=="control", depth==10)
 x0 = c(.42, 8.165, 1.1769)
 x0 = c(.38, 6.005, 1.2223)
 
 opts <- list("algorithm"="NLOPT_LN_COBYLA", "xtol_rel"=1.0e-8, "maxeval"=100000)
-out = nloptr(x0, SWP_MvG_opt, lb=c(0.1, 2, 1), ub=c(0.6, 18, 3), opts=opts, SWC=SW_opt$VWC, SWP_obs=SW_opt$SWP)
+out = nloptr(x0, SWP_MvG_opt, lb=c(0.1, 2, 1), ub=c(0.6, 18, 3), opts=opts, SWC=SW_opt$VWC, SWP_obs=SW_opt$SWPt)
 
 ths_opt = out$solution[1] * ( 1 - 0.62)
 alpha_opt = out$solution[2]
@@ -139,11 +140,11 @@ m_opt = 1 - 1 / n_opt
 
 SW_opt$SWP_opt = 9.81 * (-1 / alpha_opt) * ((SW_opt$VWC / ths_opt) ^ (-1 / m_opt) - 1) ^ (1 / n_opt)
 
-ggplot(SW_opt, aes(log10(-10*SWP), VWC))+geom_point()+
+ggplot(SW_opt, aes(log10(-10*SWPt), VWC))+geom_point()+
   geom_point(aes(log10(-10*SWP_MvG), VWC), color="red")+
   geom_point(aes(log10(-10*SWP_opt), VWC), color="blue")
 
 
-ggplot(SW_opt, aes(VWC, SWP))+geom_point()+
+ggplot(SW_opt, aes(VWC, SWPt))+geom_point()+
   geom_point(aes(VWC, SWP_MvG), color="red")+
   geom_point(aes(VWC, SWP_opt), color="blue")
