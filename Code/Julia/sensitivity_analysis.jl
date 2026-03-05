@@ -13,23 +13,23 @@ end
 # function for density plot of metrics
 function density_plot(met)
     density(met.swc_nse10, label="NSE10")
-    density!(met.swc_nse40, label="NSE40")
-    density!(met.swc_nse60, label="NSE60")
+    #density!(met.swc_nse40, label="NSE40")
+    #density!(met.swc_nse60, label="NSE60")
     density!(met.swc_nse80, label="NSE80")
 end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    #= return met[met.swc_nse10 .> 0.0 .&& 
-               met.swc_nse40 .> 0.0 .&&
-               met.swc_nse60 .> 0.0 .&&
+    #= return met[met.swc_nse10 .> -5.0 .&& 
+               #met.swc_nse40 .> 0.0 .&&
+               #met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.0 .&&
-               met.swp_nse10 .> 0.0 .&&
+               met.swc_nse80 .> -5.0 .&&
+               met.swp_nse10 .> -2.0 .&&
                #met.swp_nse80 .> 0.0, :]
                met.swp_nse80 .> -1.0 .&&
-               met.trans_nse .> 0.0 .&&
+               met.trans_nse .> -5.0 .&&
                met.trans_cor .> 0.3 .&&
                met.max_trans .< 2 .&& 
                met.iso_rmse5 .< 6.0 .&&
@@ -38,24 +38,24 @@ function behavioral_met(met)
                met.iso_rmse_xy .< 4.0, :] =#
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> -1.0 .&& 
-               met.swc_nse40 .> -1.0 .&&
-               met.swc_nse60 .> -1.0 .&&
+    return met[met.swc_nse10 .> -8.0 .&& 
+               #met.swc_nse40 .> 0.0 .&&
+               #met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> -1.0 .&&
-               met.swp_nse10 .> -1.0 .&&
+               met.swc_nse80 .> -8.0 .&&
+               met.swp_nse10 .> -2.0 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> -1.0 .&&
-               met.trans_nse .> -1.0 .&&
+               met.swp_nse80 .> -2.0 .&&
+               met.trans_nse .> -2.0 .&&
                met.trans_cor .> 0.3 .&&
                met.max_trans .< 4 .&& 
                met.iso_rmse5 .< 4.0 .&&
                met.iso_rmse20 .< 4.0 .&&
                met.iso_rmse40 .< 4.0 .&&
-               met.iso_rmse_xy .< 4.0, :] =#
+               met.iso_rmse_xy .< 4.0, :]
 
     # irr stop metrics
-    return met[met.swc_nse10 .> 0.0 .&& 
+    #= return met[met.swc_nse10 .> 0.0 .&& 
                #met.swc_nse80 .> 0.5, :]
                met.swc_nse80 .> 0.0 .&&
                met.swp_nse10 .> 0.0 .&&
@@ -67,7 +67,14 @@ function behavioral_met(met)
                met.iso_rmse5 .< 6.0 .&&
                met.iso_rmse20 .< 3.0 .&&
                met.iso_rmse40 .< 2.0 .&&
-               met.iso_rmse_xy .< 2.0, :]
+               met.iso_rmse_xy .< 2.0, :] =#
+end
+
+function behave(met)
+    return(met[met.swc_nse10 .> 0.0 .&& 
+               met.swc_nse80 .> 0.0 .&&
+               met.swp_nse10 .> 0.0 .&&
+               met.swp_nse80 .> 0.0, :])
 end
 
 # function to separate parameters into behavioral and non-behavioral runs
@@ -180,7 +187,7 @@ function met_comb!(met)
     return nothing
 end
 
-function met_comb_irst!(met)
+function met_comb!(met)
     met.swc_nse_com = sqrt.((met.swc_nse10 .^ 2 + met.swc_nse80 .^ 2) / 2);
     met.swp_nse_com = sqrt.((met.swp_nse10 .^ 2 + met.swp_nse80 .^ 2) / 2);
     met.rmse_com = sqrt.((met.swc_rmse10 .^ 2 + met.swc_rmse80 .^ 2) / 2);
@@ -199,11 +206,11 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260218.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260218.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260302.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260302.csv", DataFrame);
 met_irst = CSV.read("LWFBcal_output/metrics_irst_20260218.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260218.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260218.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260302.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260302.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/param_irst_20260218.csv", DataFrame);
 
 # filter out scenarios which produced an error
@@ -214,9 +221,7 @@ met_irst = filter_error(met_irst);
 # exploratory
 density_plot(met_ctr)
 density_plot(met_irr)
-
-density(met_irst.swc_nse10, label="NSE10")
-density!(met_irst.swc_nse80, label="NSE80")
+density_plot(met_irst)
 
 # trans density plots
 met_pl = met_ctr;
@@ -231,7 +236,7 @@ density(met_pl.ann_trans)
 # add combined metrics
 met_comb!(met_ctr);
 met_comb!(met_irr);
-met_comb_irst!(met_irst);
+met_comb!(met_irst);
 
 # filter metrics for behavioral runs
 met_ctr_good = behavioral_met(met_ctr);
@@ -245,11 +250,11 @@ println("$(size(met_irst_good, 1)) behavioral parameter sets out of total $(size
 density_plot(met_ctr_good)
 density_plot(met_irr_good)
 
-describe(met_irst_good)
+describe(met_irr_good)
 
 # compare metrics across depths
-met_plot(met_ctr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
-met_plot(met_irr_good, [:swc_nse10, :swc_nse40, :swc_nse60, :swc_nse10], [:swc_nse40, :swc_nse60, :swc_nse80, :swc_nse80])
+met_plot(met_ctr_good, :swc_nse10, :swc_nse80)
+met_plot(met_irr_good, :swc_nse10, :swc_nse80)
 met_plot(met_irst_good, :swc_nse10, :swc_nse80)
 
 met_plot(met_ctr_good, :swp_nse10, :swp_nse80)
@@ -320,7 +325,7 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irst..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
