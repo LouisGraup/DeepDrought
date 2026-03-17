@@ -36,7 +36,7 @@ function get_swc(sim; shape = "long")
     # retrieve soil water potential data from sim
     days, dates_out = get_dates(sim);
 
-    z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 400, 600, 800], days_to_read_out_d = days);
+    z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = days);
     z.date = dates_out;
 
     select!(z, Not(:time));
@@ -174,13 +174,15 @@ function swp_comp(sim, obs_swp)
 
     z_psi.src .= "sim"; # add source column
 
-    obs_swp_long = stack(obs_swp, Not(:date, :meta), variable_name = "depth", value_name="SWP");
-    select!(obs_swp_long, :date, :depth, :SWP);
-    obs_swp_long.depth = parse.(Int, map(x -> x[(end-3):(end-2)], obs_swp_long.depth)); # convert depth from var name
-    obs_swp_long.src .= "obs"; # add source column
+    #obs_swp_long = stack(obs_swp, Not(:date, :meta), variable_name = "depth", value_name="SWP");
+    #select!(obs_swp_long, :date, :depth, :SWP);
+    #obs_swp_long.depth = parse.(Int, map(x -> x[(end-3):(end-2)], obs_swp_long.depth)); # convert depth from var name
+    
+    select!(obs_swp, :date, :depth, :SWP); # remove extra columns
+    obs_swp.src .= "obs"; # add source column
 
     # combine observed and simulated data
-    swp_comp = [obs_swp_long; z_psi];
+    swp_comp = [obs_swp; z_psi];
 
     return swp_comp
 
@@ -512,13 +514,15 @@ met_irr[scen_irr_best, :]
 # soil water content
 obs_swc = CSV.read("../../Data/Pfyn/Pfyn_swat.csv", DataFrame);
 #obs_swc.VWC = obs_swc.VWC / 100; # convert to decimal
-#filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
-#filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
+filter!(:date => >(Date(2015, 1, 1)), obs_swc); # filter out early dates
+filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 
 # soil water potential
-obs_swp = CSV.read("../../Data/Pfyn/PFY_swpc_corr.csv", DataFrame);
-#filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
-filter!(:date => <(Date(2024, 1, 1)), obs_swp); # filter out late dates
+obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
+filter!(:date => <(Date(2025, 1, 1)), obs_swp); # filter out late dates
+# for temp-corrected SWP
+obs_swp.SWP .= obs_swp.SWPt;
+select!(obs_swp, Not(:SWPt));
 
 # sap flow
 #obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
@@ -540,8 +544,8 @@ obs_swc_irr = obs_swc[obs_swc.meta .== "irrigation", :]; # select irrigation tre
 obs_swc_irst = obs_swc[obs_swc.meta .== "stop", :]; # select irrigation stop treatment
 
 obs_swp_ctr = obs_swp[obs_swp.meta .== "control", :]; # select control treatment
-obs_swp_irr = obs_swp[obs_swp.meta .== "irrigated", :]; # select irrigation treatment
-obs_swp_irst = obs_swp[obs_swp.meta .== "irrigation_stop", :]; # select irrigation stop treatment
+obs_swp_irr = obs_swp[obs_swp.meta .== "irrigation", :]; # select irrigation treatment
+obs_swp_irst = obs_swp[obs_swp.meta .== "stop", :]; # select irrigation stop treatment
 
 obs_sap_ctr = obs_sap[obs_sap.scen .== "Control", :]; # select control treatment
 obs_sap_irr = obs_sap[obs_sap.scen .== "Irrigation", :]; # select irrigation treatment
@@ -563,9 +567,9 @@ obs_xy_iso_irst = obs_xy_iso[obs_xy_iso.treatment .== "irrigation stop", :]; # s
 irr = CSV.read("../../Data/Pfyn/irrigation.csv", DataFrame);
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_ctr_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
-sim_irst = run_LWFB90_param(par_irst_best, Date(2002, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
+sim_ctr = run_LWFB90_param(par_ctr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
+sim_irr = run_LWFB90_param(par_irr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
+sim_irst = run_LWFB90_param(par_irst_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
 
 ## combine observed and simulated data
 # soil water content
@@ -650,7 +654,7 @@ draw(data(swc_comp_irst)*
 
 # sap flow
 
-draw(data(stack(sap_comp_ctr, Not(:date), variable_name=:Source))*
+draw(data(stack(select!(sap_comp_ctr, Not(:Tr_rm)), Not(:date), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)

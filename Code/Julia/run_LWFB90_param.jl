@@ -56,43 +56,54 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
             if contains(name, "ths")
                 if soil_par_count > 1
-                    # apply multiplier to ths_volfrac for specific soil horizon
+                    # apply ths_volfrac for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.ths_volFrac[k] = soil0.ths_volFrac[k] * value;
+                    soil0.ths_volFrac[k] = round(value, sigdigits=3);
                 else
-                    # apply multiplier to ths_volfrac for each soil horizon
-                    soil0.ths_volFrac = soil0.ths_volFrac * value;
+                    # apply ths_volfrac for each soil horizon
+                    soil0.ths_volFrac = round.(value, sigdigits=3);
+                end
+
+            elseif contains(name, "thr")
+                if soil_par_count > 1
+                    # apply thr_volfrac for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.thr_volFrac[k] = round(value, sigdigits=3);
+                else
+                    # apply thr_volfrac for each soil horizon
+                    soil0.thr_volFrac = round.(value, sigdigits=3);
                 end
 
             elseif contains(name, "ksat")
                 if soil_par_count > 1
                     # apply additive factor to log10(ksat) for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.ksat_mmDay[k] = 10 .^ (log10.(soil0.ksat_mmDay[k]) .+ value);
+                    soil0.ksat_mmDay[k] = round(10 .^ (log10.(soil0.ksat_mmDay[k]) .+ value), sigdigits=5);
                 else
                     # apply additive factor to log10(ksat) for each soil horizon
-                    soil0.ksat_mmDay = 10 .^ (log10.(soil0.ksat_mmDay) .+ value);
+                    soil0.ksat_mmDay = round.(10 .^ (log10.(soil0.ksat_mmDay) .+ value), sigdigits=5);
                 end
+
             elseif contains(name, "alpha")
                 if soil_par_count > 1
                     # apply multiplier to alpha_perMeter for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.alpha_perMeter[k] = soil0.alpha_perMeter[k] * value;
+                    soil0.alpha_perMeter[k] = round(soil0.alpha_perMeter[k] * value, sigdigits=4);
                 else
                     # apply multiplier to alpha_perMeter for each soil horizon
-                    soil0.alpha_perMeter = soil0.alpha_perMeter * value;
+                    soil0.alpha_perMeter = round.(soil0.alpha_perMeter * value, sigdigits=4);
                 end
-        
+            
             elseif contains(name, "npar")
                 if soil_par_count > 1
-                    # apply multiplier to npar_ for specific soil horizon
+                    # apply npar_ for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.npar_[k] = soil0.npar_[k] * value;
+                    soil0.npar_[k] = round(value, sigdigits=5);
                 else
-                    # apply multiplier to npar_ for each soil horizon
-                    soil0.npar_ = soil0.npar_ * value;
+                    # apply npar_ for each soil horizon
+                    soil0.npar_ = round.(value, sigdigits=5);
                 end
-        
+            
             elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
                 # root parameters are present
                 global root_pars = true;

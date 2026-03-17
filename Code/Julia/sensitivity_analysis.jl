@@ -21,7 +21,7 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    #= return met[met.swc_nse10 .> 0.0 .&& 
+    return met[met.swc_nse10 .> 0.0 .&& 
                #met.swc_nse40 .> 0.0 .&&
                #met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.5, :]
@@ -35,7 +35,7 @@ function behavioral_met(met)
                met.iso_rmse5 .< 6.0 .&&
                met.iso_rmse20 .< 4.0 .&&
                met.iso_rmse40 .< 4.0 .&&
-               met.iso_rmse_xy .< 4.0, :] =#
+               met.iso_rmse_xy .< 4.0, :]
 
     # irrigation metrics
     #= return met[met.swc_nse10 .> 0.0 .&& 
@@ -55,7 +55,7 @@ function behavioral_met(met)
                met.iso_rmse_xy .< 4.0, :] =#
 
     # irr stop metrics
-    return met[met.swc_nse10 .> 0.0 .&& 
+    #= return met[met.swc_nse10 .> 0.0 .&& 
                #met.swc_nse80 .> 0.5, :]
                met.swc_nse80 .> 0.0 .&&
                met.swp_nse10 .> 0.0 .&&
@@ -67,7 +67,7 @@ function behavioral_met(met)
                met.iso_rmse5 .< 6.0 .&&
                met.iso_rmse20 .< 3.0 .&&
                met.iso_rmse40 .< 3.0 .&&
-               met.iso_rmse_xy .< 2.0, :]
+               met.iso_rmse_xy .< 2.0, :] =#
 end
 
 function behave(met)
@@ -191,7 +191,7 @@ function met_comb!(met)
     met.swc_nse_com = sqrt.((met.swc_nse10 .^ 2 + met.swc_nse80 .^ 2) / 2);
     met.swp_nse_com = sqrt.((met.swp_nse10 .^ 2 + met.swp_nse80 .^ 2) / 2);
     met.rmse_com = sqrt.((met.swc_rmse10 .^ 2 + met.swc_rmse80 .^ 2) / 2);
-    met.iso_rmse_com = sqrt.((met.iso_rmse5 .^ 2 + met.iso_rmse20 .^ 2 + met.iso_rmse40 .^ 2 + met.iso_rmse_xy .^ 2) / 4)
+    met.iso_rmse_com = 1 ./ sqrt.((met.iso_rmse5 .^ 2 + met.iso_rmse20 .^ 2 + met.iso_rmse40 .^ 2 + met.iso_rmse_xy .^ 2) / 4)
     met.met_com = sqrt.((met.swc_nse_com .^ 2 + met.swp_nse_com .^ 2 + met.trans_nse .^ 2 + met.iso_rmse_com .^ 2) / 4);
     return nothing
 end
