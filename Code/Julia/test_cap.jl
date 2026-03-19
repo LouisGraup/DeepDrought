@@ -72,8 +72,10 @@ model = LWFBrook90.loadSPAC(input_path, input_prefix; simulate_isotopes = false,
     root_distribution = (beta = 0.97091, z_rootMax_m=-1.35462));
 
 simulation = LWFBrook90.setup(model); #, requested_tspan=(8766, 9131));
-
 LWFBrook90.simulate!(simulation)
+
+#simulation = remakeSPAC(model; params = (STORAGEK = 1,)); #remakeSPAC returns setup
+#LWFBrook90.simulate!(simulation);
 
 # extract output
 sol = simulation.ODESolution;
@@ -81,6 +83,7 @@ timesteps = unique(round.(sol.t));
 dates = LWFBrook90.RelativeDaysFloat2DateTime.(timesteps, simulation.parametrizedSPAC.reference_date);
 
 PLSTOR = [sol(t).PLSTOR.mm for t in timesteps];
+PLVWC = [sol(t).PLHYD.θ for t in timesteps];
 PLPSI = [sol(t).PLHYD.ψ for t in timesteps];
 PLPSI_pd = [sol(t).accum.cum_pd_plpsi for t in timesteps];
 PLPSI_md = [sol(t).accum.cum_md_plpsi for t in timesteps];
@@ -136,31 +139,135 @@ draw(
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+p1 = Plots.plot(Date.(dates), RWU, color=:green, xlabel="", ylabel="Transpiration (mm/d)", legend=false, size=(1000, 500), left_margin=4mm);
+p2 = Plots.plot(swp_eff.date, swp_eff.swp_eff, color=:black, label="Effective SWP", ylabel="Water Potential (kPa)", xlabel="", size=(1000, 500), left_margin=4mm);
+p2 = Plots.plot!(p2, Date.(dates), PLPSI_pd, color=:blue, label="Plant ψ")
+Plots.plot(p1, p2, layout=(2, 1))
 
-# tabulate capacitance results for sensitivity
+# tabulate results for sensitivity
 soil.ψ_kPa_eff = swp_eff.swp_eff;
 soil.RWU = RWU + PLRF; # actual RWU
 soil.AET = RWU + PLFL; # actual transpiration
 select!(soil, Not(:time))
-soil.cap .= 2;
+#soil.cap .= 10;
+soil.ks .= 10;
 
 mapcols(x -> minimum(x[Not(isnan.(x))]), soil[:, Not([:date, :RWU, :cap])])
 sum(soil.RWU)
 sum(soil.AET)
 
-cap_comp = [cap_comp; soil];
+scen_comp = [scen_comp; soil];
+
+min_psi = combine(groupby(scen_comp, :cap), names(scen_comp, r"ψ") .=> [minimum]);
+mapcols(x -> minimum(x[Not(isnan.(x))]), scen_comp[scen_comp.cap .== 2, Not([:date, :RWU, :cap])])
+
+sum_rwu = combine(groupby(scen_comp, :cap), :RWU => sum);
+sum_aet = combine(groupby(scen_comp, :cap), :AET => sum);
+
+# plant hydraulics results
+plant = DataFrame(date = Date.(dates), PLPSI_pd = PLPSI_pd, PLPSI_md = PLPSI_md, PLFL = PLFL, PLRF = PLRF, RWU = RWU, PLSTOR = PLSTOR);
+#plant.cap .= 10;
+plant.ks .= 10;
+
+cap_comp = [cap_comp; plant];
+
+min_pdpsi = combine(groupby(cap_comp, :cap), :PLPSI_pd .=> [minimum]);
+
+#scen_comp = CSV.read("Pfyn_cap_soil.csv", DataFrame);
+#cap_comp = CSV.read("Pfyn_cap_plant.csv", DataFrame);
+
+cap_comp.PLPSI_pd[cap_comp.PLPSI_pd .< -2000] .= -2000 # cap plant psi for visualization
+draw(
+    data(cap_comp)*mapping(:date, :PLPSI_pd, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Plant ψ (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
 
 
 # compare with model without capacitance
 prior = CSV.read("Pfyn_prior.csv", DataFrame);
 
-min_psi = mapcols(x -> minimum(x[Not(isnan.(x))]), prior[:, Not([:date, :RWU, :cap])]);
-sum_rwu = sum(prior.RWU);
+mapcols(x -> minimum(x[Not(isnan.(x))]), prior[:, Not([:date, :RWU, :cap])])
+sum(prior.RWU)
 
 
 draw(
-    data(cap_comp[cap_comp.date .>= Date(2024, 8, 1) .&& cap_comp.date .< Date(2024, 9, 1), :])*mapping(:date, :AET, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
-    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 1), :])*mapping(:date, :RWU)*visual(Lines, color=:red, label="No capacitance"),
+    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 10), :])*mapping(:date, :AET, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
+    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 10), :])*mapping(:date, :RWU)*visual(Lines, color=:red, label="No capacitance"),
     scales(X = (; label=""), Y = (; label="Transpiration (mm/day)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+draw(
+    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
+    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff)*visual(Lines, color=:red, label="No capacitance"),
+    scales(X = (; label=""), Y = (; label="Effective SWP (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+
+# automated loop over parameter values
+
+ks_par = [0.1, 1, 2.4, 5, 10]
+scen_comp = nothing;
+cap_comp = nothing;
+
+for ks ∈ ks_par
+
+    model = remakeSPAC(model; params = (STORAGEK = ks,)); #remakeSPAC returns setup
+    LWFBrook90.simulate!(model);
+
+    # extract output
+    sol = model.ODESolution;
+    timesteps = unique(round.(sol.t));
+    dates = LWFBrook90.RelativeDaysFloat2DateTime.(timesteps, model.parametrizedSPAC.reference_date);
+
+    PLSTOR = [sol(t).PLSTOR.mm for t in timesteps];
+    PLPSI_pd = [sol(t).accum.cum_pd_plpsi for t in timesteps];
+    PLPSI_md = [sol(t).accum.cum_md_plpsi for t in timesteps];
+    PLFL = [sol(t).accum.cum_d_plfl for t in timesteps];
+    PLRF = [sol(t).accum.cum_d_plrf for t in timesteps];
+    RWU = [sol(t).RWU.mmday for t in timesteps];
+    
+    soil = LWFBrook90.get_soil_(:ψ, model, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
+    soil.date = Date.(dates);
+
+    swp_eff = get_eff_swp(model);
+
+    soil.ψ_kPa_eff = swp_eff.swp_eff;
+    soil.RWU = RWU + PLRF; # actual RWU
+    soil.AET = RWU + PLFL; # actual transpiration
+    select!(soil, Not(:time))
+    soil.ks .= ks;
+
+    if isnothing(scen_comp)
+        scen_comp = soil;
+    else
+        scen_comp = [scen_comp; soil];
+    end
+
+    plant = DataFrame(date = Date.(dates), PLPSI_pd = PLPSI_pd, PLPSI_md = PLPSI_md, PLFL = PLFL, PLRF = PLRF, RWU = RWU, PLSTOR = PLSTOR);
+    plant.ks .= ks;
+
+    if isnothing(cap_comp)
+        cap_comp = plant;
+    else
+        cap_comp = [cap_comp; plant];
+    end
+
+end
+
+min_psi = combine(groupby(scen_comp, :ks), names(scen_comp, r"ψ") .=> [minimum]);
+mapcols(x -> minimum(x[Not(isnan.(x))]), scen_comp[scen_comp.ks .== 2, Not([:date, :RWU, :ks])])
+
+combine(groupby(scen_comp, :ks), :RWU => sum)
+combine(groupby(scen_comp, :ks), :AET => sum)
+
+combine(groupby(cap_comp, :ks), :PLPSI_pd .=> [minimum])
+
+
+draw(
+    data(cap_comp)*mapping(:date, :PLPSI_pd, color=:ks => nonnumeric => "Conductance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Plant ψ (kPa)")),
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
