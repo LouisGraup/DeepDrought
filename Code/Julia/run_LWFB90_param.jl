@@ -111,7 +111,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
             else
                 # get index of parameter name in file
                 idx = findall(param0.param_id .== name)[1];
-                param0.x[idx] = value;
+                param0.x[idx] = round(value, sigdigits=4);
             end
         end
 
