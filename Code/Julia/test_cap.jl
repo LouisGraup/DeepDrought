@@ -110,6 +110,10 @@ psi_comp = DataFrame(t=dates, PLPSI=PLPSI_pd)
 psi_comp = [psi_comp; DataFrame(t=dates.+Hour(12), PLPSI=PLPSI_md)]
 sort!(psi_comp, :t)
 Plots.plot(psi_comp.t[305:315], psi_comp.PLPSI[305:315])
+Plots.plot(psi_comp.t, psi_comp.PLPSI)
+
+Plots.plot(PLPSI_pd, label="Pre-dawn ψ")
+Plots.plot!(PLPSI_md, label="Midday ψ")
 
 # compare plant water potential with all soil layers
 soil = LWFBrook90.get_soil_(:ψ, simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
@@ -127,8 +131,9 @@ draw(
 
 # compare plant water potential with effective soil water potential
 swp_eff = get_eff_swp(simulation);
-swp_eff.swp_eff[swp_eff.swp_eff .< -2000] .= NaN;
+swp_eff.swp_eff[swp_eff.swp_eff .< -2000] .= -2000;
 
+# pre-dawn
 draw(
     data(swp_eff[swp_eff.date .>= Date(2024, 5, 1) .&& swp_eff.date .<= Date(2024, 11, 1), :])*mapping(:date, :swp_eff)*visual(Lines, color=:blue, label="Effective SWP")+
     data(flux[flux.date .>= Date(2024, 5, 1) .&& flux.date .<= Date(2024, 11, 1), :])*mapping(:date, :cum_pd_plpsi)*visual(Lines, color=:red, label="Plant ψ")+
@@ -139,74 +144,95 @@ draw(
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+# midday
+draw(
+    data(swp_eff[swp_eff.date .>= Date(2024, 5, 1) .&& swp_eff.date .<= Date(2024, 11, 1), :])*mapping(:date, :swp_eff)*visual(Lines, color=:blue, label="Effective SWP")+
+    data(flux[flux.date .>= Date(2024, 5, 1) .&& flux.date .<= Date(2024, 11, 1), :])*mapping(:date, :cum_md_plpsi)*visual(Lines, color=:red, label="Plant ψ")+
+    data(obs_twd_lwp)*mapping(:date, :LWP_md => (x -> x * 1000))*visual(Scatter, color=:black, label="TWD-derived LWP")+
+    data(obs_twd_lwp)*mapping(:date, :twd_md => (x -> x * -2))*visual(Scatter, color=:green, label="Scaled TWD"),
+    #data(obs_lwp)*mapping(:date, :predawn_mean => (x -> x * 1000))*visual(Scatter, color=:green, label="Measured LWP"),
+    scales(X = (; label=""), Y = (; label="Water potential (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+# SPAC plot
 p1 = Plots.plot(Date.(dates), RWU, color=:green, xlabel="", ylabel="Transpiration (mm/d)", legend=false, size=(1000, 500), left_margin=4mm);
 p2 = Plots.plot(swp_eff.date, swp_eff.swp_eff, color=:black, label="Effective SWP", ylabel="Water Potential (kPa)", xlabel="", size=(1000, 500), left_margin=4mm);
 p2 = Plots.plot!(p2, Date.(dates), PLPSI_pd, color=:blue, label="Plant ψ")
 Plots.plot(p1, p2, layout=(2, 1))
 
-# tabulate results for sensitivity
-soil.ψ_kPa_eff = swp_eff.swp_eff;
-soil.RWU = RWU + PLRF; # actual RWU
-soil.AET = RWU + PLFL; # actual transpiration
-select!(soil, Not(:time))
-#soil.cap .= 10;
-soil.ks .= 10;
-
-mapcols(x -> minimum(x[Not(isnan.(x))]), soil[:, Not([:date, :RWU, :cap])])
-sum(soil.RWU)
-sum(soil.AET)
-
-scen_comp = [scen_comp; soil];
-
-min_psi = combine(groupby(scen_comp, :cap), names(scen_comp, r"ψ") .=> [minimum]);
-mapcols(x -> minimum(x[Not(isnan.(x))]), scen_comp[scen_comp.cap .== 2, Not([:date, :RWU, :cap])])
-
-sum_rwu = combine(groupby(scen_comp, :cap), :RWU => sum);
-sum_aet = combine(groupby(scen_comp, :cap), :AET => sum);
-
-# plant hydraulics results
-plant = DataFrame(date = Date.(dates), PLPSI_pd = PLPSI_pd, PLPSI_md = PLPSI_md, PLFL = PLFL, PLRF = PLRF, RWU = RWU, PLSTOR = PLSTOR);
-#plant.cap .= 10;
-plant.ks .= 10;
-
-cap_comp = [cap_comp; plant];
-
-min_pdpsi = combine(groupby(cap_comp, :cap), :PLPSI_pd .=> [minimum]);
-
-#scen_comp = CSV.read("Pfyn_cap_soil.csv", DataFrame);
-#cap_comp = CSV.read("Pfyn_cap_plant.csv", DataFrame);
-
-cap_comp.PLPSI_pd[cap_comp.PLPSI_pd .< -2000] .= -2000 # cap plant psi for visualization
+# investigate drops in soil water potential
 draw(
-    data(cap_comp)*mapping(:date, :PLPSI_pd, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
-    scales(X = (; label=""), Y = (; label="Plant ψ (kPa)")),
+    data(soil_long[soil_long.date .>= Date(2024, 8, 1) .&& soil_long.date .<= Date(2024, 9, 1), :])*mapping(:date, :swp, color=:layer => nonnumeric => "Soil layer (mm)")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Water potential (kPa)"), Color= (; palette=from_continuous(:summer))),
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
-
-# compare with model without capacitance
-prior = CSV.read("Pfyn_prior.csv", DataFrame);
-
-mapcols(x -> minimum(x[Not(isnan.(x))]), prior[:, Not([:date, :RWU, :cap])])
-sum(prior.RWU)
-
+# soil water content
+soilt = LWFBrook90.get_soil_(:θ, simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
+soilt.date = Date.(dates);
+soilt_long = stack(soilt, Not([:time, :date]), variable_name=:layer, value_name=:vwc);
+soilt_long.layer = parse.(Int, replace.(soilt_long.layer, r"θ_m3m3_(\d+)mm" => s"\1"));
 
 draw(
-    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 10), :])*mapping(:date, :AET, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
-    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 10), :])*mapping(:date, :RWU)*visual(Lines, color=:red, label="No capacitance"),
-    scales(X = (; label=""), Y = (; label="Transpiration (mm/day)")),
+    data(soilt_long[soilt_long.date .>= Date(2024, 8, 1) .&& soilt_long.date .<= Date(2024, 9, 1), :])*mapping(:date, :vwc, color=:layer => nonnumeric => "Soil layer (mm)")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="VWC")),
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+# and related conductivity
+soilk = LWFBrook90.get_soil_(:K, simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
+soilk.date = Date.(dates);
+soilk_long = stack(soilk, Not([:time, :date]), variable_name=:layer, value_name=:k);
+soilk_long.layer = parse.(Int, replace.(soilk_long.layer, r"[^\d]" => ""));
+
 draw(
-    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
-    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff)*visual(Lines, color=:red, label="No capacitance"),
-    scales(X = (; label=""), Y = (; label="Effective SWP (kPa)")),
+    data(soilk_long[soilk_long.date .>= Date(2024, 8, 1) .&& soilk_long.date .<= Date(2024, 9, 1), :])*mapping(:date, :k => (k -> log(k)), color=:layer => nonnumeric => "Soil layer (mm)")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="K")),
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+# is it root water uptake 
+TRANI = get_soil_(:TRANI, simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
+TRANI.date = Date.(dates);
+TRANI_long = stack(TRANI, Not([:time, :date]), variable_name=:layer, value_name=:rwu);
+TRANI_long.layer = parse.(Int, replace.(TRANI_long.layer, r"[^\d]" => ""));
 
-# automated loop over parameter values
+draw(
+    data(TRANI_long[TRANI_long.date .>= Date(2024, 8, 1) .&& TRANI_long.date .<= Date(2024, 9, 1), :])*mapping(:date, :rwu, color=:layer => nonnumeric => "Soil layer (mm)")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="RWU")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+# or plant refill
+PLRFI = get_soil_(:PLRFI, simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100, 200, 400, 600, 800, 1000, 1200]);
+PLRFI.date = Date.(dates);
+PLRFI_long = stack(PLRFI, Not([:time, :date]), variable_name=:layer, value_name=:plrf);
+PLRFI_long.layer = parse.(Int, replace.(PLRFI_long.layer, r"[^\d]" => ""));
+
+draw(
+    data(PLRFI_long[PLRFI_long.date .>= Date(2024, 8, 1) .&& PLRFI_long.date .<= Date(2024, 9, 1), :])*mapping(:date, :plrf, color=:layer => nonnumeric => "Soil layer (mm)")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="PLRF")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+# combine variables into single plot
+soil_comp = get_soil_([:ψ, :θ, :K, :TRANI, :PLRFI], simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100]);
+rename!(soil_comp, [:time, :K, :PLRFI, :TRANI, :θ, :ψ]);
+soil_comp.date = Date.(dates);
+soil_plot = soil_comp[soil_comp.date .>= Date(2024, 8, 1) .&& soil_comp.date .<= Date(2024, 9, 1), :];
+
+draw(
+    data(soil_plot)*mapping(:date, :ψ => x -> x / 1000)*visual(Lines, color=:purple, label="Soil ψ")+
+    data(soil_plot)*mapping(:date, :θ => x -> x * 100)*visual(Lines, color=:blue, label="Soil θ")+
+    data(soil_plot)*mapping(:date, :K => k -> log(k))*visual(Lines, color=:red, label="Soil K")+
+    data(soil_plot)*mapping(:date, :TRANI => x -> x * 100)*visual(Lines, color=:green, label="RWU")+
+    data(soil_plot)*mapping(:date, :PLRFI => x -> x * 100)*visual(Lines, color=:orange, label="PLRF"),
+    scales(X = (; label=""), Y = (; label="Var")),
+    figure = (; size=(1200, 600))
+)
+
+# automated loop over parameter values for sensitivity analysis
 
 ks_par = [0.1, 1, 2.4, 5, 10]
 scen_comp = nothing;
@@ -265,9 +291,53 @@ combine(groupby(scen_comp, :ks), :AET => sum)
 
 combine(groupby(cap_comp, :ks), :PLPSI_pd .=> [minimum])
 
+# analysis
+
+scen_comp = CSV.read("Pfyn_cap_soil.csv", DataFrame);
+cap_comp = CSV.read("Pfyn_ks_plant.csv", DataFrame);
+
+cap_comp.PLPSI_pd[cap_comp.PLPSI_pd .< -2000] .= -2000 # cap plant psi for visualization
+draw(
+    data(cap_comp)*mapping(:date, :PLPSI_pd, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Plant ψ (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
 
 draw(
     data(cap_comp)*mapping(:date, :PLPSI_pd, color=:ks => nonnumeric => "Conductance")*visual(Lines),
     scales(X = (; label=""), Y = (; label="Plant ψ (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+draw(
+    data(cap_comp[cap_comp.cap .!= 0.1, :])*mapping(:date, :PLPSI_md, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Midday plant ψ (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+draw(
+    data(cap_comp)*mapping(:date, :PLPSI_md, color=:ks => nonnumeric => "Conductance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Midday plant ψ (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+# compare with model without capacitance
+prior = CSV.read("Pfyn_prior.csv", DataFrame);
+
+mapcols(x -> minimum(x[Not(isnan.(x))]), prior[:, Not([:date, :RWU, :cap])])
+sum(prior.RWU)
+
+
+draw(
+    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 10), :])*mapping(:date, :AET, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
+    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 10), :])*mapping(:date, :RWU)*visual(Lines, color=:red, label="No capacitance"),
+    scales(X = (; label=""), Y = (; label="Transpiration (mm/day)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
+draw(
+    data(scen_comp[scen_comp.date .>= Date(2024, 8, 1) .&& scen_comp.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff, color=:cap => nonnumeric => "Capacitance")*visual(Lines)+
+    data(prior[prior.date .>= Date(2024, 8, 1) .&& prior.date .< Date(2024, 9, 1), :])*mapping(:date, :ψ_kPa_eff)*visual(Lines, color=:red, label="No capacitance"),
+    scales(X = (; label=""), Y = (; label="Effective SWP (kPa)")),
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
