@@ -28,14 +28,10 @@ function get_RWU_centroid(sim)
     rows_RWU_mmDay  = reduce(hcat, [solu(t).TRANI.mmday   for t in days_to_read_out_d]);
 
     RWU_percent = rows_RWU_mmDay ./ sum(rows_RWU_mmDay; dims = 1);
-    #RWUcentroidLabel = "mean RWU depth"
     if (any(RWU_percent .< 0))
-        #@warn "Some root water outfluxes detected. Centroid of RWU is  based only on uptakes."
         rows_RWU_mmDay_onlyUptake = ifelse.(rows_RWU_mmDay.>0,rows_RWU_mmDay, 0);
         RWU_percent_onlyUptake = rows_RWU_mmDay_onlyUptake ./ sum(rows_RWU_mmDay_onlyUptake; dims = 1);
         RWU_percent = RWU_percent_onlyUptake;
-        
-        #RWUcentroidLabel = "mean RWU depth\n(based on uptake only)"
     end
 
     row_RWU_centroid_mm = sum(RWU_percent .* y_center; dims=1);
@@ -48,13 +44,14 @@ end
 function get_eff_swp(sim)
     # derive effective soil water potential based on RWU
     days, dates_out = get_dates(sim);
-    swp = DataFrame(date = dates_out);
+    swp = DataFrame(date = dates_out[1:(end-1)]);
     
-    swp.RWU, rwu_per = get_RWU_centroid(sim); # RWU depth and percent
+    RWU, rwu_per = get_RWU_centroid(sim); # RWU depth and percent
+    swp.RWU = RWU[2:end];
 
     swp_all = get_soil_(:psi, sim, days_to_read_out_d=days); # swp
 
-    swp.swp_eff .= sum(rwu_per .* Matrix(swp_all[:, Not(:time)])', dims=1)';
+    swp.swp_eff .= sum(rwu_per[:,2:end] .* Matrix(swp_all[1:(end-1), Not(:time)])', dims=1)';
 
     return swp
 end
@@ -74,12 +71,13 @@ model = LWFBrook90.loadSPAC(input_path, input_prefix; simulate_isotopes = false,
 simulation = LWFBrook90.setup(model); #, requested_tspan=(8766, 9131));
 LWFBrook90.simulate!(simulation)
 
-#simulation = remakeSPAC(model; params = (STORAGEK = 1,)); #remakeSPAC returns setup
+#simulation = remakeSPAC(model; params = (STORAGEK = 1000, CAPACITANCE = 1)); #remakeSPAC returns setup
 #LWFBrook90.simulate!(simulation);
 
 # extract output
 sol = simulation.ODESolution;
 timesteps = unique(round.(sol.t));
+# timesteps = sol.t
 dates = LWFBrook90.RelativeDaysFloat2DateTime.(timesteps, simulation.parametrizedSPAC.reference_date);
 
 PLSTOR = [sol(t).PLSTOR.mm for t in timesteps];
@@ -103,6 +101,8 @@ Plots.plot(PLPSI_pd, label="Pre-dawn ψ")
 Plots.plot(dates[153:158], PLPSI_pd[153:158], label="Pre-dawn ψ")
 Plots.plot(122:303, PLPSI_pd[122:303], label="Pre-dawn ψ")
 Plots.plot(dates, RWU, label="RWU")
+Plots.plot(dates, PLSTOR, label="PLSTOR")
+Plots.plot(dates, PLRF, label="PLRF")
 Plots.plot(dates, PLFL, label="PLFL")
 Plots.plot(dates, PLFL./(RWU.+PLFL), label="PLFL/RWU")
 
@@ -131,7 +131,6 @@ draw(
 
 # compare plant water potential with effective soil water potential
 swp_eff = get_eff_swp(simulation);
-swp_eff.swp_eff[swp_eff.swp_eff .< -2000] .= -2000;
 
 # pre-dawn
 draw(
@@ -216,10 +215,20 @@ draw(
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+# or evaporation
+draw(
+    data(flux[flux.date .>= Date(2024, 8, 1) .&& flux.date .<= Date(2024, 9, 1), :])*mapping(:date, :cum_d_slvp)*visual(Lines, color=:brown, label="Soil evaporation")+
+    data(flux[flux.date .>= Date(2024, 8, 1) .&& flux.date .<= Date(2024, 9, 1), :])*mapping(:date, :TRANI_mmday_70mm)*visual(Lines, color=:green, label="Plant transpiration")+
+    data(PLRFI[PLRFI.date .>= Date(2024, 8, 1) .&& PLRFI.date .<= Date(2024, 9, 1), :])*mapping(:date, :PLRFI_mmday_100mm)*visual(Lines, color=:orange, label="Plant refill"),
+    scales(X = (; label=""), Y = (; label="Flux (mm/day)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
 # combine variables into single plot
 soil_comp = get_soil_([:ψ, :θ, :K, :TRANI, :PLRFI], simulation, days_to_read_out_d=timesteps, depths_to_read_out_mm=[100]);
 rename!(soil_comp, [:time, :K, :PLRFI, :TRANI, :θ, :ψ]);
 soil_comp.date = Date.(dates);
+soil_comp.PLPSI = PLPSI_pd;
 soil_plot = soil_comp[soil_comp.date .>= Date(2024, 8, 1) .&& soil_comp.date .<= Date(2024, 9, 1), :];
 
 draw(
@@ -227,9 +236,14 @@ draw(
     data(soil_plot)*mapping(:date, :θ => x -> x * 100)*visual(Lines, color=:blue, label="Soil θ")+
     data(soil_plot)*mapping(:date, :K => k -> log(k))*visual(Lines, color=:red, label="Soil K")+
     data(soil_plot)*mapping(:date, :TRANI => x -> x * 100)*visual(Lines, color=:green, label="RWU")+
-    data(soil_plot)*mapping(:date, :PLRFI => x -> x * 100)*visual(Lines, color=:orange, label="PLRF"),
+    data(soil_plot)*mapping(:date, :PLRFI => x -> x * 100)*visual(Lines, color=:orange, label="PLRF")+
+    data(soil_plot)*mapping(:date, :PLPSI => x -> x / 1000)*visual(Lines, color=:black, label="Plant ψ"),
     scales(X = (; label=""), Y = (; label="Var")),
     figure = (; size=(1200, 600))
+)
+
+draw(
+    data(soil_plot)*mapping(:θ, :ψ)*visual(Scatter)
 )
 
 # automated loop over parameter values for sensitivity analysis
