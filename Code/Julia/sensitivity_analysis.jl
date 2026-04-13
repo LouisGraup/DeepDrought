@@ -21,31 +21,31 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> 0.3 .&& 
+    #= return met[met.swc_nse10 .> 0.5 .&& 
                #met.swc_nse40 .> 0.0 .&&
                #met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.2 .&&
-               met.swp_nse10 .> 0.1 .&&
+               met.swc_nse80 .> 0.3 .&&
+               met.swp_nse10 .> 0.25 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.1 .&&
-               met.trans_nse .> 0.2 .&&
+               met.swp_nse80 .> 0.15 .&&
+               met.trans_nse .> 0.25 .&&
                met.trans_cor .> 0.3 .&&
                met.max_trans .< 2 .&& 
                met.iso_rmse5 .< 6.0 .&&
                met.iso_rmse20 .< 3.0 .&&
                met.iso_rmse40 .< 3.2 .&&
-               met.iso_rmse_xy .< 4.0, :]
+               met.iso_rmse_xy .< 4.0, :] =#
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> 0.2 .&& 
+    #= return met[met.swc_nse10 .> 0.4 .&& 
                #met.swc_nse40 .> 0.0 .&&
                #met.swc_nse60 .> 0.0 .&&
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> -0.7 .&&
-               met.swp_nse10 .> -0.3 .&&
+               met.swc_nse80 .> -0.6 .&&
+               met.swp_nse10 .> -0.2 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> -0.8 .&&
+               met.swp_nse80 .> -0.75 .&&
                met.trans_nse .> 0.4 .&&
                met.trans_cor .> 0.7 .&&
                met.max_trans .< 4 .&& 
@@ -55,19 +55,19 @@ function behavioral_met(met)
                met.iso_rmse_xy .< 4.0, :] =#
 
     # irr stop metrics
-    #= return met[met.swc_nse10 .> 0.2 .&& 
+    return met[met.swc_nse10 .> 0.4 .&& 
                #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.2 .&&
-               met.swp_nse10 .> 0.2 .&&
+               met.swc_nse80 .> 0.3 .&&
+               met.swp_nse10 .> 0.3 .&&
                #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.1 .&&
-               met.trans_nse .> 0.0 .&&
+               met.swp_nse80 .> 0.15 .&&
+               met.trans_nse .> 0.05 .&&
                met.trans_cor .> 0.5 .&&
                met.max_trans .< 4 .&& 
-               met.iso_rmse5 .< 6.0 .&&
-               met.iso_rmse20 .< 3.0 .&&
-               met.iso_rmse40 .< 2.0 .&&
-               met.iso_rmse_xy .< 2.0, :] =#
+               met.iso_rmse5 .< 5.8 .&&
+               met.iso_rmse20 .< 2.6 .&&
+               met.iso_rmse40 .< 1.8 .&&
+               met.iso_rmse_xy .< 1.8, :]
 end
 
 function behave(met)
@@ -206,12 +206,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260317.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260317.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260317.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260317.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260317.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260317.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260327.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260327.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260327.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260327.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260327.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260327.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -251,7 +251,7 @@ density_plot(met_ctr_good)
 density_plot(met_irr_good)
 density_plot(met_irst_good)
 
-describe(met_ctr_good)
+describe(met_irst_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, :swc_nse10, :swc_nse80)
@@ -278,7 +278,6 @@ met_plot(met_irr_good, :swc_nse_com, :swp_nse_com)
 
 met_plot(met_ctr_good, [:swp_nse10, :swp_nse80], [:trans_nse, :trans_nse])
 met_plot(met_irr_good, [:swc_nse10, :swc_nse80], [:trans_nse, :trans_nse])
-
 met_plot(met_irst_good, [:swc_nse10, :swc_nse80], [:trans_nse, :trans_nse])
 
 # compare metrics across scenarios
