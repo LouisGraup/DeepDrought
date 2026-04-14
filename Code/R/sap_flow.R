@@ -7,7 +7,7 @@ library(zoo)
 
 ## common data and functions
 
-source("../../Data/Pfyn/data for Pfynwald/Pfyn_sf_helpers.R") # from Richard Peters for VPDrought
+source("../../Data/Pfyn/data_RP/Pfyn_sf_helpers.R") # from Richard Peters for VPDrought
 
 sapwood_bin_size = 300
 
@@ -234,7 +234,7 @@ ggplot(ctr_irst_comp, aes(date, diff))+geom_line()+geom_hline(yintercept=0)+
 
 # 2021 - 2022 data
 
-sap = readRDS("../../Data/Pfyn/data for Pfynwald/2021-2022/PFY_sfd_cleaned.Rds")
+sap = readRDS("../../Data/Pfyn/data_RP/2021-2022/PFY_sfd_cleaned.Rds")
 sap$tree = factor(sap$tree)
 
 # remove outliers
@@ -302,9 +302,8 @@ ggplot(sap_ctr_daily, aes(date, Tr))+geom_line()
 
 ## VPDrought 2024-25 data
 
-#sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_SF_L3_2025-02-02.RDS")
-sap_vpd = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_sfden_2025-06-18.RDS")
-#sap_vpd25 = readRDS("../../Data/Pfyn/data for Pfynwald/2024/VPDrought_SF_L3_2025-12-01.RDS")
+sap_vpd = readRDS("../../Data/Pfyn/data_RP/sap_vpd_RP/VPDrought_SF_L3_2024.RDS")
+#sap_vpd25 = readRDS("../../Data/Pfyn/data_RP/sap_vpd_RP/VPDrought_SF_L3_2025.RDS")
 
 sap_vpd$Date.Time = as.POSIXct(sap_vpd$Date.Time, tz="CET", format="%Y-%m-%d %H:%M:%S")
 sap_vpd$date = as.Date(sap_vpd$Date.Time, tz="CET")
@@ -312,9 +311,9 @@ sap_vpd$date = as.Date(sap_vpd$Date.Time, tz="CET")
 ggplot(sap_vpd, aes(Date.Time, Total_Sap_Flow_kg_h, color=as.factor(Tree_id)))+geom_line()+
   facet_wrap(~Treatment)+theme_bw()+guides(color="none")
 
-sap_vpd_hourly = sap_vpd %>% filter(Total_Sap_Flow_kg_h > 0) %>% 
+sap_vpd_hourly = sap_vpd %>% filter(Total_Sap_Flow_Corr > 0) %>% 
   mutate(datehour=floor_date(Date.Time, "1 hour")) %>% 
-  group_by(datehour, Tree_id, Treatment) %>% summarize(Total_Sap_Flow=mean(Total_Sap_Flow_kg_h, na.rm=T))
+  group_by(datehour, Tree_id, Treatment) %>% summarize(Total_Sap_Flow=mean(Total_Sap_Flow_Corr, na.rm=T))
 sap_vpd_hourly$date = as.Date(sap_vpd_hourly$datehour, tz="CET")
 
 #
