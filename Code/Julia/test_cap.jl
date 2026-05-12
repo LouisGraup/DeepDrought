@@ -62,13 +62,15 @@ obs_lwp = CSV.read("../../Data/Pfyn/Pfyn_LWP.csv", DataFrame);
 obs_lwp = obs_lwp[obs_lwp.date .>= Date(2024, 1, 1) .&& obs_lwp.date .< Date(2025, 1, 1) .&& obs_lwp.meta .== "control", :];
 
 input_prefix = "pfynwald";
-#input_path   = "LWFB_testcap/control/";
-input_path   = "../../../LWFBrook90.jl/examples/PFY2024-capacitance/";
+input_path   = "LWFB_testcap/control/";
+#input_path   = "../../../LWFBrook90.jl/examples/PFY2024-capacitance/";
 
 model = LWFBrook90.loadSPAC(input_path, input_prefix; simulate_isotopes = false,
-    root_distribution = (beta = 0.97091, z_rootMax_m=-1.35462));
+    root_distribution = (beta = 0.9788135, z_rootMax_m=-1.7223));
+model_irstp = LWFBrook90.loadSPAC(input_path, input_prefix; simulate_isotopes = false, simulate_irrigation = true,
+    root_distribution = (beta = 0.966925, z_rootMax_m=-1.2569625));
 
-simulation = LWFBrook90.setup(model); #, requested_tspan=(8766, 9131));
+simulation = LWFBrook90.setup(model, requested_tspan=(3653,9131)); #, requested_tspan=(8766, 9496));
 LWFBrook90.simulate!(simulation)
 
 #simulation = remakeSPAC(model; params = (STORAGEK = 1000, CAPACITANCE = 1)); #remakeSPAC returns setup
@@ -154,10 +156,25 @@ draw(
     legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
 )
 
+# compare plant storage contribution to transpiration against effective soil water potential
+swp_eff.RWUd .= swp_eff.RWU;
+swp_eff.RWU .= RWU[2:end];
+swp_eff.PLFL .= PLFL[2:end];
+swp_eff.Trans .= swp_eff.RWU + swp_eff.PLFL;
+swp_eff.PLFL_Tr_contrib = swp_eff.PLFL ./ swp_eff.Trans * 100;
+
+# only summer months
+swp_eff.month = month.(swp_eff.date);
+swp_eff_sum = swp_eff[swp_eff.month .> 5 .&& swp_eff.month .< 9, :];
+
+draw(data(swp_eff_sum[swp_eff_sum.PLFL_Tr_contrib .> 10, :])*mapping(:swp_eff, :PLFL_Tr_contrib)*
+(smooth()+visual(Scatter)),
+    scales(X = (; label="Effective Soil Water Potential (kPa)"), Y= (; label="Plant Storage Contribution to Transpiration (%)")))
+
 # SPAC plot
 p1 = Plots.plot(Date.(dates), RWU, color=:green, xlabel="", ylabel="Transpiration (mm/d)", legend=false, size=(1000, 500), left_margin=4mm);
 p2 = Plots.plot(swp_eff.date, swp_eff.swp_eff, color=:black, label="Effective SWP", ylabel="Water Potential (kPa)", xlabel="", size=(1000, 500), left_margin=4mm);
-p2 = Plots.plot!(p2, Date.(dates), PLPSI_pd, color=:blue, label="Plant ψ")
+p2 = Plots.plot!(p2, Date.(dates), PLPSI_pd, color=:blue, label="Pre-dawn plant ψ")
 Plots.plot(p1, p2, layout=(2, 1))
 
 # investigate drops in soil water potential
