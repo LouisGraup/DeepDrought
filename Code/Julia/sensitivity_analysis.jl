@@ -38,11 +38,11 @@ function behavioral_met(met)
                met.iso_rmse_xy .< 3.7, :]
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> -1.0 .&& 
-               met.swc_nse80 .> -1.0 .&&
-               met.swp_nse10 .> -1.0 .&&
-               met.swp_nse80 .> -1.0 .&&
-               met.trans_cor .> 0.7, :] =#
+    #= return met[met.swc_nse10 .> -0.1 .&& 
+               met.swc_nse80 .> -0.8 .&&
+               met.swp_nse10 .> -0.4 .&&
+               met.swp_nse80 .> -0.8 .&&
+               met.trans_cor .> 0.75, :] =#
 
     # irr stop metrics
     #= return met[met.swc_nse10 .> 0.65 .&& 
@@ -196,12 +196,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260430.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260430.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260430.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260430.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260430.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260430.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260512.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260512.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260512.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260512.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260512.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260512.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -241,7 +241,7 @@ density_plot(met_ctr_good)
 density_plot(met_irr_good)
 density_plot(met_irst_good)
 
-describe(met_ctr_good)
+describe(met_irst_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, :swc_nse10, :swc_nse80)
@@ -315,7 +315,7 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_ctr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_irr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
