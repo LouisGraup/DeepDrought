@@ -21,10 +21,10 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
 
-    return(met[met.swp_nse20 .> 0.4 .&&
-               met.swp_nse80 .> 0.4 .&&
-               met.swp_nse110 .> 0.4 .&&
-               met.swp_nse160 .> 0.4 .&&
+    return(met[met.swp_nse20 .> 0.55 .&&
+               met.swp_nse80 .> 0.6 .&&
+               met.swp_nse110 .> 0.6 .&&
+               met.swp_nse160 .> 0.6 .&&
                met.trans_cor .> 0.6, :])
 
 end
@@ -120,8 +120,8 @@ function met_best_scen(met, metric=:swp_nse_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_vetroz_20260430.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_vetroz_20260430.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_vetroz_20260512.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_vetroz_20260512.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);

@@ -3,10 +3,10 @@
 
 using LWFBrook90, CSV, DataFrames, Dates;
 
-function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true, watbal=false, irrig=false)
+function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, output_path; new_folder=true, watbal=false, irrig=false, iso=true)
     # new_folder tells the function whether it needs to create a new folder
     # or if it can skip this step and just run the model with par
-    
+
     if new_folder
         ## make output folder structure and create parameter files
 
@@ -142,7 +142,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
     ## set up model run
 
     # dummy run for reference date
-    model = loadSPAC(output_path, output_prefix);
+    model = loadSPAC(output_path, output_prefix, simulate_isotopes=iso);
     ref_date = Date(model.reference_date);
 
     start_index = Dates.value(start_date - ref_date);
@@ -155,13 +155,13 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
 
         # run model with modified root distribution
         model = loadSPAC(output_path, output_prefix, 
-        simulate_isotopes = true, simulate_irrigation = irrig,
+        simulate_isotopes = iso, simulate_irrigation = irrig,
         root_distribution = (beta = betaroot, z_rootMax_m=maxroot));
 
     else
         # run model with input files
         model = loadSPAC(output_path, output_prefix, 
-        simulate_isotopes = true, simulate_irrigation = irrig)
+        simulate_isotopes = iso, simulate_irrigation = irrig)
     end
 
     # model set up
