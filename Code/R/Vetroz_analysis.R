@@ -1,11 +1,55 @@
 # combine and analyze Vetroz data
+# data processing below
 
 library(tidyverse)
 library(lubridate)
 
 setwd("../../Data/Daten_Vetroz_Lorenz")
 
-## soil water potential data
+## leaf water potential
+SWP_daily = read_csv("SWP_daily.csv")
+
+LWP = read_csv("LWP_gs.csv")
+LWP$Date = as.Date(LWP$Date, format="%m/%d/%y")
+LWP$pd_md = if_else(LWP$Time < hms("06:00:00"), "pd", "md")
+LWP$LWP_mean = LWP$LWP_mean / -10 # convert to MPa
+
+# compare bagged and unbagged
+ggplot(filter(LWP, Date < "2021-10-01", pd_md=="md"), aes(Date, LWP_mean, color=Method, group=interaction(Date, Method)))+geom_boxplot()+
+  facet_wrap(~TreeNr)+theme_bw()
+
+LWP_BWP = LWP %>% filter(pd_md=="md") %>% select(Date, TreeNr, LWP_mean, Method) %>% 
+  group_by(Date, TreeNr, Method) %>% summarize(LWP=mean(LWP_mean)) %>% 
+  pivot_wider(names_from=Method, values_from=LWP) %>% 
+  rename(LWP = unbagged, BWP = bagged) %>% mutate(WP_diff = BWP - LWP)
+
+ggplot(LWP_BWP, aes(LWP, WP_diff))+geom_point()+
+  stat_smooth()+theme_bw()+
+  labs(x="Unbagged Leaf Water Potential (MPa)", y="Difference between bagged and unbagged LWP (MPa)")
+
+
+# compare against soil water potential
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(SMP_mean / 1000, LWP_mean, color=pd_md))+geom_point()+
+  geom_abline(slope=1, intercept=0)+facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Soil Water Potential (MPa)", y = "Leaf Water Potential (MPa)")
+
+# sap flow and leaf water potential
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow))+geom_point()+
+  facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Leaf Water Potential (MPa)", y = "Sapflow")
+
+# TWD and LWP
+ggplot(LWP, aes(TWD, LWP_mean, color=pd_md))+geom_point()+
+  facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Tree Water Deficit (MPa)", y = "Leaf Water Potential (MPa)")
+
+# gs and LWP
+ggplot(LWP, aes(gs, LWP_mean))+geom_point()+
+  facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Stomatal Conductance (mol m^-2 s^-1)", y = "Leaf Water Potential (MPa)")
+
+
+## process soil water potential data
 SWP = read_csv("SWP_20_80_110_160cm_hourly_2014_2022.csv")
 SWP1cm = read_csv("SWP_1cm_Vetroz.csv")
 
