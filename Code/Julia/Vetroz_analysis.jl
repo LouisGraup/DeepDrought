@@ -8,16 +8,13 @@ using Measures, Plots; gr()
 include("run_LWFB90_param.jl");
 
 # function to retrieve best parameter set
-function par_best(met, par)
+function get_par_best(met, par)
     
-    # add combined NSE metrics
-    met.swc_nse_com = (met.swc_nse10 + met.swc_nse40 + met.swc_nse60 + met.swc_nse80) / 4;
-    met.swp_nse_com = (met.swp_nse10 + met.swp_nse80) / 2;
-
-    met.nse_com = (met.swc_nse_com + met.swp_nse_com) / 2;
+    # add combined NSE metric
+    met.swp_nse_com = sqrt.((met.swp_nse20 .^ 2 + met.swp_nse80 .^ 2 + met.swp_nse110 .^ 2 + met.swp_nse160 .^ 2) / 4);
 
     # best overall scenario
-    max_idx = argmax(met.nse_com);
+    max_idx = argmax(met.swp_nse_com);
     scen_best = met.scen[max_idx];
 
     par_best = par[scen_best, :];
@@ -230,6 +227,25 @@ function get_eff_swp(sim)
     return swp
 end
 
+function get_VPD(sim)
+
+    met = get_forcing(sim);
+    met.date = Date.(met.dates);
+
+    met = select(met, :date, :vappres_kPa, :tmax_degC, :tmin_degC);
+    met.month = month.(met.date);
+    met.year = year.(met.date);
+
+    met.tmean = (met.tmax_degC .+ met.tmin_degC) ./ 2;
+
+    # calc saturation vapor pressure
+    met.Es = 0.61078 .* exp.(17.26939 .* met.tmean ./ (met.tmean .+ 237.3));
+    # calc vapor pressure deficit
+    met.VPD = met.Es .- met.vappres_kPa;
+
+    return met
+end
+
 function plot_monthly_water_partitioning(df_partitioning_monthly)
     # color palette
     color_palette = reverse([
@@ -350,10 +366,10 @@ function plot_yearly_water_partitioning(df_partitioning_yearly)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_vetroz_20260430.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_vetroz_20260430.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_vetroz_20260526.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_vetroz_20260526.csv", DataFrame);
 
-par_best, scen_best = par_best(met, par);
+par_best, scen_best = get_par_best(met, par);
 
 met[scen_best, :]
 
@@ -364,11 +380,12 @@ filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
 
 # sap flow data
 obs_sap = CSV.read("../../Data/Daten_Vetroz_Lorenz/sapflow_daily.csv", DataFrame);
-obs_sap = obs_sap[obs_sap.month .∈ [5:11], :]; # filter to growing season
-select!(obs_sap, Not(:month));
+obs_sap = obs_sap[obs_sap.sensor_loc .== "stem", :]; # filter to stem sensors
+obs_sap.sapflow .= max.(obs_sap.sapflow, 0); # set negative values to zero
+select!(obs_sap, Not([:month, :year, :sensor_loc])); # drop unnecessary columns
 
 # leaf water potential data
-#obs_lwp = CSV.read("../../Data/Pfyn/Insitu_lwp.csv", DataFrame);
+obs_lwp = CSV.read("../../Data/Daten_Vetroz_Lorenz/LWP_gs.csv", DataFrame);
 
 ## run LWFBrook90.jl for all scenarios
 sim = run_LWFB90_param(par_best, Date(2014, 1, 1), Date(2023, 12, 31), "LWFBinput/Vetroz/", "vetroz", "LWFB_testrun/vetroz/", iso=false);
@@ -445,6 +462,15 @@ draw(
     figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
 )
 
+
+# get VPD
+vpd = get_VPD(sim);
+
+draw(data(vpd[vpd.year .> 2014, :])*
+    mapping(:date, :VPD)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="VPD (kPa)")),
+    figure = (; size=(1200, 600))
+)
 
 # compare RWU depth across scenarios
 

@@ -20,13 +20,14 @@ end
     # soil matric potential
     obs_swp = CSV.read("../../Data/Daten_Vetroz_Lorenz/SWP_daily.csv", DataFrame);
     filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
-    filter!(:date => <(Date(2021, 1, 1)), obs_swp); # filter out late dates
+    filter!(:date => <(Date(2023, 1, 1)), obs_swp); # filter out late dates
     obs_swp = unstack(obs_swp, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
 
     # sap flow data
     obs_sap = CSV.read("../../Data/Daten_Vetroz_Lorenz/sapflow_daily.csv", DataFrame);
-    obs_sap = obs_sap[obs_sap.month .∈ [5:11], :]; # filter to growing season
-    select!(obs_sap, Not(:month));
+    obs_sap = obs_sap[obs_sap.sensor_loc .== "stem", :]; # filter to stem sensors
+    obs_sap.sapflow .= max.(obs_sap.sapflow, 0); # set negative values to zero
+    select!(obs_sap, Not([:month, :year, :sensor_loc])); # drop unnecessary columns
 end
 
 # objective function to compare model output to observed data
@@ -126,49 +127,49 @@ n = 1000; # number of parameter sets
 param = [
     # hydro parameters
     ("DRAIN", 0.0, 1.0), # drainage (0, 1)
-    ("INFEXP", 0.0, 0.8), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.05, 0.75), # infiltration depth (m) (0.05, 1.0)
+    ("INFEXP", 0.0, 0.9), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 1.0)
     # meteo parameters
     #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 400, 1000), # soil resistance (20, 1000)
+    ("RSSA", 20, 1000), # soil resistance (20, 1000)
     ("ths1", 0.2, 0.6), # theta_sat (0.2, 0.6)
-    ("thr1", 0.0, 0.09), # theta_res (0.0, 0.1)
-    ("ksat1", -0.4, 0.4), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha1", 0.5, 1.4), # multiplier on alpha (0.5, 1.5)
+    ("thr1", 0.0, 0.2), # theta_res (0.0, 0.2)
+    ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha1", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
     ("npar1", 1.15, 1.2), # n (1.15, 1.2)
-    ("ths2", 0.25, 0.6), # theta_sat (0.2, 0.6)
-    ("thr2", 0.0, 0.09), # theta_res (0.0, 0.1)
+    ("ths2", 0.2, 0.6), # theta_sat (0.2, 0.6)
+    ("thr2", 0.0, 0.2), # theta_res (0.0, 0.2)
     ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("alpha2", 0.5, 1.25), # multiplier on alpha (0.5, 1.5)
-    ("npar2", 1.155, 1.2), # n (1.15, 1.2)
-    ("ths3", 0.35, 0.6), # theta_sat (0.2, 0.6)
-    ("thr3", 0.0, 0.1), # theta_res (0.0, 0.1)
-    ("ksat3", -0.2, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha3", 0.5, 1.3), # multiplier on alpha (0.5, 1.5)
+    ("npar2", 1.15, 1.2), # n (1.15, 1.2)
+    ("ths3", 0.2, 0.6), # theta_sat (0.2, 0.6)
+    ("thr3", 0.0, 0.2), # theta_res (0.0, 0.2)
+    ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha3", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
     ("npar3", 1.2, 1.3), # n (1.2, 1.3)
-    ("ths4", 0.2, 0.45), # theta_sat (0.2, 0.6)
-    ("thr4", 0.0, 0.1), # theta_res (0.0, 0.1)
-    ("ksat4", 0.05, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha4", 0.5, 1.3), # multiplier on alpha (0.5, 1.5)
-    ("npar4", 1.23, 1.3), # n (1.2, 1.3)
-    ("ths5", 0.2, 0.35), # theta_sat (0.2, 0.6)
-    ("thr5", 0.04, 0.1), # theta_res (0.0, 0.1)
-    ("ksat5", 0.3, 0.6), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha5", 0.5, 0.7), # multiplier on alpha (0.5, 1.5)
-    ("npar5", 1.25, 1.36), # n (1.25, 1.4)
+    ("ths4", 0.2, 0.6), # theta_sat (0.2, 0.6)
+    ("thr4", 0.0, 0.2), # theta_res (0.0, 0.2)
+    ("ksat4", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha4", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar4", 1.2, 1.3), # n (1.2, 1.3)
+    ("ths5", 0.2, 0.6), # theta_sat (0.2, 0.6)
+    ("thr5", 0.0, 0.2), # theta_res (0.0, 0.2)
+    ("ksat5", -0.25, 0.7), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha5", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
+    ("npar5", 1.25, 1.4), # n (1.25, 1.4)
     # plant parameters
-    ("CINTRL", 0.2, 0.7), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.02, 0.16), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.002, 0.006), # stomatal conductance (0.001, 0.02)
-    ("CVPD", 0.6, 2.5), # vpd sensitivity (0.5, 3)
-    ("R5", 100, 200), # radiation sensitivity (50, 200)
-    ("T1", 6, 15), # low temperature threshold (5, 15)
+    ("CINTRL", 0.05, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
+    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.01), # stomatal conductance (0.001, 0.02)
+    ("CVPD", 0.5, 3.0), # vpd sensitivity (0.5, 3)
+    ("R5", 50, 200), # radiation sensitivity (50, 200)
+    ("T1", 5, 15), # low temperature threshold (5, 15)
     ("T2", 20, 35), # high temperature threshold (20, 35)
-    ("PSICR", -1.9, -1.6), # critical water potential (-4, -1)
+    ("PSICR", -3.0, -1.0), # critical water potential (-4, -1)
     ("FXYLEM", 0.1, 0.5), # aboveground xylem fraction (0.1, 0.5)
-    ("MXKPL", 8.0, 30.0), # maximum plant conductivity (7, 30)
+    ("MXKPL", 7.0, 30.0), # maximum plant conductivity (7, 30)
     ("MXRTLN", 2000, 4000), # maximum root length (2000, 4000)
     #("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
     #("BETAROOT", 0.9, 0.999) # beta root coefficient (0.9, 0.999)
