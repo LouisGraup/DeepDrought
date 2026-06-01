@@ -6,8 +6,8 @@ using StatsPlots, Plots; gr()
 
 # function to filter out scenarios which produced error
 function filter_error(met)
-    println("Filtering out $(sum(met.swc_rmse10 .== 0 .|| isnan.(met.iso_rmse5))) scenarios out of total $(size(met, 1)) which failed to run.")
-    return met[met.swc_rmse10 .!= 0 .&& met.iso_rmse5 .>= 0, :]
+    println("Filtering out $(sum(met.swc_rmse10 .== 0 .&& met.swc_rmse80 .== 0)) scenarios out of total $(size(met, 1)) which failed to run.")
+    return met[met.swc_rmse10 .!= 0 .&& met.swc_rmse80 .>= 0, :]
 end
 
 # function for density plot of metrics
@@ -21,43 +21,25 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> 0.6 .&& 
-               #met.swc_nse40 .> 0.0 .&&
-               #met.swc_nse60 .> 0.0 .&&
-               #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.35 .&&
-               met.swp_nse10 .> 0.35 .&&
-               #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.15 .&&
-               met.trans_nse .> 0.25 .&&
-               met.trans_cor .> 0.3 .&&
-               met.max_trans .< 2 .&& 
-               met.iso_rmse5 .< 5.4 .&&
-               met.iso_rmse20 .< 2.9 .&&
-               met.iso_rmse40 .< 3.0 .&&
-               met.iso_rmse_xy .< 3.7, :]
+    return met[met.swc_nse10 .> -0.1 .&& 
+               met.swc_nse80 .> -0.1 .&&
+               met.swp_nse10 .> -0.1 .&&
+               met.swp_nse80 .> -0.1 .&&
+               met.trans_cor .> 0.4, :]
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> -0.1 .&& 
-               met.swc_nse80 .> -0.8 .&&
-               met.swp_nse10 .> -0.4 .&&
-               met.swp_nse80 .> -0.8 .&&
+    #= return met[met.swc_nse10 .> 0.0 .&& 
+               met.swc_nse80 .> -0.7 .&&
+               met.swp_nse10 .> -0.3 .&&
+               met.swp_nse80 .> -0.7 .&&
                met.trans_cor .> 0.75, :] =#
 
     # irr stop metrics
-    #= return met[met.swc_nse10 .> 0.65 .&& 
-               #met.swc_nse80 .> 0.5, :]
-               met.swc_nse80 .> 0.45 .&&
-               met.swp_nse10 .> 0.4 .&&
-               #met.swp_nse80 .> 0.0, :]
-               met.swp_nse80 .> 0.25 .&&
-               met.trans_nse .> 0.1 .&&
-               met.trans_cor .> 0.55 .&&
-               met.max_trans .< 4 .&& 
-               met.iso_rmse5 .< 5.8 .&&
-               met.iso_rmse20 .< 2.5 .&&
-               met.iso_rmse40 .< 1.7 .&&
-               met.iso_rmse_xy .< 1.8, :] =#
+    #= return met[met.swc_nse10 .> -0.1 .&& 
+               met.swc_nse80 .> -0.1 .&&
+               met.swp_nse10 .> -0.1 .&&
+               met.swp_nse80 .> -0.1 .&&
+               met.trans_cor .> 0.4, :] =#
 end
 
 function behave(met)
@@ -169,20 +151,11 @@ end
 
 # function to add combined metrics to DataFrame
 function met_comb!(met)
-    met.swc_nse_com = sqrt.((met.swc_nse10 .^ 2 + met.swc_nse40 .^ 2 + met.swc_nse60 .^ 2 + met.swc_nse80 .^ 2) / 4);
-    met.swp_nse_com = sqrt.((met.swp_nse10 .^ 2 + met.swp_nse80 .^ 2) / 2);
-    met.rmse_com = sqrt.((met.swc_rmse10 .^ 2 + met.swc_rmse40 .^ 2 + met.swc_rmse60 .^ 2 + met.swc_rmse80 .^ 2) / 4);
-    met.iso_rmse_com = sqrt.((met.iso_rmse5 .^ 2 + met.iso_rmse20 .^ 2 + met.iso_rmse40 .^ 2 + met.iso_rmse_xy .^ 2) / 4)
-    met.met_com = sqrt.((met.swc_nse_com .^ 2 + met.swp_nse_com .^ 2 + met.trans_nse .^ 2 + met.iso_rmse_com .^ 2) / 4);
-    return nothing
-end
-
-function met_comb!(met)
     met.swc_nse_com = sqrt.((met.swc_nse10 .^ 2 + met.swc_nse80 .^ 2) / 2);
     met.swp_nse_com = sqrt.((met.swp_nse10 .^ 2 + met.swp_nse80 .^ 2) / 2);
     met.rmse_com = sqrt.((met.swc_rmse10 .^ 2 + met.swc_rmse80 .^ 2) / 2);
     met.iso_rmse_com = 1 ./ sqrt.((met.iso_rmse5 .^ 2 + met.iso_rmse20 .^ 2 + met.iso_rmse40 .^ 2 + met.iso_rmse_xy .^ 2) / 4)
-    met.met_com = sqrt.((met.swc_nse_com .^ 2 + met.swp_nse_com .^ 2 + met.trans_nse .^ 2 + met.iso_rmse_com .^ 2) / 4);
+    met.met_com = sqrt.((met.swc_nse_com .^ 2 + met.swp_nse_com .^ 2) / 2);
     return nothing
 end
 
@@ -196,12 +169,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260512.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260512.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260512.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260512.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260512.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260512.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260526.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260526.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260526.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260526.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260526.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260526.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -241,7 +214,7 @@ density_plot(met_ctr_good)
 density_plot(met_irr_good)
 density_plot(met_irst_good)
 
-describe(met_irst_good)
+describe(met_ctr_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, :swc_nse10, :swc_nse80)
@@ -315,7 +288,7 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_ctr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
