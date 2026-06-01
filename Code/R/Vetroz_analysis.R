@@ -146,7 +146,7 @@ ggplot(sap_daily, aes(date, sapflow, color=sensor_loc))+geom_line()+
 
 # function to normalize pre-dawn and midday TWD with MDS
 NORM_DENDRO = function(den_long) {
-  # expect den_long with datetime, Tree, and TWD columns
+  # expect den_long with datetime, tree_name, tree_id, sensor_loc, and TWD columns
   
   # formatting
   den_long = na.omit(den_long)
@@ -155,11 +155,11 @@ NORM_DENDRO = function(den_long) {
   
   # aggregate to daily with pre-dawn
   den_pd = den_long %>% filter(hour <= 6) %>% 
-    group_by(date, Tree) %>% summarize(TWD_pd=min(TWD, na.rm=T))
+    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_pd=min(TWD, na.rm=T))
   
   # aggregate to daily with mid-day
   den_md = den_long %>% filter(hour >= 12, hour <= 17) %>% 
-    group_by(date, Tree) %>% summarize(TWD_md=max(TWD, na.rm=T))
+    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_md=max(TWD, na.rm=T))
   
   den_daily = full_join(den_pd, den_md)
   
@@ -169,7 +169,7 @@ NORM_DENDRO = function(den_long) {
   # calculate 99th percentile MDS over entire time series
   den_mds = den_daily %>% mutate(month=month(date)) %>% 
     filter(month>4, month<11, MDS>0) %>%  # only accept positive shrinkage during summer months
-    group_by(Tree) %>% summarize(mds_max = quantile(MDS, .99))
+    group_by(tree_name) %>% summarize(mds_max = quantile(MDS, .99))
   
   # join max MDS to daily data frame
   den_daily = left_join(den_daily, den_mds)
@@ -184,53 +184,61 @@ NORM_DENDRO = function(den_long) {
 
 # TreeNet data
 TN = read_csv("TreeNet_dendro/tn_timeseries.csv")
-meta = read_csv("TreeNet_dendro/tn_metadata.csv")
+TN_meta = read_csv("TreeNet_dendro/tn_metadata.csv")
 
-# long-term dendro data for 2 stems
-TWD12 = read_csv("TWD_hourly_2014_2022_Nodes_1_2.csv")
-Stem_rad12 = read_csv("Stem_radius_hourly_2014_2022_Nodes_1_2.csv")
+TN_meta$sensor_loc = if_else(grepl("Root", TN_meta$tree_name), "root", "stem")
+TN_meta$tree_id = str_extract(TN_meta$tree_name, "\\d+\\s*")
 
-# need to add time to midnight
-TWD12$MEAS_DATE = ifelse(str_length(TWD12$MEAS_DATE) == 10,
-                       paste(TWD12$MEAS_DATE, "00:00:01"), TWD12$MEAS_DATE)
-TWD12$datetime = as.POSIXct(TWD12$MEAS_DATE, format="%d.%m.%Y %H:%M:%S", tz="UTC")
-TWD12 = TWD12 %>% select(datetime, Tree, VALUE) %>% rename(TWD = "VALUE")
-TWD12$TWD[TWD12$TWD == -9999999] = NA # NA values
+TN = TN %>% filter(frost == FALSE) %>%
+  select(-c(frost, flags, gro_start, gro_end)) %>% 
+  left_join(select(TN_meta, series_id, tree_name, tree_id, sensor_loc)) %>% 
+  rename(datetime=ts, TWD=twd) %>% select(-series_id)
 
-TWD12_norm = NORM_DENDRO(TWD12)
+ggplot(TN, aes(datetime, value, color=tree_id, group=tree_name))+geom_line()+
+  facet_wrap(~sensor_loc, scales="free")+guides(color="none")+theme_bw()+
+  labs(x="", y="Radius")
+
+TWD_norm = NORM_DENDRO(TN)
 
 # plots
-ggplot(TWD12_norm, aes(date, TWD_pd, color=Tree))+geom_line()+theme_bw()
+ggplot(TWD_norm, aes(date, TWD_pd, color=tree_id, group=tree_name))+geom_line()+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
 
-ggplot(TWD12_norm, aes(date, TWD_md, color=Tree))+geom_line()+theme_bw()
+ggplot(TWD_norm, aes(date, TWD_md, color=tree_id, group=tree_name))+geom_line()+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
 
-ggplot(TWD12_norm, aes(TWD_pd, MDS, color=Tree))+geom_point()+theme_bw()
+ggplot(TWD_norm, aes(TWD_pd, MDS, color=tree_name))+geom_point(size=.5, alpha=.5)+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
 
-ggplot(TWD12_norm, aes(date, TWD_pdn, color=Tree))+geom_line()+theme_bw()
+ggplot(TWD_norm, aes(date, TWD_pdn, color=tree_id, group=tree_name))+geom_line()+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
 
-ggplot(TWD12_norm, aes(date, TWD_pdn))+geom_line(color="green")+
-  geom_line(aes(date, MDS_norm), color="black")+facet_wrap(~Tree, ncol=1)+theme_bw()
+ggplot(TWD_norm, aes(date, TWD_pdn, group=tree_name))+geom_line(color="green")+
+  geom_line(aes(date, MDS_norm, group=tree_name), color="black")+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()
 
-ggplot(TWD12_norm)+stat_summary(geom="line", fun=mean, aes(date, TWD_pdn, color="TWD_pdn"))+
+ggplot(TWD_norm)+stat_summary(geom="line", fun=mean, aes(date, TWD_pdn, color="TWD_pdn"))+
   stat_summary(geom="ribbon", aes(date, TWD_pdn, color="TWD_pdn", fill="TWD_pdn"), alpha=0.2)+
   stat_summary(geom="line", fun=mean, aes(date, MDS_norm, color="MDS_norm"))+
   stat_summary(geom="ribbon", aes(date, MDS_norm, color="MDS_norm", fill="MDS_norm"), alpha=0.2)+
   scale_colour_manual(name="Var", values=c("MDS_norm"="black","TWD_pdn"="green"))+
-  scale_fill_manual(name="Var", values=c("MDS_norm"="grey","TWD_pdn"="green"))+theme_bw()
+  scale_fill_manual(name="Var", values=c("MDS_norm"="grey","TWD_pdn"="green"))+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()
 
 
 # mean daily TWD
 
-TWD12_daily = TWD12_norm %>% select(-c(Tree, mds_max)) %>% 
-  group_by(date) %>% summarize_all(list(mean))
+TWD_daily = TWD_norm %>% select(-c(tree_name, tree_id, mds_max)) %>% 
+  group_by(date, sensor_loc) %>% summarize_all(list(mean))
 
-ggplot(TWD12_daily, aes(date, TWD_pdn))+geom_line(color="green")+
-  geom_line(aes(date, MDS_norm), color="black")+theme_bw()
+ggplot(TWD_daily, aes(date, TWD_pdn))+geom_line(color="green")+
+  geom_line(aes(date, MDS_norm), color="black")+
+  facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()
 
 # exclude winter months
-TWD12_daily$year = year(TWD12_daily$date)
-TWD12_daily$month = month(TWD12_daily$date)
-TWD12_daily[TWD12_daily$month < 5 | TWD12_daily$month > 11, c("TWD_pdn", "MDS_norm")] = NA
+TWD_daily$year = year(TWD_daily$date)
+TWD_daily$month = month(TWD_daily$date)
+TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pdn", "MDS_norm")] = NA
 
 
 # stacked plots
@@ -240,14 +248,14 @@ p_sap = sap_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"
   labs(x="", y="Daily Sap Flow (kg/day)", color="Location")+theme_bw()+
   scale_x_date(date_breaks="1 month", date_labels="%b")+facet_wrap(~year)+
   theme(legend.position="inside", legend.position.inside=c(0.45,0.75))
-p_twd = TWD12_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>%
+p_twd = TWD_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>%
   filter(date >= "2021-05-07", date < "2022-11-01", month>4, month<11) %>% 
-  ggplot()+geom_line(aes(ddate, TWD_pdn, color="TWD_pdn"))+
-  geom_line(aes(ddate, MDS_norm, color="MDS_norm"))+
+  ggplot()+geom_line(aes(ddate, TWD_pdn, color=sensor_loc, linetype="TWD_pdn"))+
+  geom_line(aes(ddate, MDS_norm, color=sensor_loc, linetype="MDS_norm"))+
   geom_hline(yintercept=0, color="darkgrey")+
-  theme_bw()+labs(x="", y="Norm. TWD / MDS")+
+  theme_bw()+labs(x="", y="Norm. TWD / MDS")+guides(color="none")+
   scale_x_date(date_breaks="1 month", date_labels="%b")+facet_wrap(~year)+
-  scale_colour_manual(name="Var", values=c("MDS_norm"="black","TWD_pdn"="green"))+
+  scale_linetype_manual(name="Var", values=c("MDS_norm"=3,"TWD_pdn"=1))+
   theme(legend.position="inside", legend.position.inside=c(0.1,0.75))
 p_wp = SWP_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>%
   filter(date >= "2021-05-07", date < "2022-11-01", month>4, month<11) %>% 
