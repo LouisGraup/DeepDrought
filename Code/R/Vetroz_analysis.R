@@ -8,8 +8,6 @@ library(gridExtra)
 setwd("../../Data/Daten_Vetroz_Lorenz")
 
 ## leaf water potential
-SWP_daily = read_csv("SWP_daily.csv")
-
 LWP = read_csv("LWP_gs.csv")
 LWP$Date = as.Date(LWP$Date, format="%m/%d/%y")
 LWP$year = year(LWP$Date)
@@ -61,7 +59,6 @@ ggplot(LWP, aes(gs, LWP_mean))+geom_point()+
   facet_wrap(~TreeNr)+theme_bw()+
   labs(x="Stomatal Conductance (mol m^-2 s^-1)", y = "Leaf Water Potential (MPa)")
 
-
 ## process soil water potential data
 SWP = read_csv("SWP_20_80_110_160cm_hourly_2014_2022.csv")
 SWP1cm = read_csv("SWP_1cm_Vetroz.csv")
@@ -100,6 +97,8 @@ SWP_daily$month = month(SWP_daily$date)
 # remove NAs for output
 SWP_daily = na.omit(SWP_daily)
 #write_csv(SWP_daily, "SWP_daily.csv")
+
+#SWP_daily = read_csv("SWP_daily.csv")
 
 ## sap flow processing
 sap_files = list.files(path = ".", pattern="Sapflow_node")
@@ -211,9 +210,32 @@ ggplot(TN, aes(datetime, value, color=tree_id, group=tree_name))+geom_line()+
 
 TWD_norm = NORM_DENDRO(TN)
 
+# correlate pre-dawn LWP against normalized pre-dawn TWD per tree
+LWP_twd_pd = LWP %>% filter(pd_md == "pd") %>%
+  select(date = Date, TreeNr, LWP_mean) %>%
+  inner_join(TWD_norm %>% filter(sensor_loc == "stem") %>%
+               mutate(TreeNr = as.numeric(tree_id)) %>%
+               select(date, TreeNr, TWD_pdn))
+
+TWD_lwp_coef = LWP_twd_pd %>% group_by(TreeNr) %>% nest() %>%
+  mutate(model = map(data, ~ lm(LWP_mean ~ TWD_pdn, data = .x)),
+         TWD_lwp_intercept = map_dbl(model, ~ coef(.x)[["(Intercept)"]]),
+         TWD_lwp_slope = map_dbl(model, ~ coef(.x)[["TWD_pdn"]])) %>% ungroup() %>% 
+         select(TreeNr, TWD_lwp_intercept, TWD_lwp_slope)
+
+# predict pre-dawn LWP from normalized TWD for stem sensors
+TWD_norm = TWD_norm %>% mutate(TreeNr = as.numeric(tree_id)) %>%
+  left_join(TWD_lwp_coef) %>%
+  mutate(LWP_pd = if_else(sensor_loc == "stem",
+                          TWD_lwp_intercept + TWD_lwp_slope * TWD_pdn, NA)) %>%
+  select(-c(TreeNr, TWD_lwp_intercept, TWD_lwp_slope))
+
 # plots
 ggplot(TWD_norm, aes(date, TWD_pd, color=tree_id, group=tree_name))+geom_line()+
   facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
+
+ggplot(TWD_norm, aes(date, LWP_pd, color=tree_id, group=tree_name))+geom_line()+
+  theme_bw()+guides(color="none")
 
 ggplot(TWD_norm, aes(date, TWD_md, color=tree_id, group=tree_name))+geom_line()+
   facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
@@ -252,7 +274,7 @@ TWD_daily$month = month(TWD_daily$date)
 TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pdn", "MDS_norm")] = NA
 
 #write_csv(TWD_daily, "TWD_daily.csv")
-TWD_daily = read_csv("TWD_daily.csv")
+#TWD_daily = read_csv("TWD_daily.csv")
 
 
 # stacked plots
@@ -280,4 +302,3 @@ p_wp = SWP_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-")
   theme(legend.position="inside", legend.position.inside=c(0.05,0.4))
 
 grid.arrange(p_sap, p_twd, p_wp)
-
