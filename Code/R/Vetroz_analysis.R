@@ -17,8 +17,11 @@ LWP$pd_md = if_else(LWP$Time < hms("06:00:00"), "pd", "md")
 LWP$LWP_mean = LWP$LWP_mean / -10 # convert to MPa
 
 # compare bagged and unbagged
-ggplot(filter(LWP, Date < "2021-10-01", pd_md=="md"), aes(Date, LWP_mean, fill=Method, group=interaction(Date, Method)))+geom_boxplot()+
-  facet_wrap(~TreeNr)+theme_bw()
+ggplot(filter(LWP, Date < "2021-10-01", pd_md=="md"), aes(Date, LWP_mean, fill=Method, group=interaction(Date, Method)))+
+  geom_point(shape=21, position=position_dodge(width=5))+
+  geom_point(data=filter(LWP, Date < "2021-10-01", pd_md=="pd"), aes(Date, LWP_mean, fill="pre-dawn"), shape=21)+
+  scale_fill_manual(values=c("bagged"="green", "unbagged"="red", "pre-dawn"="black"))+
+  facet_wrap(~TreeNr)+theme_bw()+labs(x="2021", y="Leaf Water Potential (MPa)")
 
 LWP_BWP = LWP %>% filter(pd_md=="md") %>% select(Date, TreeNr, LWP_mean, Method) %>% 
   group_by(Date, TreeNr, Method) %>% summarize(LWP=mean(LWP_mean)) %>% 
@@ -28,6 +31,14 @@ LWP_BWP = LWP %>% filter(pd_md=="md") %>% select(Date, TreeNr, LWP_mean, Method)
 ggplot(LWP_BWP, aes(LWP, WP_diff))+geom_point()+
   stat_smooth()+theme_bw()+
   labs(x="Unbagged Leaf Water Potential (MPa)", y="Difference between bagged and unbagged LWP (MPa)")
+
+# compared against pre-dawn lwp
+LWPpd = LWP %>% filter(pd_md=="pd") %>% select(Date, TreeNr, LWP_mean) %>% rename(LWP_pd=LWP_mean)
+LWP_BWP = left_join(LWP_BWP, LWPpd)
+
+ggplot(LWP_BWP, aes(LWP_pd, WP_diff))+geom_point()+
+  stat_smooth()+theme_bw()+
+  labs(x="Pre-dawn Leaf Water Potential (MPa)", y="Difference between bagged and unbagged LWP (MPa)")
 
 
 # compare against soil water potential
@@ -155,11 +166,11 @@ NORM_DENDRO = function(den_long) {
   
   # aggregate to daily with pre-dawn
   den_pd = den_long %>% filter(hour <= 6) %>% 
-    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_pd=min(TWD, na.rm=T))
+    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_pd=min(TWD, na.rm=T), .groups="drop")
   
   # aggregate to daily with mid-day
   den_md = den_long %>% filter(hour >= 12, hour <= 17) %>% 
-    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_md=max(TWD, na.rm=T))
+    group_by(date, tree_name, tree_id, sensor_loc) %>% summarize(TWD_md=max(TWD, na.rm=T), .groups="drop")
   
   den_daily = full_join(den_pd, den_md)
   
@@ -239,6 +250,9 @@ ggplot(TWD_daily, aes(date, TWD_pdn))+geom_line(color="green")+
 TWD_daily$year = year(TWD_daily$date)
 TWD_daily$month = month(TWD_daily$date)
 TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pdn", "MDS_norm")] = NA
+
+#write_csv(TWD_daily, "TWD_daily.csv")
+TWD_daily = read_csv("TWD_daily.csv")
 
 
 # stacked plots
