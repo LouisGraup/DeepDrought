@@ -16,8 +16,8 @@ LWP$LWP_mean = LWP$LWP_mean / -10 # convert to MPa
 
 # compare bagged and unbagged
 ggplot(filter(LWP, Date < "2021-10-01", pd_md=="md"), aes(Date, LWP_mean, fill=Method, group=interaction(Date, Method)))+
-  geom_point(shape=21, position=position_dodge(width=5))+
-  geom_point(data=filter(LWP, Date < "2021-10-01", pd_md=="pd"), aes(Date, LWP_mean, fill="pre-dawn"), shape=21)+
+  geom_point(shape=21, size=2, position=position_dodge(width=5))+
+  geom_point(data=filter(LWP, Date < "2021-10-01", pd_md=="pd"), aes(Date, LWP_mean, fill="pre-dawn"), size=2, shape=21)+
   scale_fill_manual(values=c("bagged"="green", "unbagged"="red", "pre-dawn"="black"))+
   facet_wrap(~TreeNr)+theme_bw()+labs(x="2021", y="Leaf Water Potential (MPa)")
 
@@ -38,26 +38,29 @@ ggplot(LWP_BWP, aes(LWP_pd, WP_diff))+geom_point()+
   stat_smooth()+theme_bw()+
   labs(x="Pre-dawn Leaf Water Potential (MPa)", y="Difference between bagged and unbagged LWP (MPa)")
 
+ggplot(LWP_BWP, aes(LWP_pd, LWP))+geom_point()+
+  theme_bw()+geom_abline(slope=1, intercept=0)+
+  labs(x="Pre-dawn Leaf Water Potential (MPa)", y="Midday Leaf Water Potential (MPa)")
 
 # compare against soil water potential
-ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(SMP_mean / 1000, LWP_mean, color=pd_md))+geom_point()+
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(SMP_mean / 1000, LWP_mean, color=pd_md))+geom_point(size=2)+
   geom_abline(slope=1, intercept=0)+facet_wrap(~TreeNr)+theme_bw()+
   labs(x="Soil Water Potential (MPa)", y = "Leaf Water Potential (MPa)")
 
 # sap flow and leaf water potential
-ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow))+geom_point()+
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow))+geom_point(size=2)+
   facet_wrap(~TreeNr)+theme_bw()+
   labs(x="Leaf Water Potential (MPa)", y = "Sapflow")
 
 # TWD and LWP
-ggplot(LWP, aes(TWD, LWP_mean, color=pd_md))+geom_point()+
-  facet_wrap(~TreeNr)+theme_bw()+
-  labs(x="Tree Water Deficit (MPa)", y = "Leaf Water Potential (MPa)")
+ggplot(filter(LWP, Method=="unbagged"), aes(TWD, LWP_mean, color=pd_md))+geom_point()+
+  geom_smooth(method="lm")+facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Tree Water Deficit", y = "Leaf Water Potential (MPa)")
 
 # gs and LWP
-ggplot(LWP, aes(gs, LWP_mean))+geom_point()+
-  facet_wrap(~TreeNr)+theme_bw()+
-  labs(x="Stomatal Conductance (mol m^-2 s^-1)", y = "Leaf Water Potential (MPa)")
+ggplot(LWP, aes(LWP_mean, gs))+geom_point(size=2)+facet_wrap(~TreeNr)+theme_bw()+
+  labs(x = "Leaf Water Potential (MPa)", y="Stomatal Conductance (mol m^-2 s^-1)")
+
 
 ## process soil water potential data
 SWP = read_csv("SWP_20_80_110_160cm_hourly_2014_2022.csv")
@@ -87,12 +90,19 @@ SWP1cm_daily = SWP1cm %>% mutate(date=as.Date(datetime)) %>%
 
 ggplot(SWP1cm_daily, aes(date, log10(SWP*-10)))+geom_line()+labs(x="", y="pF")+theme_bw()
 
-SWP1cm_daily$SWP[SWP1cm_daily$SWP < -4000] = NA # cap at -4000 kPa
+SWP1cm_daily$SWP[SWP1cm_daily$SWP < -15000] = NA # cap at -15000 kPa
 
 SWP_daily = rbind(SWP_daily, SWP1cm_daily)
 
 SWP_daily$year = year(SWP_daily$date)
 SWP_daily$month = month(SWP_daily$date)
+
+# derive weighted-average SWP
+depth_weights = data.frame(depth=c(1, 20, 80, 110, 160), weight=c(5/160, 45/160, 40/160, 40/160, 30/160))
+SWP_mean = SWP_daily %>% left_join(depth_weights) %>% group_by(date, year, month) %>% 
+  summarize(SWP = sum(SWP * weight, na.rm=T)) %>% filter(date < as.Date("2023-01-01"))
+ggplot(SWP_mean, aes(date, SWP))+geom_line()+
+  labs(x="", y="Weighted-average SWP (kPa)")+theme_bw()
 
 # remove NAs for output
 SWP_daily = na.omit(SWP_daily)
@@ -143,6 +153,10 @@ sap_mean = sap_daily %>% group_by(date, sensor_loc) %>% summarize(sapflow=mean(s
 
 ggplot(sap_mean, aes(date, sapflow, color=sensor_loc))+geom_line()+
   labs(x="", y="Daily Sap Flow (kg/day)", color="Location")+theme_bw()
+
+# normalize sap flow by treatment-specific max sap flow
+sap_max = sap_mean %>% group_by(sensor_loc) %>% summarize(max_sap=max(sapflow))
+sap_mean = sap_mean %>% left_join(sap_max) %>% mutate(sapflow_norm = sapflow / max_sap) %>% select(-max_sap)
 
 sap_mean$month = month(sap_mean$date)
 sap_mean$year = year(sap_mean$date)
@@ -210,25 +224,55 @@ ggplot(TN, aes(datetime, value, color=tree_id, group=tree_name))+geom_line()+
 
 TWD_norm = NORM_DENDRO(TN)
 
-# correlate pre-dawn LWP against normalized pre-dawn TWD per tree
+# correlate predawn LWP against TWD per tree
 LWP_twd_pd = LWP %>% filter(pd_md == "pd") %>%
+  select(date = Date, TreeNr, LWP_mean, pd_md) %>%
+  inner_join(TWD_norm %>% filter(sensor_loc == "stem") %>%
+               mutate(TreeNr = as.numeric(tree_id)) %>%
+               select(date, TreeNr, TWD_pd))
+
+TWD_lwp_coef_pd = LWP_twd_pd %>% group_by(TreeNr) %>% nest() %>%
+  mutate(model = map(data, ~ lm(LWP_mean ~ TWD_pd, data = .x)),
+         TWD_lwp_intercept_pd = map_dbl(model, ~ coef(.x)[["(Intercept)"]]),
+         TWD_lwp_slope_pd = map_dbl(model, ~ coef(.x)[["TWD_pd"]])) %>% ungroup() %>% 
+  select(TreeNr, TWD_lwp_intercept_pd, TWD_lwp_slope_pd)
+
+# correlate midday LWP against TWD per tree
+LWP_twd_md = LWP %>% filter(pd_md == "md", Method=="unbagged") %>% 
+  group_by(Date, TreeNr) %>% summarize(LWP_mean=min(LWP_mean)) %>%
   select(date = Date, TreeNr, LWP_mean) %>%
   inner_join(TWD_norm %>% filter(sensor_loc == "stem") %>%
                mutate(TreeNr = as.numeric(tree_id)) %>%
-               select(date, TreeNr, TWD_pdn))
+               select(date, TreeNr, TWD_md))
 
-TWD_lwp_coef = LWP_twd_pd %>% group_by(TreeNr) %>% nest() %>%
-  mutate(model = map(data, ~ lm(LWP_mean ~ TWD_pdn, data = .x)),
-         TWD_lwp_intercept = map_dbl(model, ~ coef(.x)[["(Intercept)"]]),
-         TWD_lwp_slope = map_dbl(model, ~ coef(.x)[["TWD_pdn"]])) %>% ungroup() %>% 
-         select(TreeNr, TWD_lwp_intercept, TWD_lwp_slope)
+TWD_lwp_coef_md = LWP_twd_md %>% group_by(TreeNr) %>% nest() %>%
+  mutate(model = map(data, ~ lm(LWP_mean ~ TWD_md, data = .x)),
+         TWD_lwp_intercept_md = map_dbl(model, ~ coef(.x)[["(Intercept)"]]),
+         TWD_lwp_slope_md = map_dbl(model, ~ coef(.x)[["TWD_md"]])) %>% ungroup() %>% 
+         select(TreeNr, TWD_lwp_intercept_md, TWD_lwp_slope_md)
 
-# predict pre-dawn LWP from normalized TWD for stem sensors
+# combine for plotting
+LWP_TWD = rbind(LWP_twd_md %>% rename(TWD=TWD_md) %>% mutate(pd_md="md"),
+                LWP_twd_pd %>% rename(TWD=TWD_pd))
+
+ggplot(LWP_TWD, aes(TWD, LWP_mean, color=pd_md))+geom_point()+
+  geom_smooth(method="lm")+facet_wrap(~TreeNr)+theme_bw()+
+  labs(x="Tree Water Deficit", y = "Leaf Water Potential (MPa)")
+
+# predict predawn and midday LWP from TWD for stem sensors
 TWD_norm = TWD_norm %>% mutate(TreeNr = as.numeric(tree_id)) %>%
-  left_join(TWD_lwp_coef) %>%
-  mutate(LWP_pd = if_else(sensor_loc == "stem",
-                          TWD_lwp_intercept + TWD_lwp_slope * TWD_pdn, NA)) %>%
-  select(-c(TreeNr, TWD_lwp_intercept, TWD_lwp_slope))
+  left_join(TWD_lwp_coef_pd) %>% left_join(TWD_lwp_coef_md) %>%
+  mutate(LWP_md = if_else(sensor_loc == "stem",
+                          TWD_lwp_intercept_md + TWD_lwp_slope_md * TWD_md, NA),
+         LWP_pd = if_else(sensor_loc == "stem",
+                          TWD_lwp_intercept_pd + TWD_lwp_slope_pd * TWD_pd, NA)) %>%
+  select(-c(TreeNr, TWD_lwp_intercept_md, TWD_lwp_slope_md, TWD_lwp_intercept_pd, TWD_lwp_slope_pd))
+
+# exclude pre-dawn predictions outside of calibration range
+TWD_min = LWP_twd_pd %>% group_by(TreeNr) %>% summarize(TWD_min = min(TWD_pd))
+
+TWD_norm = TWD_norm %>% mutate(TreeNr = as.numeric(tree_id)) %>% left_join(TWD_min) %>% 
+  mutate(LWP_pd = if_else(TWD_pd < TWD_min, NA, LWP_pd)) %>% select(-TreeNr, -TWD_min)
 
 # plots
 ggplot(TWD_norm, aes(date, TWD_pd, color=tree_id, group=tree_name))+geom_line()+
@@ -239,6 +283,9 @@ ggplot(TWD_norm, aes(date, LWP_pd, color=tree_id, group=tree_name))+geom_line()+
 
 ggplot(TWD_norm, aes(date, TWD_md, color=tree_id, group=tree_name))+geom_line()+
   facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
+
+ggplot(TWD_norm, aes(date, LWP_md, color=tree_id, group=tree_name))+geom_line()+
+  theme_bw()+guides(color="none")
 
 ggplot(TWD_norm, aes(TWD_pd, MDS, color=tree_name))+geom_point(size=.5, alpha=.5)+
   facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
@@ -262,7 +309,7 @@ ggplot(TWD_norm)+stat_summary(geom="line", fun=mean, aes(date, TWD_pdn, color="T
 # mean daily TWD
 
 TWD_daily = TWD_norm %>% select(-c(tree_name, tree_id, mds_max)) %>% 
-  group_by(date, sensor_loc) %>% summarize_all(list(mean))
+  group_by(date, sensor_loc) %>% summarize_all(list(mean), na.rm=T)
 
 ggplot(TWD_daily, aes(date, TWD_pdn))+geom_line(color="green")+
   geom_line(aes(date, MDS_norm), color="black")+
@@ -271,16 +318,39 @@ ggplot(TWD_daily, aes(date, TWD_pdn))+geom_line(color="green")+
 # exclude winter months
 TWD_daily$year = year(TWD_daily$date)
 TWD_daily$month = month(TWD_daily$date)
-TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pdn", "MDS_norm")] = NA
+TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pd", "TWD_pdn", "TWD_md", "MDS", "MDS_norm", "LWP_pd", "LWP_md")] = NA
 
 #write_csv(TWD_daily, "TWD_daily.csv")
 #TWD_daily = read_csv("TWD_daily.csv")
 
+# mutual plotting data frames
+sap_plot = sap_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>% 
+  filter(date < "2022-11-01", month > 4, month < 11)
+TWD_plot = TWD_daily %>% mutate(ddate=as.Date(paste(2000, month(date), day(date), sep="-"))) %>%
+  filter(date >= "2021-05-07", date < "2022-11-01", month > 4, month < 11, sensor_loc == "stem")
+LWP_pd_plot = LWP %>% rename(LWP=LWP_mean) %>% filter(pd_md=="pd") %>% group_by(Date, year) %>% 
+  summarize(LWP_mean=mean(LWP), LWP_sd=sd(LWP)) %>%
+  mutate(ddate=as.Date(paste(2000, month(Date), day(Date), sep="-")))
+SWP_plot = SWP_mean %>% mutate(ddate=as.Date(paste(2000, month(date), day(date), sep="-"))) %>% 
+  filter(date >= "2021-05-07", date < "2022-11-01", month>4, month<11)
+
+p_swp = ggplot(SWP_plot, aes(ddate, SWP/1000, color="Weighted SWP"))+geom_line()+
+  geom_line(data=TWD_plot, aes(ddate, LWP_pd, color="TWD-derived LWP"), inherit.aes=F)+
+  geom_pointrange(data=LWP_pd_plot, aes(x=ddate, y=LWP_mean, ymin=LWP_mean-LWP_sd, ymax=LWP_mean+LWP_sd, color="Measured LWP"), inherit.aes=F)+
+  facet_wrap(~year)+theme_bw()+labs(x="", y="SWP / pre-dawn LWP (MPa)")+
+  scale_colour_manual(name="Data", values=c("Weighted SWP"="black","Measured LWP"="red", "TWD-derived LWP"="blue"), 
+                      breaks=c("Measured LWP", "TWD-derived LWP", "Weighted SWP"))+
+  theme(legend.position="inside", legend.position.inside=c(0.1,0.2))
+
+p_sapn = ggplot(sap_plot, aes(ddate, sapflow_norm*100, color=sensor_loc))+geom_line()+
+  labs(x="", y="Normalized daily Sap Flow (%)", color="Location")+theme_bw()+
+  facet_wrap(~year)+theme(legend.position="inside", legend.position.inside=c(0.45,0.75))
+
+grid.arrange(p_sapn, p_swp)
+
 
 # stacked plots
-p_sap = sap_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>% 
-  filter(date < "2022-11-01", month > 4, month < 11) %>% 
-  ggplot()+geom_line(aes(ddate, sapflow, color=sensor_loc))+
+p_sap = ggplot(sap_plot)+geom_line(aes(ddate, sapflow, color=sensor_loc))+
   labs(x="", y="Daily Sap Flow (kg/day)", color="Location")+theme_bw()+
   scale_x_date(date_breaks="1 month", date_labels="%b")+facet_wrap(~year)+
   theme(legend.position="inside", legend.position.inside=c(0.45,0.75))
@@ -296,9 +366,65 @@ p_twd = TWD_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"
 p_wp = SWP_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>%
   filter(date >= "2021-05-07", date < "2022-11-01", month>4, month<11) %>% 
   ggplot()+geom_line(aes(ddate, SWP/1000, color=as.factor(depth)))+
-  geom_point(data=filter(mutate(LWP, ddate=as.Date(paste(2000, month(Date), day(Date), sep="-"))), pd_md=="pd"), aes(ddate, LWP_mean), color="red", inherit.aes=F)+
+  geom_line(data=TWD_plot, aes(ddate, LWP_pd), color="black", inherit.aes=F)+
+  geom_pointrange(data=LWP_pd_plot, aes(x=ddate, y=LWP_mean, ymin=LWP_mean-LWP_sd, ymax=LWP_mean+LWP_sd), color="blue", inherit.aes=F)+
   labs(x="", y="SWP / pre-dawn LWP (MPa)", color="Depth (cm)")+theme_bw()+
-  scale_x_date(date_breaks="1 month", date_labels="%b")+facet_wrap(~year)+
+  scale_x_date(date_breaks="1 month", date_labels="%b")+facet_wrap(~year)+ylim(-4.5, 0)+
   theme(legend.position="inside", legend.position.inside=c(0.05,0.4))
 
 grid.arrange(p_sap, p_twd, p_wp)
+
+
+# compare TWD against SWP
+
+TWD_SWP = left_join(TWD_daily, SWP_mean)
+
+ggplot(TWD_SWP, aes(SWP/1000, TWD_pd))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Pre-dawn TWD")
+
+ggplot(TWD_SWP, aes(SWP/1000, TWD_pdn))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Normalized pre-dawn TWD")
+
+ggplot(TWD_SWP, aes(SWP/1000, TWD_md))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Midday TWD")
+
+ggplot(TWD_SWP, aes(SWP/1000, MDS_norm))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Normalized Maximum Daily Shrinkage")
+
+ggplot(TWD_SWP, aes(SWP/1000, LWP_pd))+geom_point()+
+  geom_abline(slope=1, intercept=0)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Pre-dawn TWD-derived LWP")
+
+ggplot(TWD_SWP, aes(SWP/1000, LWP_md))+geom_point()+
+  geom_abline(slope=1, intercept=0)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Midday TWD-derived LWP")
+
+# compare sap against swp
+
+sap_swp = left_join(sap_daily, SWP_mean)
+
+ggplot(filter(sap_swp, month>4, month<11), aes(SWP/1000, sapflow))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Daily Sap Flow (kg/day)")
+
+ggplot(filter(sap_swp, month>4, month<11), aes(SWP/1000, sapflow_norm*100))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Normalized daily Sap Flow (%)")
+
+# sap against twd
+
+sap_twd = left_join(sap_daily, TWD_daily)
+
+ggplot(sap_twd, aes(LWP_pd, sapflow))+geom_point()+theme_bw()+
+  labs(x="Pre-dawn TWD-derived LWP", y="Daily Sap Flow (kg/day)")
+
+ggplot(filter(sap_twd, month>4, month<11), aes(TWD_pdn, sapflow_norm))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+
+  labs(x="Normalized pre-dawn TWD", y="Normalized Daily Sap Flow")
+
+
+
