@@ -21,25 +21,25 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> -0.1 .&& 
-               met.swc_nse80 .> -0.1 .&&
-               met.swp_nse10 .> -0.1 .&&
-               met.swp_nse80 .> -0.1 .&&
-               met.trans_cor .> 0.4, :]
+    return met[met.swc_nse10 .> 0.5 .&& 
+               met.swc_nse80 .> 0.4 .&&
+               met.swp_nse10 .> 0.5 .&&
+               met.swp_nse80 .> 0.4 .&&
+               met.trans_cor .> 0.5, :]
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> 0.0 .&& 
-               met.swc_nse80 .> -0.7 .&&
-               met.swp_nse10 .> -0.3 .&&
+    #= return met[met.swc_nse10 .> 0.3 .&& 
+               met.swc_nse80 .> -0.6 .&&
+               met.swp_nse10 .> -0.2 .&&
                met.swp_nse80 .> -0.7 .&&
                met.trans_cor .> 0.75, :] =#
 
     # irr stop metrics
-    #= return met[met.swc_nse10 .> -0.1 .&& 
-               met.swc_nse80 .> -0.1 .&&
-               met.swp_nse10 .> -0.1 .&&
-               met.swp_nse80 .> -0.1 .&&
-               met.trans_cor .> 0.4, :] =#
+    #= return met[met.swc_nse10 .> 0.7 .&& 
+               met.swc_nse80 .> 0.5 .&&
+               met.swp_nse10 .> 0.5 .&&
+               met.swp_nse80 .> 0.4 .&&
+               met.trans_cor .> 0.6, :] =#
 end
 
 function behave(met)
@@ -169,12 +169,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260526.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260526.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260526.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260526.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260526.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260526.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260602.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260602.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260602.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260602.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260602.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260602.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
