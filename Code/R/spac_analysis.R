@@ -6,7 +6,7 @@ library(tidyverse)
 library(lubridate)
 library(gridExtra)
 
-# leaf water potential from VPDrought
+## leaf water potential from VPDrought
 # 2024 data
 LWP24 = read_csv("../../Data/Pfyn/PFY_lwp.csv")
 LWP24 = na.omit(LWP24)
@@ -49,7 +49,7 @@ LWP_con = filter(LWP, meta=="control", predawn_mean < -0.4, predawn_mean > -1.1)
 LWP_stp = filter(LWP, meta=="stop", predawn_mean < -0.27, predawn_mean > -1.0)
 LWP_irr = filter(LWP, meta=="irrigation")
 
-# relate to TWD and VPDrought sap flow
+## relate to TWD and VPDrought sap flow
 TWD = read_csv("../../Data/Pfyn/TreeNet/Pfyn_twd_2010_25.csv")
 sap = read_csv("../../Data/Pfyn/Pfyn_sap_vpd.csv")
 
@@ -129,7 +129,20 @@ ggplot(filter(TWD_irr, date>="2022-08-01", date<"2024-10-01"), aes(date, LWP_pd)
 TWD_lwp = rbind(mutate(TWD_con, meta="control"), mutate(TWD_stp, meta="stop"))
 TWD_lwp = rbind(TWD_lwp, mutate(TWD_irr, meta="irrigation"))
 
-# compare against soil water potential
+## meteo data for precip and VPD
+meteo = read_csv("../../Data/Pfyn/meteo/meteo_irr_Control.csv")
+
+# calculate VPD from temp and vapor pressure
+meteo$Es = 0.61078 * exp(17.26939 * meteo$tmean / (meteo$tmean + 237.3)) # saturation vapor pressure
+meteo$VPD = meteo$Es - meteo$vappres
+meteo = meteo %>% select(date=dates, precip=precip_ctrl, VPD, globrad) %>% 
+  mutate(month=month(date))
+
+# precip plot for overlays
+ggplot(filter(meteo, date >= "2022-08-01", date<"2025-10-01"), aes(date, precip))+geom_col(fill="darkblue")+
+  scale_y_continuous(position="right")+theme_bw()+labs(x="", y="Prec")
+
+## compare against soil water potential
 
 declab = read_csv("N:/prj/Soil/Projekte/Pfynwald/Pfynwald_KM/1_Decent_lab_data/filtered/PFY_hh_all_filtered_2025-11-04.csv")
 declab_test = read_csv("N:/prj/Soil/Projekte/Pfynwald/Pfynwald_KM/1_Decent_lab_data/filtered/PFY_hh_test.csv")
@@ -178,7 +191,7 @@ ggplot(filter(SWP_pd, date >= "2022-08-01", date<"2025-10-01"), aes(date, SWP/10
   geom_pointrange(data=filter(LWP, date<"2025-10-01"), aes(x=date, y=predawn_mean, ymin=predawn_mean-predawn_sd, ymax=predawn_mean+predawn_sd), color="green", inherit.aes=F)+
   facet_wrap(~meta, ncol=1)+theme_bw()+labs(x="", y="Pre-dawn SWP / LWP (MPa)", fill="Depth")+guides(color="none")+
   theme(axis.title.y=element_text(size=14), axis.text=element_text(size=12), strip.text=element_text(size=12),
-        legend.position="inside", legend.position.inside = c(.2,.5))
+        legend.position="inside", legend.position.inside = c(.2,.9))
 
 # control scenario with legend
 cols = c("SWP"="black","Measured LWP"="red", "TWD-derived LWP"="blue")
@@ -232,9 +245,12 @@ grid.arrange(p_sap, p_wp)
 # control
 twd_swp_ctr = inner_join(TWD_con, SWP_ctr)
 twd_swp_ctr$month = month(twd_swp_ctr$date)
+twd_swp_ctr = left_join(twd_swp_ctr, meteo)
 
-ggplot(filter(twd_swp_ctr, month>4, month<10), aes(SWP, twd_pdn))+geom_point()+stat_smooth()+
-  labs(x="SWP (kPa)", y="Normalized pre-dawn TWD")+theme_bw()
+ggplot(filter(twd_swp_ctr, month>4, month<10), aes(SWP, twd_pdn, color=VPD))+geom_point()+stat_smooth()+
+  labs(x="SWP (kPa)", y="Normalized pre-dawn TWD")+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.7,.8))
+
 ggplot(filter(twd_swp_ctr, month>4, month<10), aes(SWP, twd_md))+geom_point()+
   labs(x="SWP (kPa)", y="Midday TWD")+theme_bw()
 
@@ -246,9 +262,12 @@ ggplot(filter(twd_swp_ctr, date>="2022-08-01", month>4, month<10), aes(SWP/1000,
 # irrigation stop
 twd_swp_stp = inner_join(TWD_stp, SWP_stp)
 twd_swp_stp$month = month(twd_swp_stp$date)
+twd_swp_stp = left_join(twd_swp_stp, meteo)
 
-ggplot(filter(twd_swp_stp, month>4, month<10), aes(SWP, twd_pdn))+geom_point()+
-  labs(x="SWP (kPa)", y="Normalized pre-dawn TWD")+theme_bw()
+ggplot(filter(twd_swp_stp, month>4, month<10), aes(SWP, twd_pdn, color=VPD))+geom_point()+stat_smooth()+
+  labs(x="SWP (kPa)", y="Normalized pre-dawn TWD")+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.8,.8))
+
 ggplot(filter(twd_swp_stp, month>4, month<10), aes(SWP, twd_md))+geom_point()+
   labs(x="SWP (kPa)", y="Midday TWD")+theme_bw()
 
@@ -298,17 +317,21 @@ ggplot(filter(SWP_md, date >= "2022-08-01", date<"2025-10-01"), aes(date, SWP/10
 # sap and water potentials
 sap$month = month(sap$date)
 
-# average daily soil water potential
+# average daily soil water potential and VPD
 sap_swp = left_join(filter(sap, Treatment=="control"), SWP_ctr)
+sap_swp = left_join(sap_swp, meteo)
 
-ggplot(filter(sap_swp, month>4, month<10), aes(SWP, Sap_Flow_norm))+geom_point()+
-  stat_smooth(method="gam")+labs(x="SWP (kPa)")+theme_bw()
+ggplot(filter(sap_swp, month>4, month<10), aes(SWP, Sap_Flow_norm, color=VPD))+geom_point()+
+  stat_smooth(method="gam")+labs(x="SWP (kPa)")+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.1,.8))
 
 # TWD-derived leaf water potential
 sap_lwp = left_join(filter(sap, Treatment=="control"), TWD_con)
+sap_lwp = left_join(sap_lwp, meteo)
 
-ggplot(filter(sap_lwp, month>4, month<10), aes(LWP_pd, Sap_Flow_norm))+geom_point()+
-  stat_smooth()+labs(x="Pre-dawn LWP (MPa)")+theme_bw()
+ggplot(filter(sap_lwp, month>4, month<10), aes(LWP_pd, Sap_Flow_norm, color=VPD))+geom_point()+
+  stat_smooth()+labs(x="Pre-dawn LWP (MPa)")+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.1,.8))
 
 ggplot(filter(sap_lwp, month>4, month<10), aes(LWP_md, Sap_Flow_norm))+geom_point()+
   stat_smooth()+labs(x="Midday LWP (MPa)")+theme_bw()
@@ -337,3 +360,11 @@ ggplot(SWP_pd_comp, aes(SWP, predawn_mean, color="Pre-dawn"))+geom_point(size=3)
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
         axis.text=element_text(size=12), axis.title=element_text(size=14),
         strip.text=element_text(size=12))
+
+
+# SWP and VPD
+swp_vpd = left_join(meteo, SWP_ctr)
+
+ggplot(filter(swp_vpd, month>4, month<10), aes(SWP/1000, VPD))+geom_point()+
+  stat_smooth(method="gam")+labs(x="VPD (kPa)", y="SWP (MPa)")+theme_bw()
+

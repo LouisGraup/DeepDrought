@@ -8,10 +8,8 @@ library(gridExtra)
 setwd("../../Data/Daten_Vetroz_Lorenz")
 
 ## leaf water potential
-LWP = read_csv("LWP_gs.csv")
-LWP$Date = as.Date(LWP$Date, format="%m/%d/%y")
+LWP = read_csv("LWP_gs2.csv")
 LWP$year = year(LWP$Date)
-LWP$pd_md = if_else(LWP$Time < hms("06:00:00"), "pd", "md")
 LWP$LWP_mean = LWP$LWP_mean / -10 # convert to MPa
 
 # compare bagged and unbagged
@@ -25,6 +23,10 @@ LWP_BWP = LWP %>% filter(pd_md=="md") %>% select(Date, TreeNr, LWP_mean, Method)
   group_by(Date, TreeNr, Method) %>% summarize(LWP=mean(LWP_mean)) %>% 
   pivot_wider(names_from=Method, values_from=LWP) %>% 
   rename(LWP = unbagged, BWP = bagged) %>% mutate(WP_diff = BWP - LWP)
+
+ggplot(LWP_BWP, aes(BWP, LWP))+geom_point()+geom_abline(slope=1, intercept=0)+
+  stat_smooth(method="lm")+theme_bw()+
+  labs(x="Bagged Leaf Water Potential (MPa)", y="Unbagged Leaf Water Potential (MPa)")
 
 ggplot(LWP_BWP, aes(LWP, WP_diff))+geom_point()+
   stat_smooth()+theme_bw()+
@@ -48,9 +50,10 @@ ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(SMP_mean / 1000, LWP_mean, color=pd
   labs(x="Soil Water Potential (MPa)", y = "Leaf Water Potential (MPa)")
 
 # sap flow and leaf water potential
-ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow))+geom_point(size=2)+
-  facet_wrap(~TreeNr)+theme_bw()+
-  labs(x="Leaf Water Potential (MPa)", y = "Sapflow")
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow, shape=Method, color=VPD_kPa))+geom_point(size=2)+
+  facet_wrap(~TreeNr)+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.6,.7))+
+  labs(x="Leaf Water Potential (MPa)", y = "Sapflow", color="VPD (kPa)")
 
 # TWD and LWP
 ggplot(filter(LWP, Method=="unbagged"), aes(TWD, LWP_mean, color=pd_md))+geom_point()+
@@ -58,7 +61,8 @@ ggplot(filter(LWP, Method=="unbagged"), aes(TWD, LWP_mean, color=pd_md))+geom_po
   labs(x="Tree Water Deficit", y = "Leaf Water Potential (MPa)")
 
 # gs and LWP
-ggplot(LWP, aes(LWP_mean, gs))+geom_point(size=2)+facet_wrap(~TreeNr)+theme_bw()+
+ggplot(LWP, aes(LWP_mean, gs, shape=Method))+geom_point(size=2)+facet_wrap(~TreeNr)+theme_bw()+
+  theme(legend.position="inside", legend.position.inside=c(.05,.3))+
   labs(x = "Leaf Water Potential (MPa)", y="Stomatal Conductance (mol m^-2 s^-1)")
 
 
