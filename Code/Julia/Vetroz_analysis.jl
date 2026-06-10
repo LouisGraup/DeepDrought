@@ -71,12 +71,11 @@ end
 
 function get_sap(sim)
     # retrieve transpiration from sim
-    days, dates_out = get_dates(sim);
-
-    sol = sim.ODESolution;
-    trans = [sol(t).accum.cum_d_tran for t in days];
-
-    z = DataFrame(date = Date.(dates_out), trans = trans);
+    
+    z = get_fluxes(sim);
+    z.date = Date.(z.dates);
+    z.trans = z.cum_d_tran;
+    select!(z, :date, :trans);
     
     return z
 end
@@ -85,7 +84,7 @@ function get_trans_def(sim)
     days, dates_out = get_dates(sim);
 
     z = get_fluxes(sim);
-    z.date = dates_out;
+    z.date = Date.(z.dates);
     z.trans = z.cum_d_tran;
     z.pet = z.cum_d_ptran;
     z.td = z.pet .- z.trans;
@@ -141,13 +140,14 @@ end
 function get_RWU_centroid(sim)
     # borrow code from LWFBrook90 package
     solu = sim.ODESolution;
+    saved = sim.saved_values;
 
-    days_to_read_out_d = unique(round.(solu.t));
+    days_to_read_out_d = saved.t;
 
     y_center = cumsum(solu.prob.p.p_soil.p_THICK) - solu.prob.p.p_soil.p_THICK/2;
 
     # Compute RWU centroid
-    rows_RWU_mmDay  = reduce(hcat, [solu(t).TRANI.mmday   for t in days_to_read_out_d]);
+    rows_RWU_mmDay  = reduce(hcat, [saved.saveval[t].TRANI for t in 1:length(days_to_read_out_d)]);
 
     RWU_percent = rows_RWU_mmDay ./ sum(rows_RWU_mmDay; dims = 1);
     #RWUcentroidLabel = "mean RWU depth"
@@ -377,6 +377,7 @@ met[scen_best, :]
 # soil matric potential
 obs_swp = CSV.read("../../Data/Daten_Vetroz_Lorenz/SWP_daily.csv", DataFrame);
 filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
+obs_swp = obs_swp[obs_swp.depth .!= 1, :];
 
 # sap flow data
 obs_sap = CSV.read("../../Data/Daten_Vetroz_Lorenz/sapflow_daily.csv", DataFrame);
@@ -444,20 +445,18 @@ draw(data(dropmissing(sap_comp))*
 )
 
 # format x-axis ticks
-ticks = ctr_sap[month.(ctr_sap.date) .== 1 .&& day.(ctr_sap.date) .== 1 .&& year.(ctr_sap.date) .< 2021, :date];
+ticks = obs_sap[month.(obs_sap.date) .== 1 .&& day.(obs_sap.date) .== 1, :date];
 aogticks = datetimeticks(ticks, string.(ticks));
 
 # compare leaf water potential against effective soil water potential
 
-ctr_eff_swp = get_eff_swp(sim_ctr);
-ctr_eff_swp.treatment .= "control";
+eff_swp = get_eff_swp(sim);
 
 draw(
-    ((data(eff_swp_comp)*
-    mapping(:date, :swp_eff => (x -> x/1000), color=:treatment)*visual(Lines, linewidth=1.5)+
-    data(obs_lwp[obs_lwp.date .< Date(2025, 1, 1), :])*
-    mapping(:date, :predawn => (x -> -1*x/10))*visual(Scatter, markersize=12))*
-    mapping(layout=:treatment)),
+    ((data(eff_swp[eff_swp.date .> Date(2021, 5, 1) .&& eff_swp.date .< Date(2022, 12, 31), :])*
+    mapping(:date, :swp_eff => (x -> x/1000))*visual(Lines, linewidth=1.5)+
+    data(obs_lwp[obs_lwp.pd_md .== "pd", :])*
+    mapping(:Date, :LWP_mean => (x -> -1*x/10))*visual(Scatter, color="red", markersize=12))),
     scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
     figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
 )
@@ -484,11 +483,11 @@ rwu_sim.RWU = replace(rwu_sim.RWU, NaN=>missing);
 rwu_sim.RWU_sm = replace(rwu_sim.RWU_sm, NaN=>missing);
 
 draw(
-    data(rwu_sim[rwu_sim.date.<Date("2020-01-01"), :])*
-    (mapping(:date, :RWU, color=:scen)*visual(Scatter, markersize=6)+
-    mapping(:date, :RWU_sm, color=:scen)*visual(Lines, linewidth=3)),
+    data(rwu_sim)*
+    (mapping(:date, :RWU)*visual(Scatter, markersize=6)+
+    mapping(:date, :RWU_sm)*visual(Lines, linewidth=3)),
     scales(X = (; label=""), Y= (; label="Root Water Uptake Depth (mm)")),
-    figure = (; size=(1200, 600)), axis = (; xticks=aogticks, title="RWU Depth", titlesize=20)
+    figure = (; size=(1200, 600))
 )
 
 # compare RWU against transpiration
