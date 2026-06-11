@@ -7,8 +7,18 @@ library(gridExtra)
 
 setwd("../../Data/Daten_Vetroz_Lorenz")
 
+## meteo data
+VPD = read_csv("Vetroz_Eiche_VPD.csv")
+VPD$datetime = as.POSIXct(VPD$MEAS_DATE, format="%d.%m.%Y %H:%M:%S", tz="UTC")
+VPD$date = as.Date(VPD$datetime)
+
+# daily mean VPD
+VPD_daily = VPD %>% group_by(date) %>% summarize(VPD = mean(VALUE))
+VPD_daily$year = year(VPD_daily$date)
+VPD_daily$month = month(VPD_daily$date)
+
 ## leaf water potential
-LWP = read_csv("LWP_gs2.csv")
+LWP = read_csv("LWP_gs.csv")
 LWP$year = year(LWP$Date)
 LWP$LWP_mean = LWP$LWP_mean / -10 # convert to MPa
 
@@ -61,8 +71,9 @@ ggplot(filter(LWP, Method=="unbagged"), aes(TWD, LWP_mean, color=pd_md))+geom_po
   labs(x="Tree Water Deficit", y = "Leaf Water Potential (MPa)")
 
 # gs and LWP
-ggplot(LWP, aes(LWP_mean, gs, shape=Method))+geom_point(size=2)+facet_wrap(~TreeNr)+theme_bw()+
-  theme(legend.position="inside", legend.position.inside=c(.05,.3))+
+ggplot(LWP, aes(LWP_mean, gs, shape=Method, color=VPD_kPa))+geom_point(size=2)+facet_wrap(~TreeNr)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.05,.25))+
   labs(x = "Leaf Water Potential (MPa)", y="Stomatal Conductance (mol m^-2 s^-1)")
 
 
@@ -324,7 +335,7 @@ TWD_daily$year = year(TWD_daily$date)
 TWD_daily$month = month(TWD_daily$date)
 TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pd", "TWD_pdn", "TWD_md", "MDS", "MDS_norm", "LWP_pd", "LWP_md")] = NA
 
-#write_csv(TWD_daily, "TWD_daily.csv")
+#write_csv(TWD_daily, "TWD_daily.csv", na="")
 #TWD_daily = read_csv("TWD_daily.csv")
 
 # mutual plotting data frames
@@ -382,9 +393,11 @@ grid.arrange(p_sap, p_twd, p_wp)
 # compare TWD against SWP
 
 TWD_SWP = left_join(TWD_daily, SWP_mean)
+TWD_SWP = left_join(TWD_SWP, VPD_daily)
 
-ggplot(TWD_SWP, aes(SWP/1000, TWD_pd))+geom_point()+
-  facet_wrap(~sensor_loc)+theme_bw()+
+ggplot(TWD_SWP, aes(SWP/1000, TWD_pd, color=VPD))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.4,.8))+
   labs(x="Weighted Mean SWP (MPa)", y="Pre-dawn TWD")
 
 ggplot(TWD_SWP, aes(SWP/1000, TWD_pdn))+geom_point()+
@@ -410,25 +423,29 @@ ggplot(TWD_SWP, aes(SWP/1000, LWP_md))+geom_point()+
 # compare sap against swp
 
 sap_swp = left_join(sap_daily, SWP_mean)
+sap_swp = left_join(sap_swp, VPD_daily)
 
 ggplot(filter(sap_swp, month>4, month<11), aes(SWP/1000, sapflow))+geom_point()+
   facet_wrap(~sensor_loc)+theme_bw()+
   labs(x="Weighted Mean SWP (MPa)", y="Daily Sap Flow (kg/day)")
 
-ggplot(filter(sap_swp, month>4, month<11), aes(SWP/1000, sapflow_norm*100))+geom_point()+
-  facet_wrap(~sensor_loc)+theme_bw()+
+ggplot(filter(sap_swp, month>4, month<11), aes(SWP/1000, sapflow_norm*100, color=VPD))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.1,.8))+
   labs(x="Weighted Mean SWP (MPa)", y="Normalized daily Sap Flow (%)")
 
 # sap against twd
 
 sap_twd = left_join(sap_daily, TWD_daily)
+sap_twd = left_join(sap_twd, VPD_daily)
 
 ggplot(sap_twd, aes(LWP_pd, sapflow))+geom_point()+theme_bw()+
   labs(x="Pre-dawn TWD-derived LWP", y="Daily Sap Flow (kg/day)")
 
-ggplot(filter(sap_twd, month>4, month<11), aes(TWD_pdn, sapflow_norm))+geom_point()+
-  facet_wrap(~sensor_loc)+theme_bw()+
-  labs(x="Normalized pre-dawn TWD", y="Normalized Daily Sap Flow")
+ggplot(filter(sap_twd, month>4, month<11, year<2023), aes(TWD_pdn, sapflow_norm*100, color=VPD))+geom_point()+
+  facet_wrap(~sensor_loc)+theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.4,.8))+
+  labs(x="Normalized pre-dawn TWD", y="Normalized Daily Sap Flow (%)")
 
 
 
