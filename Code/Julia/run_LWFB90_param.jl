@@ -132,6 +132,9 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
         # if new_folder is false, just define the output prefix
         output_prefix = input_prefix;
 
+        # initially assume root parameters are not present
+        global root_pars = false;
+
         # and check for root parameters
         if "BETAROOT" ∈ names(par) || "MAXROOTDEPTH" ∈ names(par)
             global root_pars = true;

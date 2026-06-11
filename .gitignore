@@ -1,9 +1,9 @@
 .vscode/settings.json
 .vscode
-./Code/Julia/LWFBcalibration/
-LWFBcalibration
+Code/Julia/LWFBcalibration/
+Code/Julia/LWFB_testrun/
 Code/R/.Rproj.user
 Code/R/.Rhistory
-.Rproj.user
-.Rhistory
+Data/Daten_Vetroz_Lorenz/Photos_Wildkamera_Vetroz/
 .DS_Store
+.positai

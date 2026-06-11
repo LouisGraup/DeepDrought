@@ -17,85 +17,55 @@ end
 
 @everywhere begin
     # behavioral data
-    # soil matric potential
-    obs_swp = CSV.read("../../Data/Daten_Vetroz_Lorenz/SWP_daily.csv", DataFrame);
-    filter!(:date => >=(Date(2015, 1, 1)), obs_swp); # filter out early dates
-    filter!(:date => <(Date(2023, 1, 1)), obs_swp); # filter out late dates
-    obs_swp = unstack(obs_swp, :date, :depth, :SWP, renamecols=x->Symbol("SWP_$(x)cm")); # reshape data
-
-    # sap flow data
-    obs_sap = CSV.read("../../Data/Daten_Vetroz_Lorenz/sapflow_daily.csv", DataFrame);
-    obs_sap = obs_sap[obs_sap.sensor_loc .== "stem", :]; # filter to stem sensors
-    obs_sap = obs_sap[obs_sap.year .< 2023, :]; # filter out last year
-    obs_sap.sapflow .= max.(obs_sap.sapflow, 0); # set negative values to zero
-    select!(obs_sap, Not([:month, :year, :sensor_loc])); # drop unnecessary columns
+    # dendrometer data
+    obs_twd = CSV.read("../../Data/Daten_Vetroz_Lorenz/TWD_daily.csv", DataFrame);
+    obs_twd = obs_twd[obs_twd.sensor_loc .== "stem", :]; # filter to stem sensors
+    obs_twd = obs_twd[obs_twd.year .< 2023, :]; # filter out last years
+    select!(obs_twd, Not([:month, :year, :sensor_loc, :MDS])); # drop unnecessary columns
 end
 
 # objective function to compare model output to observed data
-@everywhere function obj_fun_swp(sim, obs)
+@everywhere function obs_fun_twd(twd_comp)
 
-    # separate observed data into different depths and remove missing values
-    obs_20cm = dropmissing(obs[!, [:date, :SWP_20cm]]);
-    obs_80cm = dropmissing(obs[!, [:date, :SWP_80cm]]);
-    obs_110cm = dropmissing(obs[!, [:date, :SWP_110cm]]);
-    obs_160cm = dropmissing(obs[!, [:date, :SWP_160cm]]);
-
-    # match simulated data to available dates for each depth
-    sim_20cm = sim[sim.dates .∈ [obs_20cm.date], :psi_kPa_200mm];
-    sim_80cm = sim[sim.dates .∈ [obs_80cm.date], :psi_kPa_800mm];
-    sim_110cm = sim[sim.dates .∈ [obs_110cm.date], :psi_kPa_1100mm];
-    sim_160cm = sim[sim.dates .∈ [obs_160cm.date], :psi_kPa_1600mm];
-
-    function NSE(sim, obs)
-        # calculate Nash-Sutcliffe Efficiency
-        nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
-        return nse
-    end
-
-    # calculate NSE
-    nse20 = NSE(sim_20cm, obs_20cm.SWP_20cm);
-    nse80 = NSE(sim_80cm, obs_80cm.SWP_80cm);
-    nse110 = NSE(sim_110cm, obs_110cm.SWP_110cm);
-    nse160 = NSE(sim_160cm, obs_160cm.SWP_160cm);
-
-    return nse20, nse80, nse110, nse160
-end
-
-@everywhere function obs_fun_sap(sap_comp)
+    # split into pd and md
+    twd_comp_pd = twd_comp[:, [:date, :TWD_pd, :cum_pd_plpsi]];
+    lwp_comp_pd = twd_comp[:, [:date, :LWP_pd, :cum_pd_plpsi]];
+    twd_comp_md = twd_comp[:, [:date, :TWD_md, :cum_md_plpsi]];
+    lwp_comp_md = twd_comp[:, [:date, :LWP_md, :cum_md_plpsi]];
 
     # remove missing values
-    sap_comp = dropmissing(sap_comp);
+    twd_comp_pd = dropmissing(twd_comp_pd);
+    lwp_comp_pd = dropmissing(lwp_comp_pd);
+    twd_comp_md = dropmissing(twd_comp_md);
+    lwp_comp_md = dropmissing(lwp_comp_md);
 
-    cc = cor(sap_comp.trans, sap_comp.sapflow);
+    cc_twd_pd = cor(twd_comp_pd.cum_pd_plpsi, twd_comp_pd.TWD_pd);
+    cc_lwp_pd = cor(lwp_comp_pd.cum_pd_plpsi, lwp_comp_pd.LWP_pd);
+    cc_twd_md = cor(twd_comp_md.cum_md_plpsi, twd_comp_md.TWD_md);
+    cc_lwp_md = cor(lwp_comp_md.cum_md_plpsi, lwp_comp_md.LWP_md);
 
-    return cc
+    return cc_twd_pd, cc_lwp_pd, cc_twd_md, cc_lwp_md
 
 end
 
-@everywhere function sap_combine(sim, obs_sap)
+@everywhere function twd_combine(sim, obs_twd)
     # sim is the LWFBrook90 simulation
-    # obs is the observed soil water potential data
+    # obs is the observed dendrometer data
 
-    z_trans = get_sap(sim);
+    z_plpsi = get_plpsi(sim);
 
-    z_trans = z_trans[z_trans.date .∈ [obs_sap.date], :];
-    
-    sap_comp = leftjoin(z_trans, obs_sap, on = :date);
+    twd_comp = sort(innerjoin(obs_twd, z_plpsi, on = :date), :date);
 
-    return sap_comp
-
+    return twd_comp
 end
 
-@everywhere function get_sap(sim)
-    # retrieve transpiration from sim
-    days = range(sim.ODESolution.prob.tspan...);
-    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
-    
-    sol = sim.ODESolution;
-    trans = [sol(t).accum.cum_d_tran for t in days];
+@everywhere function get_plpsi(sim)
+    # retrieve plant water potential from sim
 
-    z = DataFrame(date = Date.(dates_out), trans = trans);
-    
+    z = get_fluxes(sim);
+    z.date = Date.(z.dates);
+    select!(z, :date, :cum_pd_plpsi, :cum_md_plpsi);
+
     return z
 end
 
@@ -114,66 +84,23 @@ end
     ## simulation dates
 
     start_date = Date(2014, 1, 1);
-    end_date = Date(2022, 12, 31);
+    end_date = Date(2023, 12, 31);
 
 end
 
 
 ## define calibration parameter sets
 
-n = 500; # number of parameter sets
+n = 1000; # number of parameter sets
 
 # define prior parameter ranges
 
 param = [
-    # hydro parameters
-    ("DRAIN", 0.2, 1.0), # drainage (0, 1)
-    ("INFEXP", 0.3, 0.8), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.1, 0.7), # infiltration depth (m) (0.05, 1.0)
-    # meteo parameters
-    #("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
-    #("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
-    # soil parameters
-    ("RSSA", 100, 600), # soil resistance (20, 1000)
-    ("ths1", 0.3, 0.55), # theta_sat (0.2, 0.6)
-    ("thr1", 0.01, 0.1), # theta_res (0.0, 0.2)
-    ("ksat1", -0.4, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha1", 0.7, 1.4), # multiplier on alpha (0.5, 1.5)
-    ("npar1", 1.15, 1.2), # n (1.15, 1.2)
-    ("ths2", 0.4, 0.55), # theta_sat (0.2, 0.6)
-    ("thr2", 0.04, 0.18), # theta_res (0.0, 0.2)
-    ("ksat2", -0.4, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha2", 0.5, 1.25), # multiplier on alpha (0.5, 1.5)
-    ("npar2", 1.15, 1.19), # n (1.15, 1.2)
-    ("ths3", 0.55, 0.6), # theta_sat (0.2, 0.6)
-    ("thr3", 0.01, 0.08), # theta_res (0.0, 0.2)
-    ("ksat3", -0.2, 0.35), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha3", 0.6, 0.8), # multiplier on alpha (0.5, 1.5)
-    ("npar3", 1.21, 1.28), # n (1.2, 1.3)
-    ("ths4", 0.2, 0.45), # theta_sat (0.2, 0.6)
-    ("thr4", 0.02, 0.08), # theta_res (0.0, 0.2)
-    ("ksat4", 0.0, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha4", 0.5, 1.1), # multiplier on alpha (0.5, 1.5)
-    ("npar4", 1.25, 1.3), # n (1.2, 1.3)
-    ("ths5", 0.2, 0.3), # theta_sat (0.2, 0.6)
-    ("thr5", 0.125, 0.2), # theta_res (0.0, 0.2)
-    ("ksat5", 0.4, 0.8), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha5", 0.3, 0.5), # multiplier on alpha (0.5, 1.5)
-    ("npar5", 1.26, 1.38), # n (1.25, 1.4)
     # plant parameters
-    ("CINTRL", 0.6, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.09, 0.18), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.0025, 0.0045), # stomatal conductance (0.001, 0.02)
-    ("CVPD", 0.6, 1.25), # vpd sensitivity (0.5, 3)
-    ("R5", 75, 180), # radiation sensitivity (50, 200)
-    ("T1", 9, 14), # low temperature threshold (5, 15)
-    ("T2", 27, 34), # high temperature threshold (20, 35)
-    ("PSICR", -1.9, -1.7), # critical water potential (-4, -1)
-    ("FXYLEM", 0.25, 0.5), # aboveground xylem fraction (0.1, 0.5)
-    ("MXKPL", 15.0, 24.0), # maximum plant conductivity (7, 30)
-    ("MXRTLN", 2000, 3000), # maximum root length (2000, 4000)
-    #("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
-    #("BETAROOT", 0.9, 0.999) # beta root coefficient (0.9, 0.999)
+    ("CAPACITANCE", 0.1, 10.0), # capacitance (0.1, 10)
+    ("STORAGEK", 0.1, 10.0), # storage conductance (0.1, 10)
+    ("VSTORAGE", 1.0, 20.0), # stem storage volume (1, 20)
+    ("PSICR", -4.0, -1.7) # critical water potential (-4, -1)
 ];
 
 ### END USER INPUT ###
@@ -366,30 +293,16 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 4), fill(0, 2)) # skip if simulation fails
+        return (par_id, fill(0, 4)) # skip if simulation fails
     end
 
     ## retrieve model output
 
-    # soil water
-    z_psi = get_soil_(:psi, sim, depths_to_read_out_mm = [200, 800, 1100, 1600], days_to_read_out_d = start_index:end_index);
-
-    # add dates column
-    dates_to_read_out = LWFBrook90.RelativeDaysFloat2DateTime.(start_index:end_index,sim.parametrizedSPAC.reference_date);
-    z_psi.dates = Date.(dates_to_read_out);
-
-    swp_met = obj_fun_swp(z_psi, obs_swp)
+    # plant potential
+    twd_comp = twd_combine(sim, obs_twd);
+    twd_cor = obs_fun_twd(twd_comp);
     
-    # transpiration
-    sap_comp = sap_combine(sim, obs_sap);
-    sap_cor = obs_fun_sap(sap_comp);
-    
-    z_trans = get_sap(sim);
-    max_trans = maximum(z_trans.trans);
-
-    tr_met = [sap_cor, max_trans];
-
-    return (par_id, swp_met, tr_met)
+    return (par_id, twd_cor)
 
 end
 
@@ -399,18 +312,16 @@ results = pmap(i -> run_calibration(i), 1:nsets);
 
 # intialize metric dataframes
 metrics = DataFrame(scen = Int[],
-    swp_nse20 = Float64[],
-    swp_nse80 = Float64[],
-    swp_nse110 = Float64[],
-    swp_nse160 = Float64[],
-    trans_cor = Float64[], 
-    max_trans = Float64[]);
+    twd_pd_cor = Float64[],
+    lwp_pd_cor = Float64[],
+    twd_md_cor = Float64[],
+    lwp_md_cor = Float64[]);
 
 # loop through results
 for res in results
     # retrieve scenario, parameter id, and metrics
-    par_id, swp, sap = res;
-    row = [par_id, swp..., sap...];
+    par_id, twd = res;
+    row = [par_id, twd...];
     push!(metrics, row);
 end
 
