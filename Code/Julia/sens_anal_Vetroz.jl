@@ -22,9 +22,9 @@ end
 function behavioral_met(met)
 
     return(met[met.swp_nse20 .> 0.65 .&&
-               met.swp_nse80 .> 0.73 .&&
-               met.swp_nse110 .> 0.83 .&&
-               met.swp_nse160 .> 0.73 .&&
+               met.swp_nse80 .> 0.75 .&&
+               met.swp_nse110 .> 0.85 .&&
+               met.swp_nse160 .> 0.75 .&&
                met.trans_cor .> 0.6, :])
 
 end
@@ -120,8 +120,8 @@ function met_best_scen(met, metric=:swp_nse_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_vetroz_20260608.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_vetroz_20260608.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_vetroz_20260610.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_vetroz_20260610.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);
