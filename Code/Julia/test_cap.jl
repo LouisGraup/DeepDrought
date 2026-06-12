@@ -167,9 +167,11 @@ swp_eff.PLFL_Tr_contrib = swp_eff.PLFL ./ swp_eff.Trans * 100;
 swp_eff.month = month.(swp_eff.date);
 swp_eff_sum = swp_eff[swp_eff.month .> 5 .&& swp_eff.month .< 9, :];
 
-draw(data(swp_eff_sum[swp_eff_sum.PLFL_Tr_contrib .> 10, :])*mapping(:swp_eff, :PLFL_Tr_contrib)*
+draw(data(swp_eff_sum[swp_eff_sum.PLFL_Tr_contrib .> 10, :])*mapping(:swp_eff, :PLFL_Tr_contrib, color=:RWUd)*
 (smooth()+visual(Scatter)),
-    scales(X = (; label="Effective Soil Water Potential (kPa)"), Y= (; label="Plant Storage Contribution to Transpiration (%)")))
+    scales(X = (; label="Effective Soil Water Potential (kPa)"), 
+        Y = (; label="Plant Storage Contribution to Transpiration (%)"),
+        Color = (; label="Weighted-average RWU depth (mm)")))
 
 # SPAC plot
 p1 = Plots.plot(Date.(dates), RWU, color=:green, xlabel="", ylabel="Transpiration (mm/d)", legend=false, size=(1000, 500), left_margin=4mm);

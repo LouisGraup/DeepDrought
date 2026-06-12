@@ -90,20 +90,6 @@ function get_plpsi(sim)
     return z
 end
 
-function get_trans_def(sim)
-    days, dates_out = get_dates(sim);
-
-    z = get_fluxes(sim);
-    z.date = Date.(z.dates);
-    z.trans = z.cum_d_tran;
-    z.pet = z.cum_d_ptran;
-    z.td = z.pet .- z.trans;
-
-    select!(z, :date, :trans, :pet, :td);
-
-    return z
-end
-
 function ann_trans(sim)
     # calculates annual transpiration
     z = get_sap(sim);
@@ -188,6 +174,33 @@ function get_RWU_centroid(sim)
     return col_RWU_centroid_mm, RWU_percent
 end
 
+function get_PLRF_centroid(sim)
+    # borrow code from LWFBrook90 package
+    solu = sim.ODESolution;
+    saved = sim.saved_values;
+
+    days_to_read_out_d = saved.t;
+
+    y_center = cumsum(solu.prob.p.p_soil.p_THICK) - solu.prob.p.p_soil.p_THICK/2;
+
+    # Compute PLRF centroid
+    rows_PLRF_mmDay  = reduce(hcat, [saved.saveval[t].PLRFI for t in 1:(length(days_to_read_out_d)-1)]);
+
+    PLRF_percent = rows_PLRF_mmDay ./ sum(rows_PLRF_mmDay; dims = 1);
+
+    if (any(PLRF_percent .< 0))
+        rows_PLRF_mmDay_onlyUptake = ifelse.(rows_PLRF_mmDay.>0,rows_PLRF_mmDay, 0);
+        PLRF_percent_onlyUptake = rows_PLRF_mmDay_onlyUptake ./ sum(rows_PLRF_mmDay_onlyUptake; dims = 1);
+        PLRF_percent = PLRF_percent_onlyUptake;
+    end
+
+    row_PLRF_centroid_mm = sum(PLRF_percent .* y_center; dims=1);
+
+    col_PLRF_centroid_mm = reshape(row_PLRF_centroid_mm, :);
+    
+    return col_PLRF_centroid_mm, PLRF_percent
+end
+
 function get_REW(sim)
     # derive relate extractable soil water based on maximum root depth
     # for now, just use normalized SWAT over all layers
@@ -248,12 +261,12 @@ function get_eff_swp(sim)
     return swp
 end
 
-function get_VPD(sim)
+function get_clim(sim)
 
     met = get_forcing(sim);
     met.date = Date.(met.dates);
 
-    met = select(met, :date, :vappres_kPa, :tmax_degC, :tmin_degC);
+    met = select(met, :date, :vappres_kPa, :tmax_degC, :tmin_degC, :prec_mmDay);
     met.month = month.(met.date);
     met.year = year.(met.date);
 
@@ -265,6 +278,38 @@ function get_VPD(sim)
     met.VPD = met.Es .- met.vappres_kPa;
 
     return met
+end
+
+function combine_fluxes(sim)
+    # get all relevant fluxes and combine into single data frame
+
+    df_fluxes = get_fluxes(sim);
+    df_fluxes.date = Date.(df_fluxes.dates);
+    df_fluxes.trans = df_fluxes.cum_d_tran;
+    df_fluxes.pet = df_fluxes.cum_d_ptran;
+    df_fluxes.td = df_fluxes.pet .- df_fluxes.trans
+    df_fluxes.PLFL = df_fluxes.cum_d_plfl;
+    df_fluxes.PLRF = df_fluxes.cum_d_plrf;
+    df_fluxes.plpsi_pd = df_fluxes.cum_pd_plpsi;
+    df_fluxes.plpsi_md = df_fluxes.cum_md_plpsi;
+    df_fluxes.PLFL_Tr_perc = df_fluxes.PLFL ./ df_fluxes.trans * 100;
+    df_fluxes.RWUd, = get_RWU_centroid(sim);
+    df_fluxes.PLRFd, = get_PLRF_centroid(sim);
+    df_fluxes.REW = get_REW(sim);
+
+    eff_swp = get_eff_swp(sim);
+    df_fluxes.SWP = eff_swp.swp_eff;
+
+    df_fluxes.RWUd = replace(df_fluxes.RWUd, NaN=>missing);
+    df_fluxes.PLRFd = replace(df_fluxes.PLRFd, NaN=>missing);
+    df_fluxes.month = month.(df_fluxes.date);
+    df_fluxes.year = year.(df_fluxes.date);
+
+    select!(df_fluxes, :date, :trans, :pet, :td, :RWU,
+    :PLFL, :PLRF, :plpsi_pd, :plpsi_md, :PLFL_Tr_perc,
+    :RWUd, :PLRFd, :REW, :SWP, :month, :year);
+
+    return df_fluxes
 end
 
 function plot_monthly_water_partitioning(df_partitioning_monthly)
@@ -511,12 +556,6 @@ draw(data(twd_comp)*
     figure = (; size=(1200, 600), title="Midday LWP / Plant Water Potential", titlealign = :center)
 )
 
-
-
-# format x-axis ticks
-ticks = obs_sap[month.(obs_sap.date) .== 1 .&& day.(obs_sap.date) .== 1, :date];
-aogticks = datetimeticks(ticks, string.(ticks));
-
 # compare leaf water potential against effective soil water potential
 
 eff_swp = get_eff_swp(sim);
@@ -528,16 +567,6 @@ draw(
     mapping(:Date, :LWP_mean => (x -> -1*x/10))*visual(Scatter, color="red", markersize=12))),
     scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
     figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
-)
-
-
-# get VPD
-vpd = get_VPD(sim);
-
-draw(data(vpd[vpd.year .> 2014, :])*
-    mapping(:date, :VPD)*visual(Scatter, markersize=4),
-    scales(X = (; label=""), Y= (; label="VPD (kPa)")),
-    figure = (; size=(1200, 600))
 )
 
 # compare RWU depth across scenarios
@@ -559,39 +588,34 @@ draw(
     figure = (; size=(1200, 600))
 )
 
-# compare RWU against transpiration
+# compare fluxes
 
-df_rwu_tran = get_trans_def(sim);
-df_rwu_tran.RWU, = get_RWU_centroid(sim);
-df_rwu_tran.REW = get_REW(sim);
-df_rwu_tran_swp = get_eff_swp(sim);
-df_rwu_tran.SWP = df_rwu_tran_swp.swp_eff;
+df_fluxes = combine_fluxes(sim);
 
-df_rwu_tran.RWU = replace(df_rwu_tran.RWU, NaN=>missing);
-df_rwu_tran.month = month.(df_rwu_tran.date);
-df_rwu_tran.year = year.(df_rwu_tran.date);
-df_rwu_tran = df_rwu_tran[ df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 11, :];
+# restrict to growing season
+df_flux_grow = df_fluxes[df_fluxes.month .> 3 .&& df_fluxes.month .< 11, :];
+
+# compare RWU depth and PLRF depth
+draw(data(df_flux_grow)*
+    mapping(:RWUd, :PLRFd, color=:SWP)*visual(Scatter, markersize=8)
+)
 
 # apply bikini filter from Peters et al. (2018) with forcing data
-clim = get_forcing(sim);
-clim.date = Date.(clim.dates);
-clim.tmean = (clim.tmax_degC .+ clim.tmin_degC) ./ 2;
-clim.vpd = (0.61078 .* exp.(17.26939 .* clim.tmean ./ (clim.tmean .+ 237.3))) - clim.vappres_kPa;
-clim_bikini = clim[clim.tmean .> 12 .&& clim.vpd .< 1 .&& clim.prec_mmDay .< 10, :];
+clim = get_clim(sim);
+clim_bikini = clim[clim.tmean .> 12 .&& clim.VPD .< 1 .&& clim.prec_mmDay .< 10, :];
 
-df_rwu_tran_filt = dropmissing(df_rwu_tran[df_rwu_tran.date .∈ [clim_bikini.date], :]);
-# df_rwu_tran = df_rwu_tran[df_rwu_tran.REW .> 0.5, :]; # filter for water availability
+df_flux_filt = dropmissing(df_flux_grow[df_flux_grow.date .∈ [clim_bikini.date], :]);
 
-df_rwu_tran_clim = leftjoin(df_rwu_tran_filt, clim_bikini[:, [:date, :tmean, :vpd]], on=:date);
+df_flux_clim = leftjoin(df_flux_filt, clim_bikini[:, [:date, :tmean, :VPD]], on=:date);
 
 # mean uptake depth
-med_rwu_comp = combine(df_rwu_tran_filt, :RWU .=> [median mean]);
+med_rwu_comp = combine(df_flux_filt, :RWUd .=> [median mean]);
 
 # RWU vs transpiration
 draw(
-    data(df_rwu_tran_filt)*
-    mapping(:trans, :RWU, color=:month => nonnumeric)*visual(Scatter, alpha=.6, markersize=8)+
-    data(med_rwu_comp)*mapping(:RWU_mean)*visual(HLines, color=:black, linestyle=:dash),
+    data(df_flux_filt)*
+    mapping(:trans, :RWUd, color=:month => nonnumeric)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWUd_mean)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
     axis = (; yreversed = true), figure = (; size=(800, 400))
@@ -599,41 +623,58 @@ draw(
 
 # colored by VPD
 draw(
-    data(df_rwu_tran_clim)*
-    mapping(:trans, :RWU, color=:vpd, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
-    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    data(df_flux_clim)*
+    mapping(:trans, :RWUd, color=:VPD)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWUd_mean)*visual(HLines, color=:black, linestyle=:dash),
     scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
-    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+    axis = (; yreversed = true), figure = (; size=(800, 400))
 )
 
 # Trans vs VPD colored by RWU
 draw(
-    data(df_rwu_tran_clim)*
-    mapping(:vpd, :trans, color=:SWP, layout=:scen)*visual(Scatter, alpha=.6, markersize=8),
-    #data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    data(df_flux_clim)*
+    mapping(:VPD, :trans, color=:SWP)*visual(Scatter, alpha=.6, markersize=8),
+    #data(med_rwu_comp)*mapping(:RWUd_mean)*visual(HLines, color=:black, linestyle=:dash),
     #scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
-    #axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+    #axis = (; yreversed = true), figure = (; size=(800, 400))
 )
 
 # colored by REW
 draw(
-    data(df_rwu_tran_clim)*
-    mapping(:trans, :RWU, color=:REW, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
-    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    data(df_flux_clim)*
+    mapping(:trans, :RWUd, color=:REW)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWUd_mean)*visual(HLines, color=:black, linestyle=:dash),
     scales(X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
-    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+    axis = (; yreversed = true), figure = (; size=(800, 400))
 )
 
 # RWU vs transpiration deficit
 draw(
-    data(df_rwu_tran_filt)*
-    mapping(:td, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
-    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    data(df_flux_filt)*
+    mapping(:td, :RWUd, color=:month => nonnumeric)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWUd_mean)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="Transpiration Deficit (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
-    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+    axis = (; yreversed = true), figure = (; size=(800, 400))
 )
 
+# plot VPD over time
+draw(data(clim[clim.year .> 2014, :])*
+    mapping(:date, :VPD)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="VPD (kPa)")),
+    figure = (; size=(1200, 600))
+)
+
+# compare plant storage contribution to transpiration against effective soil water potential
+# only summer months
+df_flux_filt = df_flux_filt[df_flux_filt.month .> 5 .&& df_flux_filt.month .< 9, :];
+
+draw(data(df_flux_filt[df_flux_filt.PLFL_Tr_perc .> 10, :])*
+    mapping(:SWP, :PLFL_Tr_perc, color=:PLRFd)*(smooth()+visual(Scatter)),
+    scales(X = (; label="Effective Soil Water Potential (kPa)"), 
+    Y= (; label="Plant Storage Contribution to Transpiration (%)"),
+    Color = (; label="Weighted-average RWU depth for plant refill (mm)"))
+)
 
 # compare rwu against swp in each layer
 
