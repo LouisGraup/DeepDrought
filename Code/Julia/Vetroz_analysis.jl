@@ -126,8 +126,10 @@ function f_comp_sap(sim, obs_sap)
     z_trans = get_sap(sim);
 
     filter!(:date => >=(obs_sap.date[1]), z_trans);
-
-    sap_comp = sort(leftjoin(z_trans, obs_sap, on = :date), :date);
+    z_trans.year = year.(z_trans.date);
+    z_trans.month = month.(z_trans.date);
+    
+    sap_comp = sort(leftjoin(z_trans, obs_sap, on=[:date, :year, :month]), :date);
 
     return sap_comp
 
@@ -447,9 +449,8 @@ obs_swp = obs_swp[obs_swp.depth .!= 1, :];
 
 # sap flow data
 obs_sap = CSV.read("../../Data/Daten_Vetroz_Lorenz/sapflow_daily.csv", DataFrame);
-obs_sap = obs_sap[obs_sap.sensor_loc .== "stem", :]; # filter to stem sensors
 obs_sap.sapflow .= max.(obs_sap.sapflow, 0); # set negative values to zero
-select!(obs_sap, Not([:month, :year, :sensor_loc])); # drop unnecessary columns
+obs_sap = unstack(obs_sap, :sensor_loc, :sapflow)
 
 # leaf water potential data
 obs_lwp = CSV.read("../../Data/Daten_Vetroz_Lorenz/LWP_gs.csv", DataFrame);
@@ -490,19 +491,21 @@ draw(data(swc_sim)*
 
 # sap flow
 
-draw(data(stack(sap_comp, Not(:date), variable_name=:Source))*
+draw(data(stack(sap_comp, Not([:date, :month, :year]), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison", titlealign = :center)
 )
 
-sap_comp.trans_sm = runmean(sap_comp.trans, 14);
-sap_comp.sapflow_sm = runmean(sap_comp.sapflow, 14);
+sap_comp.trans_sm = runmean(sap_comp.trans, 7);
+sap_comp.stem_sm = runmean(sap_comp.stem, 7);
+sap_comp.root_sm = runmean(sap_comp.root, 7);
 
-sap_comp_long = stack(sap_comp[:, Not([:trans_sm, :sapflow_sm])], Not(:date), variable_name=:Source);
-sap_comp_long2 = stack(sap_comp[:, Not([:trans, :sapflow])], Not(:date), value_name=:value_sm, variable_name=:Source);
+sap_comp_long = stack(sap_comp[:, Not([:trans_sm, :stem_sm, :root_sm])], Not([:date, :month, :year]), variable_name=:Source);
+sap_comp_long_sm = stack(sap_comp[:, Not([:trans, :stem, :root])], Not([:date, :month, :year]), value_name=:value_sm, variable_name=:Source);
+sap_comp_long_sm.Source = replace.(sap_comp_long_sm.Source, r"_sm$" => "");
 
-sap_comp_long.value_sm = sap_comp_long2.value_sm;
+sap_comp_long = leftjoin(sap_comp_long, sap_comp_long_sm[:,[:date, :Source, :value_sm]], on=[:date, :Source])
 
 draw(data(sap_comp_long)*
     (mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6)+
@@ -511,8 +514,13 @@ draw(data(sap_comp_long)*
     figure = (; size=(800, 600), title="Sap Flow Comparison", titlealign = :center)
 )
 
+draw(data(dropmissing(sap_comp[sap_comp.year .< 2023, :]))*
+    mapping(:trans, :stem)*(visual(Scatter)+linear()),
+    figure = (; size=(800, 600), title="Sap Flow Comparison", titlealign = :center)
+)
+
 draw(data(dropmissing(sap_comp))*
-    mapping(:trans, :sapflow)*(visual(Scatter)+linear()),
+    mapping(:trans, :root)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison", titlealign = :center)
 )
 
