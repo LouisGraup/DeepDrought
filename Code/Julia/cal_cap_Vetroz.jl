@@ -74,7 +74,7 @@ end
 @everywhere begin
     ## parameter input and output paths
     # input
-    input_path = "LWFB_testcap/Vetroz/";
+    input_path = "LWFB_testcap/vetroz/";
     input_prefix = "vetroz";
 
     # output
