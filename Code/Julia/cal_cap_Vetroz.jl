@@ -74,7 +74,7 @@ end
 @everywhere begin
     ## parameter input and output paths
     # input
-    input_path = "LWFBinput/Vetroz/";
+    input_path = "LWFB_testcap/Vetroz/";
     input_prefix = "vetroz";
 
     # output
@@ -100,7 +100,7 @@ param = [
     ("CAPACITANCE", 0.1, 10.0), # capacitance (0.1, 10)
     ("STORAGEK", 0.1, 10.0), # storage conductance (0.1, 10)
     ("VSTORAGE", 1.0, 20.0), # stem storage volume (1, 20)
-    ("PSICR", -4.0, -1.7) # critical water potential (-4, -1)
+    ("PSICR", -4.0, -1.5) # critical water potential (-4, -1)
 ];
 
 ### END USER INPUT ###
@@ -244,7 +244,7 @@ for i in 1:nsets
     
     # write parameter and soil horizons files
     CSV.write(out_dir * output_prefix * "_param.csv", param_set);
-    output_soil_file(soil_set, out_dir * output_prefix);
+    #output_soil_file(soil_set, out_dir * output_prefix);
     
 end
 
