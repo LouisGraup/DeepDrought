@@ -293,7 +293,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 4)) # skip if simulation fails
+        return (par_id, fill(0, 4), fill(0, 4)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -301,8 +301,21 @@ end_index = Dates.value(end_date - ref_date);
     # plant potential
     twd_comp = twd_combine(sim, obs_twd);
     twd_cor = obs_fun_twd(twd_comp);
-    
-    return (par_id, twd_cor)
+
+    # capacitance sensitivity metrics
+    vars = get_fluxes(sim);
+    min_pd = minimum(vars.cum_pd_plpsi);
+    min_md = minimum(vars.cum_md_plpsi);
+
+    plfl = mean(vars[vars.cum_d_plfl .> 0, :cum_d_plfl]);
+    if isnan(plfl)
+        plfl = 0;
+    end
+    plfl_max = maximum(vars.cum_d_plfl);
+
+    pl_met = [min_pd, min_md, plfl, plfl_max];
+
+    return (par_id, twd_cor, pl_met)
 
 end
 
@@ -315,13 +328,17 @@ metrics = DataFrame(scen = Int[],
     twd_pd_cor = Float64[],
     lwp_pd_cor = Float64[],
     twd_md_cor = Float64[],
-    lwp_md_cor = Float64[]);
+    lwp_md_cor = Float64[],
+    min_pd_psi = Float64[],
+    min_md_psi = Float64[],
+    plfl_mean  = Float64[],
+    plfl_max   = Float64[]);
 
 # loop through results
 for res in results
     # retrieve scenario, parameter id, and metrics
-    par_id, twd = res;
-    row = [par_id, twd...];
+    par_id, twd, cap = res;
+    row = [par_id, twd..., cap...];
     push!(metrics, row);
 end
 
