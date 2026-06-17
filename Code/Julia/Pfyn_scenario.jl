@@ -27,13 +27,13 @@ function par_best(met, par)
 end
 
 function get_dates(sim)
-    days = range(sim.ODESolution.prob.tspan...);
+    days = range(sim.ODESolution.prob.tspan...)[Not(end)];
     dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
     return days, Date.(dates_out)
 end
 
 function get_swc(sim; shape = "long")
-    # retrieve soil water potential data from sim
+    # retrieve soil water content data from sim
     days, dates_out = get_dates(sim);
 
     z = get_soil_(:theta, sim, depths_to_read_out_mm = [100, 800], days_to_read_out_d = days);
@@ -74,11 +74,9 @@ function get_swp(sim; shape="long")
 end
 
 function get_sap(sim)
-    # retrieve soil water potential data from sim
-    days, dates_out = get_dates(sim);
-    
+    # retrieve transpiration data from sim
     z = get_fluxes(sim);
-    z.date = dates_out;
+    z.date = Date.(z.dates);
     z.trans = z.cum_d_tran;
     select!(z, :date, :trans);
     
@@ -120,10 +118,9 @@ function get_xy_iso(sim)
 end
 
 function get_trans_def(sim)
-    days, dates_out = get_dates(sim);
-
+    # calculate transpiration deficit
     z = get_fluxes(sim);
-    z.date = dates_out;
+    z.date = Date.(z.dates);
     z.trans = z.cum_d_tran;
     z.pet = z.cum_d_ptran;
     z.td = z.pet .- z.trans;
@@ -208,13 +205,14 @@ end
 function get_RWU_centroid(sim)
     # borrow code from LWFBrook90 package
     solu = sim.ODESolution;
+    saved = sim.saved_values;
 
-    days_to_read_out_d = unique(round.(solu.t));
+    days_to_read_out_d = saved.t;
 
     y_center = cumsum(solu.prob.p.p_soil.p_THICK) - solu.prob.p.p_soil.p_THICK/2;
 
     # Compute RWU centroid
-    rows_RWU_mmDay  = reduce(hcat, [solu(t).TRANI.mmday   for t in days_to_read_out_d]);
+    rows_RWU_mmDay  = reduce(hcat, [saved.saveval[t].TRANI for t in 1:(length(days_to_read_out_d)-1)]);
 
     RWU_percent = rows_RWU_mmDay ./ sum(rows_RWU_mmDay; dims = 1);
     #RWUcentroidLabel = "mean RWU depth"
@@ -520,9 +518,6 @@ filter!(:date => <(Date(2024, 1, 1)), obs_swc); # filter out late dates
 # soil water potential
 obs_swp = CSV.read("../../Data/Pfyn/Pfyn_swp.csv", DataFrame);
 filter!(:date => <(Date(2025, 1, 1)), obs_swp); # filter out late dates
-# for temp-corrected SWP
-obs_swp.SWP .= obs_swp.SWPt;
-select!(obs_swp, Not(:SWPt));
 
 # sap flow
 #obs_sap = CSV.read("../../Data/Pfyn/PFY_sap.csv", DataFrame);
@@ -614,21 +609,22 @@ end
 ## plot observed and simulated data using ggplot
 
 # soil water potential
-draw(data(swp_comp_irst[swp_comp_irst.SWP .> -2000, :])*
+draw(data(swp_comp_irst)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
-    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")), facet = (; linkyaxes = :none),
     figure = (; size=(800, 600), title="Soil Water Potential Comparison for Irrigation Stop Scenario", titlealign = :center)
 )
 
 draw(data(swp_comp_ctr)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")), facet = (; linkyaxes = :none),
-    figure = (; size=(1200, 800), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Potential Comparison for Control Scenario", titlealign = :center)
 )
 
-draw(data(swp_comp_irr)*
-    mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
-    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")),
+draw(data(irr[irr.year .> 2014 .&& irr.year .< 2025, :])*
+    mapping(:dates)*visual(VLines, color=:lightblue, alpha=0.4)+
+    data(swp_comp_irr)*mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+    scales(X = (; label=""), Y= (; label="SMP (kPa)"), Color = (; label="Source")), facet = (; linkyaxes = :none),
     figure = (; size=(800, 600), title="Soil Water Potential Comparison for Irrigation Scenario", titlealign = :center)
 )
 
@@ -637,11 +633,12 @@ draw(data(swp_comp_irr)*
 draw(data(swc_comp_ctr)*
     mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Color = (; label="Source")),
-    figure = (; size=(1200, 800), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
+    figure = (; size=(800, 600), title="Soil Water Content Comparison for Control Scenario", titlealign = :center)
 )
 
-draw(data(swc_comp_irr)*
-    mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
+draw(data(irr[irr.year .> 2014 .&& irr.year .< 2025, :])*
+    mapping(:dates)*visual(VLines, color=:lightblue, alpha=0.4)+
+    data(swc_comp_irr)*mapping(:date, :VWC, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
     scales(X = (; label=""), Color = (; label="Source")),
     figure = (; size=(800, 600), title="Soil Water Content Comparison for Irrigation Scenario", titlealign = :center)
 )
@@ -654,19 +651,19 @@ draw(data(swc_comp_irst)*
 
 # sap flow
 
-draw(data(stack(select!(sap_comp_ctr, Not(:Tr_rm)), Not(:date), variable_name=:Source))*
+draw(data(stack(sap_comp_ctr[sap_comp_ctr.date .<= Date(2017,1,1), Not(:Tr_rm)], Not(:date), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
 )
 
 draw(data(dropmissing(sap_comp_ctr))*
-    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    mapping(:trans, :Tr)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Control Scenario", titlealign = :center)
 )
 
 
-draw(data(stack(sap_comp_irr, Not(:date), variable_name=:Source))*
+draw(data(stack(sap_comp_irr[sap_comp_irr.date .< Date(2018,1,1), Not(:Tr_rm)], Not(:date), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
@@ -688,11 +685,11 @@ draw(data(sap_comp_irr_long)*
 )
 
 draw(data(dropmissing(sap_comp_irr))*
-    mapping(:trans, :sfd)*(visual(Scatter)+linear()),
+    mapping(:trans, :Tr)*(visual(Scatter)+linear()),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
 )
 
-draw(data(stack(sap_comp_irst, Not(:date), variable_name=:Source))*
+draw(data(stack(sap_comp_irst[sap_comp_irst.date .<= Date(2017,1,1), Not(:Tr_rm)], Not(:date), variable_name=:Source))*
     mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6),
     scales(X = (; label="")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Stop Scenario", titlealign = :center)
@@ -742,8 +739,8 @@ sap_comp_scen = [ctr_sap; irr_sap; irst_sap];
 ticks = ctr_sap[month.(ctr_sap.date) .== 1 .&& day.(ctr_sap.date) .== 1 .&& year.(ctr_sap.date) .< 2021, :date];
 aogticks = datetimeticks(ticks, string.(ticks));
 draw(
-    data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
-    mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
+    data(irr[irr.year .>= 2010 .&& irr.year .< 2020, :])*
+    mapping(:dates)*visual(VLines, color=:lightblue, alpha=0.4)+
     data(sap_comp_scen[sap_comp_scen.date.<Date("2020-01-01"), :])*
     (mapping(:date, :trans, color=:scen)*visual(Scatter, markersize=6)+
     mapping(:date, :trans_sm, color=:scen)*visual(Lines, linewidth=3)),
@@ -794,15 +791,15 @@ irr_eff_swp.treatment .= "irrigation";
 irst_eff_swp = get_eff_swp(sim_irst);
 irst_eff_swp.treatment .= "stop irrigation";
 
-eff_swp_comp = [ctr_eff_swp; irr_eff_swp; irst_eff_swp];
+eff_swp_comp = [ctr_eff_swp; irst_eff_swp];
 eff_swp_comp = eff_swp_comp[eff_swp_comp.date .>= Date(2022, 4, 1) .&& eff_swp_comp.date .< Date(2025,1,1), :];
 
 draw(
     ((data(eff_swp_comp)*
     mapping(:date, :swp_eff => (x -> x/1000), color=:treatment)*visual(Lines, linewidth=1.5)+
-    data(obs_lwp[obs_lwp.date .< Date(2025, 1, 1), :])*
+    data(obs_lwp[obs_lwp.date .< Date(2025, 1, 1) .&& obs_lwp.treatment .!= "irrigation", :])*
     mapping(:date, :predawn => (x -> -1*x/10))*visual(Scatter, markersize=12))*
-    mapping(layout=:treatment)),
+    mapping(row=:treatment)),
     scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
     figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
 )
@@ -833,8 +830,8 @@ rwu_comp.RWU = replace(rwu_comp.RWU, NaN=>missing);
 rwu_comp.RWU_sm = replace(rwu_comp.RWU_sm, NaN=>missing);
 
 draw(
-    data(irr[irr.year .>= 2014 .&& irr.year .< 2020, :])*
-    mapping(:on, :off)*visual(VSpan, color=:lightblue, alpha=0.4)+
+    data(irr[irr.year .>= 2010 .&& irr.year .< 2020, :])*
+    mapping(:dates)*visual(VLines, color=:lightblue, alpha=0.4)+
     data(rwu_comp[rwu_comp.date.<Date("2020-01-01"), :])*
     (mapping(:date, :RWU, color=:scen)*visual(Scatter, markersize=6)+
     mapping(:date, :RWU_sm, color=:scen)*visual(Lines, linewidth=3)),
@@ -879,11 +876,18 @@ irr_rwu_tran_swp = get_eff_swp(sim_irr);
 irr_rwu_tran.SWP = irr_rwu_tran_swp.swp_eff;
 irr_rwu_tran.scen .= "Irrigation";
 
-df_rwu_tran = [ctr_rwu_tran; irr_rwu_tran];
+irst_rwu_tran = get_trans_def(sim_irst);
+irst_rwu_tran.RWU, = get_RWU_centroid(sim_irst);
+irst_rwu_tran.REW = get_REW(sim_irst);
+irst_rwu_tran_swp = get_eff_swp(sim_irst);
+irst_rwu_tran.SWP = irst_rwu_tran_swp.swp_eff;
+irst_rwu_tran.scen .= "Irrigation Stop";
+
+df_rwu_tran = [ctr_rwu_tran; irst_rwu_tran];
 df_rwu_tran.RWU = replace(df_rwu_tran.RWU, NaN=>missing);
 df_rwu_tran.month = month.(df_rwu_tran.date);
 df_rwu_tran.year = year.(df_rwu_tran.date);
-df_rwu_tran = df_rwu_tran[df_rwu_tran.year .> 2002 .&& df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 11, :];
+df_rwu_tran = df_rwu_tran[df_rwu_tran.year .> 2014 .&& df_rwu_tran.month .> 3 .&& df_rwu_tran.month .< 11, :];
 
 # apply bikini filter from Peters et al. (2018) with forcing data
 clim = get_forcing(sim_ctr);
@@ -904,6 +908,37 @@ med_rwu_comp = combine(groupby(df_rwu_tran_filt, :scen), :RWU .=> [median mean])
 draw(
     data(df_rwu_tran_filt)*
     mapping(:trans, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
+           X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
+
+# upper transpiration envelope for small RWU bins
+rwu_binwidth = 30.0;
+rwu_quantile = 0.95;
+rwu_smooth_bins = 3;
+rwu_trans_env = copy(df_rwu_tran_filt[:, [:scen, :month, :trans, :RWU]]);
+rwu_trans_env.RWU_bin = floor.(rwu_trans_env.RWU ./ rwu_binwidth) .* rwu_binwidth .+ rwu_binwidth / 2;
+rwu_trans_env = combine(
+    groupby(rwu_trans_env, [:scen, :month, :RWU_bin]),
+    :trans => (x -> quantile(x, rwu_quantile)) => :trans_p95,
+    nrow => :n,
+);
+sort!(rwu_trans_env, [:scen, :month, :RWU_bin]);
+transform!(
+    groupby(rwu_trans_env, [:scen, :month]),
+    :trans_p95 => (x -> runmean(x, min(length(x), rwu_smooth_bins))) => :trans_p95_sm,
+);
+rwu_trans_env.trans_min = zeros(nrow(rwu_trans_env));
+
+# RWU vs transpiration as monthly envelopes
+draw(
+    data(rwu_trans_env)*
+    (
+        mapping(:trans_min, :trans_p95_sm, :RWU_bin, color=:month => nonnumeric, layout=:scen)*visual(Band, direction=:x, alpha=.5)+
+        mapping(:trans_p95_sm, :RWU_bin, color=:month => nonnumeric, layout=:scen)*visual(Lines, linewidth=2)
+    )+
     data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="Transpiration (mm/day)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
