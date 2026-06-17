@@ -54,7 +54,7 @@ function par_plot(par, met; met_y="met_com", behave=true)
     # loop through each parameter
     for i in 1:np
         p = scatter(par[!, i], met[!, met_y], xlabel=names(par)[i], ylabel=met_y, 
-        mc="black", msc="black", ms = 1.5, legend=false)
+        mc="black", msc="black", ms = 3, legend=false)
         title!(p, "$(names(par)[i]) vs $(met_y)")
         push!(par_plots, p)
     end
@@ -69,8 +69,10 @@ function par2_plot(par, met; met_y="met_com", behave=true)
         # only plot behavioral parameter sets
         par, _ = sep_params(par, met);
         met = behavioral_met(met);
+        marker_size = 5;
     else
         par = par[met.scen, :];
+        marker_size = 3;
     end
 
     np = size(par, 2);
@@ -91,6 +93,8 @@ function par2_plot(par, met; met_y="met_com", behave=true)
             par[!, i],
             par[!, j],
             marker_z=metric_vals,
+            ms=marker_size,
+            markerstrokewidth=0,
             xlabel=names(par)[i],
             ylabel=names(par)[j],
             clims=metric_lim,
@@ -170,18 +174,26 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_vetroz_20260615.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_vetroz_20260615.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_vetroz_20260616.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_vetroz_20260616.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);
 
 # exploratory
 density_plot(met)
+scatter(met.plfl_mean, met.plfl_max, xlabel="Mean Daily Plant Discharge > 0 (mm)", 
+    ylabel="Max Daily Plant Discharge (mm)", legend=false)
+
+# calculate pFs
+met.min_pd_pF = log10.(-10 * met.min_pd_psi);
+met.min_md_pF = log10.(-10 * met.min_md_psi);
 
 # parameter interactions
-par2_plot(par, met, met_y="twd_pd_cor", behave=false)
-par2_plot(par, met, met_y="twd_md_cor", behave=false)
+par2_plot(par, met, met_y="min_pd_pF", behave=false)
+par2_plot(par, met, met_y="min_md_pF", behave=false)
+par2_plot(par, met, met_y="plfl_mean", behave=false)
+par2_plot(par, met, met_y="plfl_max", behave=false)
 par2_plot(par, met, met_y="lwp_pd_cor", behave=false)
 par2_plot(par, met, met_y="lwp_md_cor", behave=false)
 
@@ -195,7 +207,7 @@ describe(met_good)
 
 density_plot(met_good)
 
-# compare metrics across depths
+# compare metrics
 met_plot(met, [:twd_pd_cor, :twd_pd_cor, :lwp_pd_cor, :twd_md_cor], [:twd_md_cor, :lwp_pd_cor, :lwp_md_cor, :lwp_md_cor])
 met_plot(met_good, [:twd_pd_cor, :twd_pd_cor, :lwp_pd_cor, :twd_md_cor], [:twd_md_cor, :lwp_pd_cor, :lwp_md_cor, :lwp_md_cor])
 
@@ -206,11 +218,14 @@ par_best = par[scen_max, :];
 par_best
 
 # parameter relationships
-par_plots = par_plot(par, met, met_y="twd_pd_cor");
+par_plots = par_plot(par, met, met_y="twd_pd_com");
 
-plot(par_plots..., size=(1000,1000), layout=(2,2), legend=false, titlefontsize=8, guidefontsize=6)
+plot(par_plots..., size=(1000,1000), layout=(2,2), legend=false, titlefontsize=12, guidefontsize=12)
 
 # parameter interactions
+par2_plot(par, met, met_y="min_md_psi")
+par2_plot(par, met, met_y="plfl_mean")
+par2_plot(par, met, met_y="plfl_max")
 par2_plot(par, met, met_y="twd_pd_cor")
 par2_plot(par, met, met_y="twd_md_cor")
 par2_plot(par, met, met_y="lwp_pd_cor")

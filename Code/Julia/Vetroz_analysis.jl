@@ -477,7 +477,7 @@ twd_comp = f_comp_twd(sim, obs_twd);
 # soil water potential
 draw(data(swp_comp)*
     mapping(:date, :SWP, color=:src, row=:depth => nonnumeric)*visual(Scatter, markersize=4),
-    scales(X = (; label=""), Y= (; label="SWP (kPa)"), Color = (; label="Source")),
+    scales(X = (; label=""), Y= (; label="SWP (kPa)"), Color = (; label="Source")), facet = (; linkyaxes = :none),
     figure = (; size=(800, 600), title="Soil Water Potential Comparison", titlealign = :center)
 )
 
@@ -505,7 +505,7 @@ sap_comp_long = stack(sap_comp[:, Not([:trans_sm, :stem_sm, :root_sm])], Not([:d
 sap_comp_long_sm = stack(sap_comp[:, Not([:trans, :stem, :root])], Not([:date, :month, :year]), value_name=:value_sm, variable_name=:Source);
 sap_comp_long_sm.Source = replace.(sap_comp_long_sm.Source, r"_sm$" => "");
 
-sap_comp_long = leftjoin(sap_comp_long, sap_comp_long_sm[:,[:date, :Source, :value_sm]], on=[:date, :Source])
+sap_comp_long = leftjoin(sap_comp_long, sap_comp_long_sm[:,[:date, :Source, :value_sm]], on=[:date, :Source]);
 
 draw(data(sap_comp_long)*
     (mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6)+
@@ -549,6 +549,14 @@ draw(data(twd_comp)*mapping(:LWP_md, :cum_md_plpsi)*visual(Scatter, markersize=6
 
 # time series
 draw(data(twd_comp)*
+    (mapping(:date, :TWD_pdn => (x -> -1 * x))*visual(Lines, color="black", label="TWD")+
+    mapping(:date, :cum_pd_plpsi => (x -> x/1000))*visual(Lines, color="red", label="Model")),
+    scales(X = (; label=""), Y= (; label="Pre-dawn plant water potential (MPa) / -TWDnorm")),
+    legend = (; position = :bottom, framevisible = false),
+    figure = (; size=(1200, 600), title="Pre-dawn TWDnorm / Plant Water Potential", titlealign = :center)
+)
+
+draw(data(twd_comp)*
     (mapping(:date, :LWP_pd)*visual(Lines, color="black", label="LWP")+
     mapping(:date, :cum_pd_plpsi => (x -> x/1000))*visual(Lines, color="red", label="Model")),
     scales(X = (; label=""), Y= (; label="Water potential (MPa)")),
@@ -562,19 +570,6 @@ draw(data(twd_comp)*
     scales(X = (; label=""), Y= (; label="Water potential (MPa)")),
     legend = (; position = :bottom, framevisible = false),
     figure = (; size=(1200, 600), title="Midday LWP / Plant Water Potential", titlealign = :center)
-)
-
-# compare leaf water potential against effective soil water potential
-
-eff_swp = get_eff_swp(sim);
-
-draw(
-    ((data(eff_swp[eff_swp.date .> Date(2021, 5, 1) .&& eff_swp.date .< Date(2022, 12, 31), :])*
-    mapping(:date, :swp_eff => (x -> x/1000))*visual(Lines, linewidth=1.5)+
-    data(obs_lwp[obs_lwp.pd_md .== "pd", :])*
-    mapping(:Date, :LWP_mean => (x -> -1*x/10))*visual(Scatter, color="red", markersize=12))),
-    scales(X = (; label=""), Y= (; label="SWP, LWP (MPa)")),
-    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Effective Soil Water Potential (SWP)")
 )
 
 # compare RWU depth across scenarios
@@ -600,12 +595,25 @@ draw(
 
 df_fluxes = combine_fluxes(sim);
 
+# compare leaf water potential against effective soil water potential
+
+draw(
+    ((data(df_fluxes[df_fluxes.date .> Date(2021, 5, 1) .&& df_fluxes.date .< Date(2022, 12, 1), :])*
+    (mapping(:date, :SWP => (x -> x/1000))*visual(Lines, label="SWP", linewidth=1.5)+
+    mapping(:date, :plpsi_pd => (x -> x/1000))*visual(Lines, color="green", label="Plant ψ", linewidth=1.5))+
+    data(obs_lwp[obs_lwp.pd_md .== "pd", :])*
+    mapping(:Date, :LWP_mean => (x -> -1*x/10))*visual(Scatter, label="LWP", color="red", markersize=12))),
+    scales(X = (; label=""), Y= (; label="Water Potentials (MPa)")),
+    figure = (; size=(1200, 600), title="Comparison between Observed pre-dawn Leaf Water Potential (LWP) and Modelled Plant Water Potential and Effective Soil Water Potential (SWP)")
+)
+
 # restrict to growing season
 df_flux_grow = df_fluxes[df_fluxes.month .> 3 .&& df_fluxes.month .< 11, :];
 
 # compare RWU depth and PLRF depth
 draw(data(df_flux_grow)*
-    mapping(:RWUd, :PLRFd, color=:SWP)*visual(Scatter, markersize=8)
+    mapping(:RWUd, :PLRFd, color=:SWP)*visual(Scatter, markersize=8),
+    scales(X = (; label="Weighted RWU Depth (mm)"), Y= (; label="Weighted Plant Recharge Depth (mm)"), Color = (; label="Weighted Soil Water Potential (kPa)"))
 )
 
 # apply bikini filter from Peters et al. (2018) with forcing data
@@ -677,7 +685,7 @@ draw(data(clim[clim.year .> 2014, :])*
 # only summer months
 df_flux_filt = df_flux_filt[df_flux_filt.month .> 5 .&& df_flux_filt.month .< 9, :];
 
-draw(data(df_flux_filt[df_flux_filt.PLFL_Tr_perc .> 10, :])*
+draw(data(df_flux_filt)*
     mapping(:SWP, :PLFL_Tr_perc, color=:PLRFd)*(smooth()+visual(Scatter)),
     scales(X = (; label="Effective Soil Water Potential (kPa)"), 
     Y= (; label="Plant Storage Contribution to Transpiration (%)"),

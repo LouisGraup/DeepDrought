@@ -147,23 +147,23 @@ sap_df$datetime = as.POSIXct(paste(sap_df$Date, sap_df$Time), format="%m/%d/%Y %
 sap_df = sap_df %>% mutate(sensor_loc = ifelse(node_id %in% c("3", "8"), "stem", "root"))
 
 # group to daily
-sap_daily = sap_df %>% mutate(datehour=floor_date(datetime, "1 hour")) %>%
+sap_day = sap_df %>% mutate(datehour=floor_date(datetime, "1 hour")) %>%
   group_by(datehour, node_id, sensor_loc) %>% summarize(sapflow=mean(sapflow, na.rm=T), .groups="drop") %>%
   mutate(date=as.Date(datehour)) %>% select(-datehour) %>%
   group_by(date, node_id, sensor_loc) %>% summarize_at(vars(sapflow), list(sum))
 
-ggplot(sap_daily, aes(date, sapflow, color=sensor_loc))+geom_line()+facet_wrap(~node_id)
+ggplot(sap_day, aes(date, sapflow, color=sensor_loc))+geom_line()+facet_wrap(~node_id)
 
 # fix zero offset for some sensors
-sap_daily$sapflow = ifelse(sap_daily$node_id %in% c("3", "7", "9"), sap_daily$sapflow - 1,
-                           ifelse(sap_daily$node_id == "6", sap_daily$sapflow - 0.5, sap_daily$sapflow))
+sap_day$sapflow = ifelse(sap_day$node_id %in% c("3", "7", "9"), sap_day$sapflow - 1,
+                         ifelse(sap_day$node_id == "6", sap_day$sapflow - 0.5, sap_day$sapflow))
 
-ggplot(sap_daily, aes(date, sapflow, color=sensor_loc))+
+ggplot(sap_day, aes(date, sapflow, color=sensor_loc))+
   stat_summary(geom="line", fun=mean)+stat_summary(geom="ribbon", aes(fill=sensor_loc), alpha=0.3)+
   labs(x="", y="Daily Sap Flow (kg/day)", color="Location", fill="Location")+theme_bw()
 
 # mean sap flow
-sap_mean = sap_daily %>% group_by(date, sensor_loc) %>% summarize(sapflow=mean(sapflow, na.rm=T)) %>%
+sap_mean = sap_day %>% group_by(date, sensor_loc) %>% summarize(sapflow=mean(sapflow, na.rm=T)) %>%
   filter(date >= as.Date("2021-05-01"), date < as.Date("2023-12-19"))
 
 ggplot(sap_mean, aes(date, sapflow, color=sensor_loc))+geom_line()+
@@ -175,6 +175,7 @@ sap_mean = sap_mean %>% left_join(sap_max) %>% mutate(sapflow_norm = sapflow / m
 
 sap_mean$month = month(sap_mean$date)
 sap_mean$year = year(sap_mean$date)
+sap_daily = sap_mean
 #write_csv(sap_mean, "sapflow_daily.csv")
 
 sap_daily = read_csv("sapflow_daily.csv")
@@ -338,6 +339,12 @@ TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pd", "TWD_pdn", "TW
 #write_csv(TWD_daily, "TWD_daily.csv", na="")
 #TWD_daily = read_csv("TWD_daily.csv")
 
+# meteo for precip
+meteo = read_csv("meteo.csv")
+ggplot(filter(meteo, dates>="2022-06-01", dates<"2022-09-01"), aes(dates, prec_Sion))+geom_col(fill="darkblue")+
+  scale_y_continuous(position="right")+theme_bw()+labs(x="", y="Prec")
+
+
 # mutual plotting data frames
 sap_plot = sap_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-"))) %>% 
   filter(date < "2022-11-01", month > 4, month < 11)
@@ -388,6 +395,40 @@ p_wp = SWP_daily %>% mutate(ddate=as.Date(paste(2000, month, day(date), sep="-")
   theme(legend.position="inside", legend.position.inside=c(0.05,0.4))
 
 grid.arrange(p_sap, p_twd, p_wp)
+
+
+# zoom into summer 2022
+p_sap = ggplot()+geom_line(data=filter(VPD_daily, year==2022, month>5, month<9), aes(date, VPD), linewidth=1)+
+  geom_line(data=filter(sap_daily, year==2022, month>5, month<9), aes(date, sapflow, color=sensor_loc), linewidth=1.1)+
+  labs(x="", y="Daily Sap Flow (kg/day) /\n VPD (kPa)")+theme_bw()+guides(color="none")+
+  theme(axis.title=element_text(size=14), axis.text=element_text(size=12))
+p_twd = TN %>% filter(datetime>=as.POSIXct("2022-06-01 00:00:00", tz="UTC"), datetime<as.POSIXct("2022-09-01 00:00:00", tz="UTC")) %>% 
+  ggplot(aes(datetime, TWD, color=sensor_loc, fill=sensor_loc))+
+  stat_summary(geom="line", fun=mean, linewidth=1)+stat_summary(geom="ribbon", alpha=0.2)+
+  theme_bw()+labs(x="", y="Tree Water Deficit", fill="Location")+guides(color="none")+
+  theme(legend.position="inside", legend.position.inside=c(0.1,0.7),
+        legend.text=element_text(size=12), legend.title=element_text(size=14),
+        axis.title=element_text(size=14), axis.text=element_text(size=12))
+p_twd = TWD_daily %>% filter(year==2022, month>5, month<9) %>% 
+  ggplot()+geom_line(aes(date, TWD_pdn, color=sensor_loc, linetype="TWD_pdn"), linewidth=1.1)+
+  geom_line(aes(date, MDS_norm, color=sensor_loc, linetype="MDS_norm"), linewidth=1.1)+
+  geom_hline(yintercept=0, color="darkgrey")+
+  theme_bw()+labs(x="", y="Norm. TWD / MDS")+guides(color="none")+
+  scale_x_date(date_breaks="1 month", date_labels="%b")+
+  scale_linetype_manual(name="Var", values=c("MDS_norm"=3,"TWD_pdn"=1))+
+  theme(legend.position="inside", legend.position.inside=c(0.1,0.7),
+        legend.text=element_text(size=12), legend.title=element_text(size=14),
+        axis.title=element_text(size=14), axis.text=element_text(size=12))
+p_wp = SWP_daily %>% filter(year==2022, month>5, month<9) %>% 
+  ggplot()+geom_line(aes(date, SWP/1000, color=as.factor(depth)), linewidth=1)+
+  geom_pointrange(data=filter(LWP_pd_plot, year==2022), aes(x=Date, y=LWP_mean, ymin=LWP_mean-LWP_sd, ymax=LWP_mean+LWP_sd), color="blue", inherit.aes=F)+
+  labs(x="", y="Pre-dawn LWP /\n SWP (MPa)", color="Depth (cm)")+theme_bw()+ylim(-5, 0)+
+  theme(legend.position="inside", legend.position.inside=c(0.05,0.5),
+        legend.text=element_text(size=12), legend.title=element_text(size=14),
+        axis.title=element_text(size=14), axis.text=element_text(size=12))
+
+grid.arrange(p_sap, p_twd, p_wp)
+
 
 
 # compare TWD against SWP
