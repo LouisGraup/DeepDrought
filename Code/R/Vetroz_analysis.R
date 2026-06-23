@@ -65,6 +65,12 @@ ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(LWP_mean, sapflow, shape=Method, co
   theme(legend.position="inside", legend.position.inside=c(.6,.7))+
   labs(x="Leaf Water Potential (MPa)", y = "Sapflow", color="VPD (kPa)")
 
+# LWP and PRI
+ggplot(filter(LWP, TreeNr == 8), aes(LWP_mean, PRI, shape=Method, color=VPD_kPa))+geom_point(size=2)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.2,.6))+
+  labs(x="Leaf Water Potential (MPa)", y = "PRI", color="VPD (kPa)")
+
 # TWD and LWP
 ggplot(filter(LWP, Method=="unbagged"), aes(TWD, LWP_mean, color=pd_md))+geom_point()+
   geom_smooth(method="lm")+facet_wrap(~TreeNr)+theme_bw()+
@@ -75,6 +81,30 @@ ggplot(LWP, aes(LWP_mean, gs, shape=Method, color=VPD_kPa))+geom_point(size=2)+f
   theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
   theme(legend.position="inside", legend.position.inside=c(.05,.25))+
   labs(x = "Leaf Water Potential (MPa)", y="Stomatal Conductance (mol m^-2 s^-1)")
+
+# gs and sap flow
+ggplot(filter(LWP, TreeNr %in% c(3, 8)), aes(gs, sapflow, color=VPD_kPa))+geom_point(size=2)+facet_wrap(~TreeNr)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.35,.3))+
+  labs(x="Stomatal Conductance (mol m^-2 s^-1)", y = "Sapflow")
+
+# gs and PRI
+ggplot(filter(LWP, TreeNr == 8), aes(gs, PRI, color=VPD_kPa))+geom_point(size=2)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.2,.6))+
+  labs(x="Stomatal Conductance (mol m^-2 s^-1)", y = "PRI", color="VPD (kPa)")
+
+# sap flow and PRI
+ggplot(filter(LWP, TreeNr == 8), aes(sapflow, PRI, color=VPD_kPa))+geom_point(size=2)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.2,.6))+
+  labs(x="Sapflow", y = "PRI", color="VPD (kPa)")
+
+# TWD and PRI
+ggplot(filter(LWP, TreeNr == 8), aes(TWD, PRI, color=VPD_kPa))+geom_point(size=2)+
+  theme_bw()+scale_color_viridis_c(name="VPD (kPa)")+
+  theme(legend.position="inside", legend.position.inside=c(.8,.6))+
+  labs(x="Tree Water Deficit", y = "PRI", color="VPD (kPa)")
 
 
 ## process soil water potential data
@@ -221,7 +251,6 @@ NORM_DENDRO = function(den_long) {
   return(den_daily)
 }
 
-
 # TreeNet data
 TN = read_csv("TreeNet_dendro/tn_timeseries.csv")
 TN_meta = read_csv("TreeNet_dendro/tn_metadata.csv")
@@ -353,6 +382,8 @@ TWD_plot = TWD_daily %>% mutate(ddate=as.Date(paste(2000, month(date), day(date)
 LWP_pd_plot = LWP %>% rename(LWP=LWP_mean) %>% filter(pd_md=="pd") %>% group_by(Date, year) %>% 
   summarize(LWP_mean=mean(LWP), LWP_sd=sd(LWP)) %>%
   mutate(ddate=as.Date(paste(2000, month(Date), day(Date), sep="-")))
+gs_plot = LWP %>% group_by(Date, year) %>% 
+  summarize(gs_mean=mean(gs/100, na.rm=T), gs_sd=sd(gs/100, na.rm=T)) %>% na.omit()
 SWP_plot = SWP_mean %>% mutate(ddate=as.Date(paste(2000, month(date), day(date), sep="-"))) %>% 
   filter(date >= "2021-05-07", date < "2022-11-01", month>4, month<11)
 
@@ -400,7 +431,8 @@ grid.arrange(p_sap, p_twd, p_wp)
 # zoom into summer 2022
 p_sap = ggplot()+geom_line(data=filter(VPD_daily, year==2022, month>5, month<9), aes(date, VPD), linewidth=1)+
   geom_line(data=filter(sap_daily, year==2022, month>5, month<9), aes(date, sapflow, color=sensor_loc), linewidth=1.1)+
-  labs(x="", y="Daily Sap Flow (kg/day) /\n VPD (kPa)")+theme_bw()+guides(color="none")+
+  geom_pointrange(data=filter(gs_plot, year==2022), aes(x=Date, y=gs_mean, ymin=gs_mean-gs_sd, ymax=gs_mean+gs_sd), color="darkgreen", inherit.aes=F)+
+  labs(x="", y="Sap Flow (kg/day) / VPD (kPa) /\n Stom. Cond. (hmol/m2/s)")+theme_bw()+guides(color="none")+
   theme(axis.title=element_text(size=14), axis.text=element_text(size=12))
 p_twd = TN %>% filter(datetime>=as.POSIXct("2022-06-01 00:00:00", tz="UTC"), datetime<as.POSIXct("2022-09-01 00:00:00", tz="UTC")) %>% 
   ggplot(aes(datetime, TWD, color=sensor_loc, fill=sensor_loc))+
