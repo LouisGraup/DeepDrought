@@ -526,7 +526,7 @@ draw(data(dropmissing(sap_comp))*
 
 # dendro
 # predawn correlations
-draw(data(twd_comp)*mapping(:TWD_pd, :cum_pd_plpsi)*visual(Scatter, markersize=6),
+draw(data(dropmissing(twd_comp))*mapping(:TWD_pd, :cum_pd_plpsi, color = :date => x -> dayofyear(x))*visual(Scatter, markersize=6),
     scales(X = (; label="Pre-dawn TWD"), Y= (; label="Pre-dawn plant water potential (kPa)")),
     figure = (; size=(800, 600), title="Pre-dawn TWD vs Plant Water Potential", titlealign = :center)
 )
@@ -537,7 +537,7 @@ draw(data(twd_comp)*mapping(:LWP_pd, :cum_pd_plpsi)*visual(Scatter, markersize=6
 )
 
 # midday correlations
-draw(data(twd_comp)*mapping(:TWD_md, :cum_md_plpsi)*visual(Scatter, markersize=6),
+draw(data(dropmissing(twd_comp))*mapping(:TWD_md, :cum_md_plpsi, color = :date => x -> dayofyear(x))*visual(Scatter, markersize=6),
     scales(X = (; label="Midday TWD"), Y= (; label="Midday plant water potential (kPa)")),
     figure = (; size=(800, 600), title="Midday TWD vs Plant Water Potential", titlealign = :center)
 )

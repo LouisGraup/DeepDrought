@@ -296,8 +296,23 @@ TWD_lwp_coef_md = LWP_twd_md %>% group_by(TreeNr) %>% nest() %>%
          TWD_lwp_slope_md = map_dbl(model, ~ coef(.x)[["TWD_md"]])) %>% ungroup() %>% 
          select(TreeNr, TWD_lwp_intercept_md, TWD_lwp_slope_md)
 
+# correlate midday bagged LWP (branch WP) against TWD per tree
+BWP_twd_md = LWP %>% filter(pd_md == "md", Method=="bagged") %>% 
+  group_by(Date, TreeNr) %>% summarize(LWP_mean=min(LWP_mean)) %>%
+  select(date = Date, TreeNr, LWP_mean) %>%
+  inner_join(TWD_norm %>% filter(sensor_loc == "stem") %>%
+               mutate(TreeNr = as.numeric(tree_id)) %>%
+               select(date, TreeNr, TWD_md))
+
+TWD_bwp_coef_md = BWP_twd_md %>% group_by(TreeNr) %>% nest() %>%
+  mutate(model = map(data, ~ lm(LWP_mean ~ TWD_md, data = .x)),
+         TWD_bwp_intercept_md = map_dbl(model, ~ coef(.x)[["(Intercept)"]]),
+         TWD_bwp_slope_md = map_dbl(model, ~ coef(.x)[["TWD_md"]])) %>% ungroup() %>% 
+  select(TreeNr, TWD_bwp_intercept_md, TWD_bwp_slope_md)
+
 # combine for plotting
-LWP_TWD = rbind(LWP_twd_md %>% rename(TWD=TWD_md) %>% mutate(pd_md="md"),
+LWP_TWD = rbind(LWP_twd_md %>% rename(TWD=TWD_md) %>% mutate(pd_md="md_lwp"),
+                BWP_twd_md %>% rename(TWD=TWD_md) %>% mutate(pd_md="md_bwp"),
                 LWP_twd_pd %>% rename(TWD=TWD_pd))
 
 ggplot(LWP_TWD, aes(TWD, LWP_mean, color=pd_md))+geom_point()+
@@ -306,18 +321,22 @@ ggplot(LWP_TWD, aes(TWD, LWP_mean, color=pd_md))+geom_point()+
 
 # predict predawn and midday LWP from TWD for stem sensors
 TWD_norm = TWD_norm %>% mutate(TreeNr = as.numeric(tree_id)) %>%
-  left_join(TWD_lwp_coef_pd) %>% left_join(TWD_lwp_coef_md) %>%
+  left_join(TWD_lwp_coef_pd) %>% left_join(TWD_lwp_coef_md) %>% left_join(TWD_bwp_coef_md) %>%
   mutate(LWP_md = if_else(sensor_loc == "stem",
                           TWD_lwp_intercept_md + TWD_lwp_slope_md * TWD_md, NA),
+         BWP_md = if_else(sensor_loc == "stem",
+                          TWD_bwp_intercept_md + TWD_bwp_slope_md * TWD_md, NA),
          LWP_pd = if_else(sensor_loc == "stem",
                           TWD_lwp_intercept_pd + TWD_lwp_slope_pd * TWD_pd, NA)) %>%
-  select(-c(TreeNr, TWD_lwp_intercept_md, TWD_lwp_slope_md, TWD_lwp_intercept_pd, TWD_lwp_slope_pd))
+  select(-c(TreeNr, TWD_lwp_intercept_md, TWD_lwp_slope_md, TWD_bwp_intercept_md, 
+            TWD_bwp_slope_md, TWD_lwp_intercept_pd, TWD_lwp_slope_pd))
 
 # exclude pre-dawn predictions outside of calibration range
 TWD_min = LWP_twd_pd %>% group_by(TreeNr) %>% summarize(TWD_min = min(TWD_pd))
 
 TWD_norm = TWD_norm %>% mutate(TreeNr = as.numeric(tree_id)) %>% left_join(TWD_min) %>% 
-  mutate(LWP_pd = if_else(TWD_pd < TWD_min, NA, LWP_pd)) %>% select(-TreeNr, -TWD_min)
+  mutate(LWP_pd = if_else(TWD_pd < TWD_min, NA, LWP_pd),
+         BWP_md = if_else(TWD_md < TWD_min, NA, BWP_md)) %>% select(-TreeNr, -TWD_min)
 
 # plots
 ggplot(TWD_norm, aes(date, TWD_pd, color=tree_id, group=tree_name))+geom_line()+
@@ -331,6 +350,15 @@ ggplot(TWD_norm, aes(date, TWD_md, color=tree_id, group=tree_name))+geom_line()+
 
 ggplot(TWD_norm, aes(date, LWP_md, color=tree_id, group=tree_name))+geom_line()+
   theme_bw()+guides(color="none")
+
+ggplot(TWD_norm, aes(date, BWP_md, color=tree_id, group=tree_name))+geom_line()+
+  theme_bw()+guides(color="none")
+
+ggplot(TWD_norm, aes(BWP_md, LWP_md, color=tree_id, group=tree_name))+geom_point()+
+  geom_abline(slope=1, intercept=0)+theme_bw()+guides(color="none")
+
+ggplot(TWD_norm, aes(LWP_pd, BWP_md, color=tree_id, group=tree_name))+geom_point()+
+  geom_abline(slope=1, intercept=0)+facet_wrap(~tree_id)+theme_bw()+guides(color="none")
 
 ggplot(TWD_norm, aes(TWD_pd, MDS, color=tree_name))+geom_point(size=.5, alpha=.5)+
   facet_wrap(~sensor_loc, ncol=1, scales="free")+theme_bw()+guides(color="none")
@@ -363,7 +391,7 @@ ggplot(TWD_daily, aes(date, TWD_pdn))+geom_line(color="green")+
 # exclude winter months
 TWD_daily$year = year(TWD_daily$date)
 TWD_daily$month = month(TWD_daily$date)
-TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pd", "TWD_pdn", "TWD_md", "MDS", "MDS_norm", "LWP_pd", "LWP_md")] = NA
+TWD_daily[TWD_daily$month < 5 | TWD_daily$month > 11, c("TWD_pd", "TWD_pdn", "TWD_md", "MDS", "MDS_norm", "LWP_pd", "LWP_md", "BWP_md")] = NA
 
 #write_csv(TWD_daily, "TWD_daily.csv", na="")
 #TWD_daily = read_csv("TWD_daily.csv")
@@ -462,7 +490,6 @@ p_wp = SWP_daily %>% filter(year==2022, month>5, month<9) %>%
 grid.arrange(p_sap, p_twd, p_wp)
 
 
-
 # compare TWD against SWP
 
 TWD_SWP = left_join(TWD_daily, SWP_mean)
@@ -492,6 +519,11 @@ ggplot(TWD_SWP, aes(SWP/1000, LWP_pd))+geom_point()+
 ggplot(TWD_SWP, aes(SWP/1000, LWP_md))+geom_point()+
   geom_abline(slope=1, intercept=0)+theme_bw()+
   labs(x="Weighted Mean SWP (MPa)", y="Midday TWD-derived LWP")
+
+ggplot(TWD_SWP, aes(SWP/1000, BWP_md))+geom_point()+
+  geom_abline(slope=1, intercept=0)+theme_bw()+
+  labs(x="Weighted Mean SWP (MPa)", y="Midday TWD-derived BWP")
+
 
 # compare sap against swp
 
