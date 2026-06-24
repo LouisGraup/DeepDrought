@@ -204,12 +204,10 @@ end
 end
 
 @everywhere function get_sap(sim)
-    # retrieve soil water potential data from sim
-    days = range(sim.ODESolution.prob.tspan...);
-    dates_out = LWFBrook90.RelativeDaysFloat2DateTime.(days,sim.parametrizedSPAC.reference_date);
+    # retrieve transpiration from sim
     
     z = get_fluxes(sim);
-    z.date = Date.(dates_out);
+    z.date = Date.(z.dates);
     z.trans = z.cum_d_tran;
     select!(z, :date, :trans);
     
