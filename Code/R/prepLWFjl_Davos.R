@@ -9,7 +9,7 @@ library(lubridate)
 meteo = read.csv("../../Data/Davos/meteo/Davos_meteo.csv")
 meteo$dates = as.Date(meteo$date)
 
-meteo = meteo %>% select(-ET, -date)
+meteo = meteo %>% select(-date)
 
 soil_df = read.csv("../../Data/Pfyn/soil_hydraulic.csv") # dummy filler
 
@@ -18,7 +18,7 @@ soil_df = read.csv("../../Data/Pfyn/soil_hydraulic.csv") # dummy filler
 library(LWFBrook90R)
 source("C:/Users/grauplou/Documents/LWFBrook90.jl/src/generate_LWFBrook90jl_Input_mod.R", echo=F)
 
-opt = set_optionsLWFB90(startdate=as.Date("2007-01-01"), enddate=as.Date("2022-12-31"), 
+opt = set_optionsLWFB90(startdate=as.Date("2007-01-01"), enddate=as.Date("2024-12-31"), 
                         root_method="soilvar", budburst_method="Menzel", 
                         leaffall_method="vonWilpert", lai_method="Coupmodel")
 
@@ -26,4 +26,3 @@ opt = set_optionsLWFB90(startdate=as.Date("2007-01-01"), enddate=as.Date("2022-1
 par = set_paramLWFB90(maxlai=3, winlaifrac=.6, height=25, height_ini=25, 
                       coords_y=47, budburst_species="Picea abies (frueh)")
 generate_LWFBrook90jl_Input("Davos","davos",".", options_b90=opt, param_b90=par, climate=meteo, soil=soil_df)
-
