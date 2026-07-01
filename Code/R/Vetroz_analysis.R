@@ -173,8 +173,55 @@ sap_df = bind_rows(sap_list, .id="node_id")
 # combine date and time columns
 sap_df$datetime = as.POSIXct(paste(sap_df$Date, sap_df$Time), format="%m/%d/%Y %H:%M:%S")
 
-# define root and stem sensors
-sap_df = sap_df %>% mutate(sensor_loc = ifelse(node_id %in% c("3", "8"), "stem", "root"))
+# define root/stem sensors and tree IDs
+sap_df = sap_df %>% mutate(sensor_loc = ifelse(node_id %in% c("3", "8"), "stem", "root"),
+                           tree_id = ifelse(as.numeric(node_id) < 8, 3, 8),
+                           Date = as.Date(Date, format="%m/%d/%Y"),
+                           year = year(datetime), month=month(datetime))
+
+# analyze lags between root and stem sap flow to derive time constant
+
+ggplot(filter(sap_df, Date > "2022-07-28", Date < "2022-08-01"),
+       aes(datetime, sapflow, color=node_id, linetype=sensor_loc))+geom_line()+
+  facet_wrap(~tree_id, ncol=1)+theme_bw()
+
+ggplot(filter(sap_df, Date > "2022-07-28", Date < "2022-08-01", node_id %in% c("3", "5", "8", "12")),
+       aes(datetime, sapflow, color=sensor_loc))+geom_line()+
+  facet_wrap(~tree_id, ncol=1)+theme_bw()
+
+# sap flow sensor correlations
+sap_hourly = sap_df %>% mutate(datetime = round_date(datetime, "10 mins")) %>% # make timestamps consistent
+  select(datetime, node_id, sapflow) %>% 
+  filter(node_id %in% c("3", "5", "8", "12"), !is.na(datetime)) %>% # keep representative sensors
+  group_by(datetime, node_id) %>% summarize(sapflow=mean(sapflow), .groups="drop") %>% # average over duplicate timestamps
+  pivot_wider(names_from=node_id, names_prefix="sap", values_from=sapflow) %>%  # widen data frame
+  na.omit()
+
+# function to calculate lagged correlation coefficient
+calc_lag_cor <- function(df, lag_minutes = 10) {
+  df_shifted <- df %>%
+    mutate(datetime_shifted = datetime + minutes(lag_minutes))
+  
+  joined <- df %>%
+    select(datetime, sap3, sap8) %>%
+    inner_join(
+      df_shifted %>%
+        select(datetime_shifted, sap5, sap12),
+      by = c("datetime" = "datetime_shifted")
+    )
+  
+  tibble(
+    lag_minutes = lag_minutes,
+    cor_sap3_sap5 = cor(joined$sap3, joined$sap5, use = "complete.obs"),
+    cor_sap8_sap12 = cor(joined$sap8, joined$sap12, use = "complete.obs")
+  )
+}
+
+lag_results <- purrr::map_dfr(
+  seq(-120, 360, by = 10),
+  ~ calc_lag_cor(sap_hourly, lag_minutes = .x)
+)
+
 
 # group to daily
 sap_day = sap_df %>% mutate(datehour=floor_date(datetime, "1 hour")) %>%
