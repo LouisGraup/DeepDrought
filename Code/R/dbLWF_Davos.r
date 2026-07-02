@@ -121,7 +121,7 @@ ggplot(SWP_daily, aes(date, -SWP, color=messvar_name))+geom_line()+
 # average of sensors for each depth
 SWP_avg = SWP_daily %>% select(-messvar_name) %>% 
   group_by(date, depth) %>% summarize(SWP=mean(SWP, na.rm=T)) %>% 
-  filter(SWP > -200) %>% mutate(depth = depth * -1000)
+  mutate(depth = depth * -1000)
 
 ggplot(SWP_avg, aes(date, SWP, color=as.factor(depth)))+geom_line()+facet_wrap(~depth)+
   guides(color="none")
