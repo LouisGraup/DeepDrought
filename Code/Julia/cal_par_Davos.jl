@@ -184,34 +184,34 @@ n = 1000; # number of parameter sets
 
 param = [ # store unmodified parameter ranges here for posterity
     # hydro parameters
-    ("DRAIN", 0.0, 1.0), # drainage (0, 1)
+    ("DRAIN", 0.5, 1.0), # drainage (0, 1)
     ("INFEXP", 0.0, 0.9), # infiltration exponent (0, 0.9)
     ("IDEPTH_m", 0.05, 1.0), # infiltration depth (m) (0.05, 1.0)
     # meteo parameters
     ("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     ("ALBSN", 0.4, 0.8), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 20, 1000), # soil resistance (20, 1000)
+    ("RSSA", 100, 1000), # soil resistance (20, 1000)
     ("ths1", 0.15, 0.6), # theta_sat (0.15, 0.6)
     ("thr1", 0.0, 0.1), # theta_res (0.0, 0.1)
     ("ksat1", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("alpha1", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
     ("npar1", 1.15, 1.3), # n (1.15, 1.3)
-    ("ths2", 0.15, 0.6), # theta_sat (0.15, 0.6)
-    ("thr2", 0.0, 0.1), # theta_res (0.0, 0.1)
+    ("ths2", 0.35, 0.55), # theta_sat (0.15, 0.6)
+    ("thr2", 0.0, 0.09), # theta_res (0.0, 0.1)
     ("ksat2", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha2", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
-    ("npar2", 1.15, 1.3), # n (1.15, 1.3)
-    ("ths3", 0.15, 0.6), # theta_sat (0.15, 0.6)
-    ("thr3", 0.0, 0.1), # theta_res (0.0, 0.1)
-    ("ksat3", -0.5, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha2", 0.5, 1.4), # multiplier on alpha (0.5, 1.5)
+    ("npar2", 1.16, 1.3), # n (1.15, 1.3)
+    ("ths3", 0.4, 0.55), # theta_sat (0.15, 0.6)
+    ("thr3", 0.03, 0.1), # theta_res (0.0, 0.1)
+    ("ksat3", -0.4, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
     ("alpha3", 0.5, 1.5), # multiplier on alpha (0.5, 1.5)
-    ("npar3", 1.15, 1.3), # n (1.15, 1.3)
+    ("npar3", 1.15, 1.22), # n (1.15, 1.3)
     # plant parameters
     ("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
     ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.02)
-    ("CVPD", 0.5, 3.0), # vpd sensitivity (0.5, 3)
+    ("GLMAX", 0.001, 0.008), # stomatal conductance (0.001, 0.02)
+    ("CVPD", 0.5, 2.6), # vpd sensitivity (0.5, 3)
     ("R5", 50, 200), # radiation sensitivity (50, 200)
     ("T1", 5, 15), # low temperature threshold (5, 15)
     ("T2", 20, 35), # high temperature threshold (20, 35)
@@ -222,7 +222,7 @@ param = [ # store unmodified parameter ranges here for posterity
     ("VXYLEM_mm", 5.0, 80.0), # xylem volume (5, 80)
     ("DISPERSIVITY_mm", 30.0, 50.0), # dispersivity coefficient (30, 50)
     ("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
-    ("BETAROOT", 0.9, 0.999) # beta root coefficient (0.9, 0.999)
+    ("BETAROOT", 0.9, 0.99) # beta root coefficient (0.9, 0.999)
 ];
 
 ### END USER INPUT ###
@@ -400,12 +400,12 @@ end_index = Dates.value(end_date - ref_date);
         maxroot = round(param_sets[root_dict["MAXROOTDEPTH"], par_id], sigdigits=4);
 
         # run model with modified root distribution
-        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = false,
+        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = true,
         root_distribution = (beta = betaroot, z_rootMax_m=maxroot));
 
     else
         # run model with input files
-        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = false)
+        model = loadSPAC(cal_dir, output_prefix, simulate_isotopes = true)
     end
 
     # model set up
