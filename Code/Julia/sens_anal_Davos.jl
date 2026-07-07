@@ -21,16 +21,16 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
 
-    return(met[met.swc_nse15 .> -8.0 .&&
-               met.swc_nse50 .> -3.0 .&&
-               met.swc_nse80 .> -3.0 .&&
-               met.swc_nse150 .> -3.0 .&&
-               met.swp_nse15 .> -10.0 .&&
-               met.swp_nse50 .> -3.0 .&&
-               met.swp_nse80 .> -2.0 .&&
-               met.swp_nse150 .> -1.0 .&&
-               met.et_cor .> 0.5 .&&
-               met.et_nse .> -1.0, :])
+    return(met[met.swc_nse15 .> -4.0 .&&
+               met.swc_nse50 .> -2.0 .&&
+               met.swc_nse80 .> -2.0 .&&
+               met.swc_nse150 .> -2.0 .&&
+               met.swp_nse15 .> -7.0 .&&
+               met.swp_nse50 .> -2.0 .&&
+               met.swp_nse80 .> -1.0 .&&
+               met.swp_nse150 .> -0.5 .&&
+               met.et_cor .> 0.65 .&&
+               met.et_nse .> -0.25, :])
 
 end
 
@@ -127,8 +127,8 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_davos_20260702.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_davos_20260702.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_davos_20260703.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_davos_20260703.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);
