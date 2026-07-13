@@ -124,8 +124,9 @@ function get_trans_def(sim)
     z.trans = z.cum_d_tran;
     z.pet = z.cum_d_ptran;
     z.td = z.pet .- z.trans;
+    z.t_pet = z.trans ./ z.pet;
 
-    select!(z, :date, :trans, :pet, :td);
+    select!(z, :date, :trans, :pet, :td, :t_pet);
 
     return z
 end
@@ -820,7 +821,7 @@ irr_rwu.RWU_sm = runmean(irr_rwu.RWU, 14);
 irr_rwu.scen .= "Irrigation";
 
 irst_rwu = DataFrame(date=dates_out);
-irst_rwu.RWU, = get_RWU_centroid(sim_irst);
+irst_rwu.RWU, irst_rwu_per = get_RWU_centroid(sim_irst);
 irst_rwu.RWU_sm = runmean(irst_rwu.RWU, 14);
 irst_rwu.scen .= "Irrigation Stop";
 
@@ -838,6 +839,65 @@ draw(
     scales(Color = (; label="Scenario", palette = ["#E69F00","#56B4E9","#009E73"]),
            X = (; label=""), Y= (; label="Root Water Uptake Depth (mm)")),
     figure = (; size=(1200, 600)), axis = (; xticks=aogticks, title="RWU Depth Comparison across Scenarios", titlesize=20)
+)
+
+# visualize RWU depth as distribution
+
+# control
+depths = round.(Int, cumsum(sim_ctr.ODESolution.prob.p.p_soil.p_THICK) - sim_ctr.ODESolution.prob.p.p_soil.p_THICK/2);
+ctr_rwu_dist = DataFrame(copy(ctr_rwu_per'), Symbol.(depths));
+ctr_rwu_dist.date = dates_out;
+ctr_rwu_dist = mapcols(col -> replace(col, NaN => missing), ctr_rwu_dist);
+
+# reformat to long
+ctr_rwu_dist_long = stack(ctr_rwu_dist, Not(:date), variable_name=:depth, value_name=:RWU_per);
+ctr_rwu_dist_long.depth = parse.(Int, ctr_rwu_dist_long.depth);
+depth_bins = [0, 200, 400, 600, 800, 1000, 1200, 1500, 1800, 2000];
+ctr_rwu_dist_long.depth_bin = cut(ctr_rwu_dist_long.depth .- 1, depth_bins, extend=true);
+
+# group by depth bin
+ctr_rwu_dist_long_d = combine(groupby(ctr_rwu_dist_long, [:date, :depth_bin]), :RWU_per .=> sum);
+
+# take monthly average
+ctr_rwu_dist_long_d.month = month.(ctr_rwu_dist_long_d.date);
+ctr_rwu_dist_mon = combine(groupby(ctr_rwu_dist_long_d, [:month, :depth_bin]), :RWU_per_sum .=> mean∘skipmissing);
+rename!(ctr_rwu_dist_mon, [:month, :depth_bin, :RWU_per]);
+ctr_rwu_dist_mon.scen .= "Control";
+
+draw(data(ctr_rwu_dist_mon[ctr_rwu_dist_mon.month .>= 4 .&& ctr_rwu_dist_mon.month .<= 10, :])*
+    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric)*visual(Lines), 
+    scales(Color = (; label="Month"),
+           X = (; label="% Contribution to Transpiration"), Y= (; label="RWU Depth Bin (mm)")),
+    axis = (; yreversed = true)
+)
+
+# irrigation stop
+
+irst_rwu_dist = DataFrame(copy(irst_rwu_per'), Symbol.(depths));
+irst_rwu_dist.date = dates_out;
+irst_rwu_dist = mapcols(col -> replace(col, NaN => missing), irst_rwu_dist);
+
+# reformat to long
+irst_rwu_dist_long = stack(irst_rwu_dist, Not(:date), variable_name=:depth, value_name=:RWU_per);
+irst_rwu_dist_long.depth = parse.(Int, irst_rwu_dist_long.depth);
+irst_rwu_dist_long.depth_bin = cut(irst_rwu_dist_long.depth .- 1, depth_bins, extend=true);
+
+# group by depth bin
+irst_rwu_dist_long_d = combine(groupby(irst_rwu_dist_long, [:date, :depth_bin]), :RWU_per .=> sum);
+
+# take monthly average
+irst_rwu_dist_long_d.month = month.(irst_rwu_dist_long_d.date);
+irst_rwu_dist_mon = combine(groupby(irst_rwu_dist_long_d, [:month, :depth_bin]), :RWU_per_sum .=> mean∘skipmissing);
+rename!(irst_rwu_dist_mon, [:month, :depth_bin, :RWU_per]);
+irst_rwu_dist_mon.scen .= "Irrigation Stop";
+
+rwu_dist_mon = [ctr_rwu_dist_mon; irst_rwu_dist_mon];
+
+draw(data(rwu_dist_mon[rwu_dist_mon.month .>= 4 .&& rwu_dist_mon.month .<= 10, :])*
+    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric, layout=:scen)*visual(Lines), 
+    scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
+           X = (; label="% Contribution to Transpiration"), Y= (; label="RWU Depth Bin (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
 )
 
 # compare annual transpiration across scenarios
@@ -982,6 +1042,14 @@ draw(
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
 )
 
+draw(
+    data(df_rwu_tran_filt)*
+    mapping(:t_pet, :RWU, color=:month => nonnumeric, layout=:scen)*visual(Scatter, alpha=.6, markersize=8)+
+    data(med_rwu_comp)*mapping(:RWU_mean, layout=:scen)*visual(HLines, color=:black, linestyle=:dash),
+    scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
+           X = (; label="Transpiration Deficit (-)"), Y= (; label="Weighted-Average\nRoot Water Uptake Depth (mm)")),
+    axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
+)
 
 # compare rwu against swp in each layer
 
