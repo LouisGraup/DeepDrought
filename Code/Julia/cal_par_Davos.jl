@@ -178,51 +178,51 @@ end
 
 ## define calibration parameter sets
 
-n = 1000; # number of parameter sets
+n = 2000; # number of parameter sets
 
 # define prior parameter ranges
 
 param = [ # store unmodified parameter ranges here for posterity
     # hydro parameters
-    ("DRAIN", 0.6, 0.8), # drainage (0, 1)
-    ("INFEXP", 0.2, 0.8), # infiltration exponent (0, 0.9)
-    ("IDEPTH_m", 0.05, 0.9), # infiltration depth (m) (0.05, 1.0)
+    ("DRAIN", 0.65, 0.8), # drainage (0, 1)
+    ("INFEXP", 0.28, 0.7), # infiltration exponent (0, 0.9)
+    ("IDEPTH_m", 0.2, 0.9), # infiltration depth (m) (0.05, 1.0)
     # meteo parameters
     ("ALB", 0.15, 0.3), # surface albedo (0.1, 0.3)
     ("ALBSN", 0.4, 0.75), # snow surface albedo (0.4, 0.8)
     # soil parameters
-    ("RSSA", 100, 1000), # soil resistance (20, 1000)
-    ("ths1", 0.2, 0.6), # theta_sat (0.15, 0.6)
-    ("thr1", 0.0, 0.1), # theta_res (0.0, 0.1)
-    ("ksat1", -0.5, 0.3), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha1", 0.6, 1.3), # multiplier on alpha (0.5, 1.5)
-    ("npar1", 1.15, 1.29), # n (1.15, 1.3)
-    ("ths2", 0.45, 0.55), # theta_sat (0.15, 0.6)
-    ("thr2", 0.03, 0.09), # theta_res (0.0, 0.1)
-    ("ksat2", -0.3, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha2", 0.5, 1.4), # multiplier on alpha (0.5, 1.5)
-    ("npar2", 1.18, 1.29), # n (1.15, 1.3)
-    ("ths3", 0.42, 0.51), # theta_sat (0.15, 0.6)
-    ("thr3", 0.05, 0.1), # theta_res (0.0, 0.1)
-    ("ksat3", -0.2, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
-    ("alpha3", 0.5, 1.1), # multiplier on alpha (0.5, 1.5)
-    ("npar3", 1.15, 1.2), # n (1.15, 1.3)
+    ("RSSA", 300, 800), # soil resistance (20, 1000)
+    ("ths1", 0.3, 0.6), # theta_sat (0.15, 0.6)
+    ("thr1", 0.0, 0.07), # theta_res (0.0, 0.1)
+    ("ksat1", -0.3, 0.3), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha1", 0.6, 1.25), # multiplier on alpha (0.5, 1.5)
+    ("npar1", 1.16, 1.23), # n (1.15, 1.3)
+    ("ths2", 0.48, 0.53), # theta_sat (0.15, 0.6)
+    ("thr2", 0.06, 0.09), # theta_res (0.0, 0.1)
+    ("ksat2", 0.2, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha2", 0.6, 1.2), # multiplier on alpha (0.5, 1.5)
+    ("npar2", 1.2, 1.29), # n (1.15, 1.3)
+    ("ths3", 0.425, 0.44), # theta_sat (0.15, 0.6)
+    ("thr3", 0.075, 0.1), # theta_res (0.0, 0.1)
+    ("ksat3", 0.2, 0.5), # additive factor on log10(k_sat) (-0.5, 0.5)
+    ("alpha3", 0.5, 0.7), # multiplier on alpha (0.5, 1.5)
+    ("npar3", 1.155, 1.17), # n (1.15, 1.3)
     # plant parameters
-    ("CINTRL", 0.1, 0.65), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.02, 0.15), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.001, 0.006), # stomatal conductance (0.001, 0.02)
-    ("CVPD", 0.5, 2.6), # vpd sensitivity (0.5, 3)
+    ("CINTRL", 0.1, 0.2), # interception storage capacity per unit LAI (0.05, 0.75)
+    ("FRINTLAI", 0.02, 0.1), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.003, 0.0045), # stomatal conductance (0.001, 0.02)
+    ("CVPD", 0.5, 1.5), # vpd sensitivity (0.5, 3)
     ("R5", 50, 200), # radiation sensitivity (50, 200)
-    ("T1", 5, 13), # low temperature threshold (5, 15)
-    ("T2", 21, 35), # high temperature threshold (20, 35)
-    ("PSICR", -2.0, -1.1), # critical water potential (-2, -1)
-    ("FXYLEM", 0.18, 0.5), # aboveground xylem fraction (0.1, 0.5)
-    ("MXKPL", 12.0, 30.0), # maximum plant conductivity (7, 30)
-    ("MXRTLN", 2000, 4000), # maximum root length (2000, 4000)
-    ("VXYLEM_mm", 5.0, 62.0), # xylem volume (5, 80)
-    ("DISPERSIVITY_mm", 31.0, 48.0), # dispersivity coefficient (30, 50)
-    ("MAXROOTDEPTH", -2.0, -0.8), # max rooting depth (-2, -0.8)
-    ("BETAROOT", 0.9, 0.99) # beta root coefficient (0.9, 0.999)
+    ("T1", 7, 12), # low temperature threshold (5, 15)
+    ("T2", 23, 33), # high temperature threshold (20, 35)
+    ("PSICR", -2.0, -1.2), # critical water potential (-2, -1)
+    ("FXYLEM", 0.2, 0.54), # aboveground xylem fraction (0.1, 0.5)
+    ("MXKPL", 17.0, 30.0), # maximum plant conductivity (7, 30)
+    ("MXRTLN", 2400, 3700), # maximum root length (2000, 4000)
+    ("VXYLEM_mm", 5.0, 42.0), # xylem volume (5, 80)
+    ("DISPERSIVITY_mm", 33.0, 41.0), # dispersivity coefficient (30, 50)
+    ("MAXROOTDEPTH", -1.8, -1.0), # max rooting depth (-2, -0.8)
+    ("BETAROOT", 0.9, 0.98) # beta root coefficient (0.9, 0.999)
 ];
 
 ### END USER INPUT ###
