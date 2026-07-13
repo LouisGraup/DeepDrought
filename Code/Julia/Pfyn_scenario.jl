@@ -864,8 +864,15 @@ ctr_rwu_dist_mon = combine(groupby(ctr_rwu_dist_long_d, [:month, :depth_bin]), :
 rename!(ctr_rwu_dist_mon, [:month, :depth_bin, :RWU_per]);
 ctr_rwu_dist_mon.scen .= "Control";
 
+# calculate rooting fractions according to beta
+beta_ctr = sim_ctr.parametrizedSPAC.pars.root_distribution.beta;
+root_frac_ctr = beta_ctr.^(depth_bins[1:end-1] ./ 10) .- beta_ctr.^(depth_bins[2:end] ./ 10);
+df_root_ctr = DataFrame(depth_bin = cut(depth_bins[2:end].-1, depth_bins, extend=true), 
+    root_frac = root_frac_ctr .* 100, scen="Control");
+
 draw(data(ctr_rwu_dist_mon[ctr_rwu_dist_mon.month .>= 4 .&& ctr_rwu_dist_mon.month .<= 10, :])*
-    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric)*visual(Lines), 
+    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric)*visual(Lines)+
+    data(df_root_ctr)*mapping(:root_frac, :depth_bin)*visual(Lines, color=:black, linewidth=2),
     scales(Color = (; label="Month"),
            X = (; label="% Contribution to Transpiration"), Y= (; label="RWU Depth Bin (mm)")),
     axis = (; yreversed = true)
@@ -891,10 +898,18 @@ irst_rwu_dist_mon = combine(groupby(irst_rwu_dist_long_d, [:month, :depth_bin]),
 rename!(irst_rwu_dist_mon, [:month, :depth_bin, :RWU_per]);
 irst_rwu_dist_mon.scen .= "Irrigation Stop";
 
+# calculate rooting fractions according to beta
+beta_irst = sim_irst.parametrizedSPAC.pars.root_distribution.beta;
+root_frac_irst = beta_irst.^(depth_bins[1:end-1] ./ 10) .- beta_irst.^(depth_bins[2:end] ./ 10);
+df_root_irst = DataFrame(depth_bin = cut(depth_bins[2:end].-1, depth_bins, extend=true), 
+    root_frac = root_frac_irst .* 100, scen="Irrigation Stop");
+
 rwu_dist_mon = [ctr_rwu_dist_mon; irst_rwu_dist_mon];
+df_root_dist = [df_root_ctr; df_root_irst];
 
 draw(data(rwu_dist_mon[rwu_dist_mon.month .>= 4 .&& rwu_dist_mon.month .<= 10, :])*
-    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric, layout=:scen)*visual(Lines), 
+    mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric, layout=:scen)*visual(Lines)+
+    data(df_root_dist)*mapping(:root_frac, :depth_bin, layout=:scen)*visual(Lines, color=:black, linewidth=2), 
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="% Contribution to Transpiration"), Y= (; label="RWU Depth Bin (mm)")),
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
