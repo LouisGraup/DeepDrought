@@ -1,0 +1,15 @@
+Site,Date,Type,Beprobungsperson,Messperson,TreeNr,Species,HarvestTime,MessTime,HarvestHeight_m,Light,Weather,Leaf1_bar,Leaf2_bar,Leaf3_bar,Remarks,LWP_mean
+VOR,24.07.2026,Predawn,Dennis,Andreas,1569,Tanne,02:30,02:35,2.0,night,klar,6,9,7,,7
+VOR,24.07.2026,Predawn,Dennis,Andreas,1473,Tanne,02:50,02:55,6.0,night,klar,7,8,8,,8
+VOR,24.07.2026,Predawn,Dennis,Andreas,1303,Tanne,03:00,03:05,8.0,night,klar,6,6,6,,6
+VOR,24.07.2026,Predawn,Andreas,Andreas,60,Buche,03:15,03:20,2.0,night,klar,3,4,4,,4
+VOR,24.07.2026,Predawn,Andreas,Louis,1378,Buche,03:30,03:35,3.0,night,klar,2,3,5,leaf 3 harvested at  9m,3
+VOR,24.07.2026,Predawn,Dennis,Louis,1379,Buche,03:45,03:50,2.0,night,klar,3,4,4,,4
+VOR,24.07.2026,Predawn,Andreas,Dennis,59,Buche,04:35,04:40,5.0,night,klar,1,1,1,height gradient (2/5/9),1
+VOR,24.07.2026,Midday,Andreas,Dennis,1569,Tanne,11:30,11:35,4.0,kein,sonnig,12,12,12,,12
+VOR,24.07.2026,Midday,Andreas,Dennis,1473,Tanne,11:35,11:40,6.0,halb,sonnig,16,17,15,,16
+VOR,24.07.2026,Midday,Andreas,Dennis,1303,Tanne,11:45,11:50,8.0,halb,sonnig,12,12,12,,12
+VOR,24.07.2026,Midday,Louis,Dennis,60,Buche,12:00,12:05,2.0,voll,sonnig,14,14,15,,14
+VOR,24.07.2026,Midday,Louis,Dennis,1379,Buche,12:05,12:10,2.0,voll,sonnig,14,15,14,,14
+VOR,24.07.2026,Midday,Louis,Dennis,1378,Buche,12:10,12:15,3.0,halb,sonnig,16,17,21,leaf 3 harvested at  9m,18
+VOR,24.07.2026,Midday,Andreas,Dennis,59,Buche,12:15,12:20,5.0,halb,sonnig,13,14,14,height gradient (2/5/9),14

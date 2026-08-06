@@ -8,15 +8,19 @@ LWP_Bhutan$Date = if_else(LWP_Bhutan$Date == "10.07.2026", "09.07.2026", LWP_Bhu
 
 LWP_Visp = read_csv("../../Data/Visp/LWP_Visp.csv")
 LWP_Visp$Date = if_else(LWP_Visp$Date == "11.07.2026", "10.07.2026", LWP_Visp$Date) # shift date for predawn-midday comparison
-LWP_Visp$TreeNr = LWP_Visp$Remarks # use shorthand notation instead of tree #
+LWP_Visp$TreeNr = LWP_Visp$TreeID # use shorthand notation instead of tree #
 
-LWP_comp = rbind(LWP_Bhutan, select(LWP_Visp, -Remarks))
+LWP_VOR = read_csv("../../Data/Vordemwald/LWP_VOR.csv")
+
+LWP_comp = rbind(LWP_Bhutan, select(LWP_Visp, -TreeID))
+LWP_comp = rbind(LWP_comp, LWP_VOR)
 LWP_comp$Date = as.Date(LWP_comp$Date, format="%d.%m.%Y")
 LWP_comp$Species = case_when(LWP_comp$Species == "Eiche" ~ "Oak",
                              LWP_comp$Species == "Esche" ~ "Ash",
                              LWP_comp$Species == "Fichte" ~ "Spruce",
                              LWP_comp$Species == "Tanne" ~ "Fir",
                              LWP_comp$Species == "Foehre" ~ "Pine",
+                             LWP_comp$Species == "Buche" ~ "Beech",
                              .default = "Other")
 
 ggplot(LWP_comp, aes(Species, LWP_mean, group=interaction(Type, Species), fill=Species, alpha=Type))+geom_boxplot()+
