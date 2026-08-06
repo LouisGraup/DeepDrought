@@ -21,25 +21,25 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    #= return met[met.swc_nse10 .> 0.81 .&& 
-               met.swc_nse80 .> 0.61 .&&
-               met.swp_nse10 .> 0.71 .&&
-               met.swp_nse80 .> 0.51 .&&
-               met.trans_cor .> 0.7, :] =#
+    return met[met.swc_nse10 .> 0.82 .&& 
+               met.swc_nse80 .> 0.62 .&&
+               met.swp_nse10 .> 0.72 .&&
+               met.swp_nse80 .> 0.52 .&&
+               met.trans_cor .> 0.7, :]
 
     # irrigation metrics
-    #= return met[met.swc_nse10 .> 0.3 .&& 
-               met.swc_nse80 .> -0.4 .&&
-               met.swp_nse10 .> -0.15 .&&
-               met.swp_nse80 .> -0.6 .&&
+    #= return met[met.swc_nse10 .> 0.4 .&& 
+               met.swc_nse80 .> -0.3 .&&
+               met.swp_nse10 .> -0.05 .&&
+               met.swp_nse80 .> -0.56 .&&
                met.trans_cor .> 0.91, :] =#
 
     # irr stop metrics
-    return met[met.swc_nse10 .> 0.83 .&& 
-               met.swc_nse80 .> 0.66 .&&
-               met.swp_nse10 .> 0.67 .&&
-               met.swp_nse80 .> 0.56 .&&
-               met.trans_cor .> 0.74, :]
+    #= return met[met.swc_nse10 .> 0.87 .&& 
+               met.swc_nse80 .> 0.7 .&&
+               met.swp_nse10 .> 0.7 .&&
+               met.swp_nse80 .> 0.59 .&&
+               met.trans_cor .> 0.75, :] =#
 end
 
 function behave(met)
@@ -169,12 +169,12 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260723.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20260723.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260726.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260723.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20260723.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260726.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260729.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260728.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260801.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260729.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260728.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260801.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -214,7 +214,7 @@ density_plot(met_ctr_good)
 density_plot(met_irr_good)
 density_plot(met_irst_good)
 
-describe(met_irst_good)
+describe(met_ctr_good)
 
 # compare metrics across depths
 met_plot(met_ctr_good, :swc_nse10, :swc_nse80)
@@ -288,7 +288,7 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irst..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_ctr..., size=(1000,1000), layout=(5,6), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
 
