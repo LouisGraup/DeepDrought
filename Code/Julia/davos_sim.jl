@@ -5,6 +5,8 @@ using CairoMakie, AlgebraOfGraphics, CategoricalArrays, Chain;
 using Measures, Plots; gr()
 using LWFBrook90
 
+include("run_LWFB90_param.jl");
+
 function NSE(sim, obs)
         # calculate Nash-Sutcliffe Efficiency
         nse = 1 - (sum((obs .- sim).^2) / sum((obs .- mean(obs)).^2))
@@ -24,9 +26,10 @@ plotforcingandstates(sim)
 plotamounts(sim, :above_and_belowground, :showRWUcentroid)
 plotisotopes(sim, :d18O, (d18O = :auto, d2H = :auto), :showRWUcentroid)
 
+sim = run_LWFB90_param(par_best, Date(2007, 1, 1), Date(2024, 12, 31), "LWFBinput/Davos/", "davos", "LWFB_testrun/davos/");
+
 # compare against flux tower ET
-flux = CSV.read("../../Data/Davos/meteo/Davos_meteo.csv", DataFrame);
-select!(flux, [:date, :ET]);
+flux = CSV.read("../../Data/Davos/Davos_ET.csv", DataFrame);
 flux.meta .= "Flux";
 
 sim_ET = get_fluxes(sim);

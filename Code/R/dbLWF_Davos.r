@@ -39,8 +39,7 @@ soil.df <- data.df %>% rename(datetime = messtime, depth = varvpos, value = mess
 soil.df$depth = factor(soil.df$depth, levels=c(-0.05, -0.15, -0.5, -0.8, -1.5))
 
 # soil water content
-SWC = soil.df %>% filter(varname_name == "Soil water content", 
-                         !(messvar_name %in% c("SWC1_15_Avg", "SWC3_15_Avg", "SWC1_50_Avg", "SWC2_50_Avg", "SWC1_80_Avg")))
+SWC = soil.df %>% filter(varname_name == "Soil water content", grepl("EC", messvar_name))
 SWC$value[SWC$value < .1 | SWC$value > .52] = NA
 
 ggplot(SWC, aes(datetime, value, color=messvar_name))+geom_line()+facet_wrap(~depth)+
@@ -62,44 +61,24 @@ SWC_daily = SWC %>% mutate(date=as.Date(datetime)) %>% select(-datetime) %>%
 ggplot(SWC_daily, aes(date, SWC, color=messvar_name))+geom_line()+
   facet_wrap(~depth)+guides(color="none")+theme_bw()+labs(x="")
 
-# remove unreliable sensors
-SWC_filt = SWC_daily %>% filter(SWC > 0,
-            !(messvar_name %in% c("SWC4_15_Avg","BodenFeu15_Avg","EC3_15cm",
-                                  "SWC3_50_Avg","SWC4_50_Avg",
-                                  "SWC3_80_Avg","SWC4_80_Avg","EC2_80cm")))
+# choose individual sensors for each depth
+SWC_filt = SWC_daily %>% mutate(depth = depth * -1000) %>% 
+  filter(messvar_name %in% c("EC1_15cm","EC3_50cm","EC2_80cm")) #,"EC2_150cm"))
 
-ggplot(filter(SWC_filt, depth==-1.5), aes(date, SWC, color=messvar_name))+geom_line()+
+ggplot(SWC_filt, aes(date, SWC, color=messvar_name))+geom_line()+
   theme_bw()+labs(x="")
 
-# average of sensors for each depth
-SWC_avg = SWC_filt %>% select(-messvar_name) %>% 
-  group_by(date, depth) %>% summarize_all(list(mean), na.rm=T)
-
-ggplot(SWC_avg, aes(date, SWC, color=depth))+geom_line()+facet_wrap(~depth)
-
-# remove factor from depth
-SWC_avg$depth = as.numeric(levels(SWC_avg$depth))[SWC_avg$depth]
-
-# clean time series
-SWC_clean = SWC_avg %>% 
-  filter(depth != -0.05, date < "2025-12-31",
-         !(depth==-0.15 & (SWC < .275 | SWC > .35)),
-         !(depth==-0.15 & (date > "2024-09-01" | date < "2020-06-01")),
-         !(depth==-0.15 & (date > "2020-12-31" & date < "2021-04-01")),
-         !(depth==-0.5 & date < "2020-06-01"), 
-         !(depth==-0.5 & SWC < .33)) %>% 
-  mutate(depth = depth * -1000)
-
-ggplot(SWC_clean, aes(date, SWC, color=as.factor(depth)))+geom_line()+facet_wrap(~depth)
+SWC_cal = select(SWC_filt, -messvar_name)
 
 # calibration ready output
-# write_csv(SWC_clean, "../../Data/Davos/Davos_SWC_cal.csv")
+# write_csv(SWC_cal, "../../Data/Davos/Davos_SWC_cal.csv")
 
 # soil water potential
 SWP = soil.df %>% filter(varname_name == "Soil water matric potential") %>% 
   select(-varname_name) %>% rename(SWP=value) %>% 
-  filter(SWP > -2000, SWP < 0, !is.na(depth), depth != -0.05, 
+  filter(!is.na(depth), depth != -0.05, depth != -0.45,
          messvar_name != "PsiSoil15_kPa_Avg")
+SWP$SWP[SWP$SWP < -2000 | SWP$SWP > 0] = NA
 
 ggplot(SWP, aes(datetime, SWP, color=messvar_name))+geom_line()+facet_wrap(~depth)+
   guides(color="none")
@@ -119,12 +98,12 @@ ggplot(SWP_daily, aes(date, -SWP, color=messvar_name))+geom_line()+
   scale_y_log10()+facet_wrap(~depth)+guides(color="none")+theme_bw()
 
 # average of sensors for each depth
-SWP_avg = SWP_daily %>% select(-messvar_name) %>% 
+SWP_avg = SWP_daily %>% select(-messvar_name) %>% filter(depth != -1.5) %>% 
   group_by(date, depth) %>% summarize(SWP=mean(SWP, na.rm=T)) %>% 
   mutate(depth = depth * -1000)
 
 ggplot(SWP_avg, aes(date, SWP, color=as.factor(depth)))+geom_line()+facet_wrap(~depth)+
-  guides(color="none")
+  guides(color="none")+theme_bw()
 
 # calibration ready output
 # write_csv(SWP_avg, "../../Data/Davos/Davos_SWP_cal.csv")
