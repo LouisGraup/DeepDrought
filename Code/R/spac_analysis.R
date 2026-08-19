@@ -145,13 +145,9 @@ ggplot(filter(meteo, date >= "2022-08-01", date<"2025-10-01"), aes(date, precip)
 ## compare against soil water potential
 
 declab = read_csv("N:/prj/Soil/Projekte/Pfynwald/Pfynwald_KM/1_Decent_lab_data/filtered/PFY_hh_all_filtered_2025-11-04.csv")
-declab_test = read_csv("N:/prj/Soil/Projekte/Pfynwald/Pfynwald_KM/1_Decent_lab_data/filtered/PFY_hh_test.csv")
 
 # temp- and dry-corrected SWP
 SWP = declab %>% filter(para == "SWP") %>% rename(SWP=value, datetime=hour) %>% 
-  select(-c(para, sensor, plot, yr, mo)) %>% mutate(date = as.Date(datetime), hour=hour(datetime))
-# only temp-corrected SWP
-SWP = declab_test %>% filter(para == "swpt") %>% rename(SWP=value, datetime=hour) %>% 
   select(-c(para, sensor, plot, yr, mo)) %>% mutate(date = as.Date(datetime), hour=hour(datetime))
 
 # average daily SWP
