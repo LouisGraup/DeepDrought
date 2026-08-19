@@ -222,3 +222,63 @@ ggplot(TN_daily, aes(date, twd_pdn, color=as.factor(tree_name)))+geom_line()+
   facet_wrap(~meta, ncol=1)+guides(color="none")+theme_bw()
 
 #write_csv(TN_daily, "../../Data/Pfyn/TreeNet/Pfyn_twd_2010_25.csv")
+
+
+# analyze TreeNet data for legacy effects
+
+irr = read_csv("../../Data/Pfyn/irrigation.csv")
+
+TN_legacy = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_dendro_legacy.csv")
+TN_leg_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_dendro_legacy.csv")
+
+TN_leg_meta$meta = TN_leg_meta$site_subplot
+
+# formatting
+TN_legacy$date = as.Date(TN_legacy$ts)
+TN_legacy$hour = hour(TN_legacy$ts)
+
+TN_legacy = TN_legacy %>% filter(frost == FALSE, !(series_id %in% c(912, 913, 1008, 1021))) %>% 
+  select(-c(frost, flags, gro_start, gro_end)) %>% 
+  left_join(select(TN_leg_meta, series_id, tree_name, meta))
+
+#TN_legacy = filter(TN_legacy, tree_name != 622, tree_name != 239)
+
+ggplot(TN_legacy, aes(ts, value, color=as.factor(tree_name)))+geom_line()+
+  facet_wrap(~meta)+guides(color="none")
+
+# ggplot(TN_legacy, aes(ts, twd, color=meta, fill=meta))+
+#  stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon")+
+#  theme_bw()+labs(x="", y="TWD (um)")
+
+TN_leg_daily = TN_legacy %>% group_by(date, tree_name, meta) %>% 
+  summarize_at(vars(twd, gro_yr), list(max)) %>% 
+  mutate(year=year(date), month=month(date))
+
+# growth of individual trees across scenarios
+ggplot(filter(TN_leg_daily, year>2010), aes(date, gro_yr, color=as.factor(tree_name)))+geom_line()+
+  facet_wrap(~meta, ncol=1)+theme_bw()
+
+# twd of individual trees across scenarios
+ggplot(filter(TN_leg_daily, year>2010), aes(date, twd, color=as.factor(tree_name)))+geom_line()+
+  facet_wrap(~meta, ncol=1)+theme_bw()
+
+# summarized growth across scenarios per year
+ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date, gro_yr, color=meta, fill=meta))+
+  stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
+  facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
+  scale_color_manual(values=c("#E69F00","#009E73","#56B4E9"))+
+  scale_fill_manual(values=c("#E69F00","#009E73","#56B4E9"))
+
+# comparison of control vs irrigation stop growth
+ggplot(filter(TN_leg_daily, meta != "Irrigation", year>2013, month>3), aes(date, gro_yr, color=meta, fill=meta))+
+  stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
+  facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
+  scale_color_manual(values=c("#E69F00","#009E73"))+
+  scale_fill_manual(values=c("#E69F00","#009E73"))
+
+# summarized twd across scenarios per year
+ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date, twd, color=meta, fill=meta))+
+  stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
+  facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
+  scale_color_manual(values=c("#E69F00","#009E73","#56B4E9"))+
+  scale_fill_manual(values=c("#E69F00","#009E73","#56B4E9"))
