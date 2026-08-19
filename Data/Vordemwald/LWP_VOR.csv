@@ -13,3 +13,27 @@ VOR,24.07.2026,Midday,Louis,Dennis,60,Buche,12:00,12:05,2.0,voll,sonnig,14,14,15
 VOR,24.07.2026,Midday,Louis,Dennis,1379,Buche,12:05,12:10,2.0,voll,sonnig,14,15,14,,14
 VOR,24.07.2026,Midday,Louis,Dennis,1378,Buche,12:10,12:15,3.0,halb,sonnig,16,17,21,leaf 3 harvested at  9m,18
 VOR,24.07.2026,Midday,Andreas,Dennis,59,Buche,12:15,12:20,5.0,halb,sonnig,13,14,14,height gradient (2/5/9),14
+VOR,13.08.2026,Midday,LG,LG,1303,Tanne,11:15,11:20,4,half,good,14,13,14,,14
+VOR,13.08.2026,Midday,AD,AD,1473,Tanne,11:20,11:25,6,half,good,17,18,18,,18
+VOR,13.08.2026,Midday,AD,LG,1569,Tanne,11:35,11:40,6,none,good,13,14,14,,14
+VOR,13.08.2026,Midday,PW,LG,1300,Fichte,11:40,11:45,25,full,good,18,20,21,,20
+VOR,13.08.2026,Midday,PW,LG,1375,Fichte,11:50,11:55,25,full,good,17,18,21,,19
+VOR,13.08.2026,Midday,PW,AD,1286,Fichte,12:00,12:05,25,full,good,22,23,25,,23
+VOR,13.08.2026,Midday,PW,LG,1301,Tanne,12:05,12:10,25,full,good,16,18,19,,18
+VOR,13.08.2026,Midday,AD,AO,60,Buche,12:10,12:15,5,half,good,15,16,17,,16
+VOR,13.08.2026,Midday,AD,AD,59,Buche,12:20,12:25,4,none,good,14,15,15,,15
+VOR,13.08.2026,Midday,AO,LG,1378,Buche,12:40,12:45,8,none,good,19,21,21,,20
+VOR,13.08.2026,Midday,PW,LG,1379,Buche,12:50,12:55,10,halb,good,19,20,21,,20
+VOR,13.08.2026,Midday,LG,LG,1463,Tanne,13:10,13:15,6,none,good,15,17,17,,16
+VOR,14.08.2026,Predawn,LG,AD,1569,Tanne,2:35,2:45,6,dark,clear,12,13,13,,13
+VOR,14.08.2026,Predawn,AD,LG,1473,Tanne,2:50,2:55,6,dark,clear,12,13,14,,13
+VOR,14.08.2026,Predawn,AD,AD,1303,Tanne,2:55,3:00,5,dark,clear,10,11,11,,11
+VOR,14.08.2026,Predawn,PW,LG,1300,Fichte,3:00,3:05,25,dark,clear,18,18,17,,18
+VOR,14.08.2026,Predawn,PW,AD,1375,Fichte,3:10,3:15,25,dark,clear,17,18,18,,18
+VOR,14.08.2026,Predawn,PW,LG,1301,Tanne,3:20,3:25,25,dark,clear,15,15,15,,15
+VOR,14.08.2026,Predawn,PW,AD,1286,Fichte,3:30,3:35,25,dark,clear,15,16,17,,16
+VOR,14.08.2026,Predawn,LG,LG,1463,Tanne,3:40,3:45,6,dark,clear,15,15,17,,16
+VOR,14.08.2026,Predawn,PW,AD,1379,Buche,3:55,4:00,10,dark,clear,9,9,10,,9
+VOR,14.08.2026,Predawn,PW,LG,1378,Buche,3:50,3:55,8,dark,clear,9,10,15,*** small petiole,10
+VOR,14.08.2026,Predawn,LG,LG,60,Buche,4:00,4:05,5,dark,clear,4,5,5,,5
+VOR,14.08.2026,Predawn,AD,AD,59,Buche,4:00,4:05,6,dark,clear,3,4,4,,4

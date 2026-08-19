@@ -11,6 +11,8 @@ LWP_Visp$Date = if_else(LWP_Visp$Date == "11.07.2026", "10.07.2026", LWP_Visp$Da
 LWP_Visp$TreeNr = LWP_Visp$TreeID # use shorthand notation instead of tree #
 
 LWP_VOR = read_csv("../../Data/Vordemwald/LWP_VOR.csv")
+LWP_VOR$Date = if_else(LWP_VOR$Date == "14.08.2026", "13.08.2026", LWP_VOR$Date) # shift date for predawn-midday comparison)
+LWP_VOR$Site = "Vordemwald"
 
 LWP_comp = rbind(LWP_Bhutan, select(LWP_Visp, -TreeID))
 LWP_comp = rbind(LWP_comp, LWP_VOR)
@@ -23,16 +25,16 @@ LWP_comp$Species = case_when(LWP_comp$Species == "Eiche" ~ "Oak",
                              LWP_comp$Species == "Buche" ~ "Beech",
                              .default = "Other")
 
-ggplot(LWP_comp, aes(Species, LWP_mean, group=interaction(Type, Species), fill=Species, alpha=Type))+geom_boxplot()+
+ggplot(LWP_comp, aes(Species, LWP_mean / -10, group=interaction(Type, Species), fill=Species, alpha=Type))+geom_boxplot()+
   facet_wrap(~Site, nrow=1, scales="free_x")+theme_bw()+scale_alpha_manual(values=c(0.2, 1.0))+
   guides(alpha=guide_legend(override.aes = list(fill="black")))+
-  labs(y="LWP (bar)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
+  labs(y="LWP (MPa)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
   theme(axis.text=element_text(size=12), axis.title=element_text(size=14), 
         strip.text.x=element_text(size=14), plot.title=element_text(size=16, hjust=.5))
 
-ggplot(LWP_comp, aes(TreeNr, LWP_mean, group=interaction(Type, Species), color=Species, shape=Type))+geom_point(size=2.5)+
+ggplot(LWP_comp, aes(TreeNr, LWP_mean / -10, group=interaction(Type, Species), color=Species, shape=Type))+geom_point(size=2.5)+
   facet_wrap(~Site, nrow=1, scales="free_x")+theme_bw()+
-  labs(x="Tree ID", y="LWP (bar)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
+  labs(x="Tree ID", y="LWP (MPa)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
   theme(axis.text=element_text(size=12), axis.title=element_text(size=14), 
         strip.text.x=element_text(size=14), plot.title=element_text(size=16, hjust=.5))
 
@@ -40,8 +42,8 @@ ggplot(LWP_comp, aes(TreeNr, LWP_mean, group=interaction(Type, Species), color=S
 LWP_pdmd = LWP_comp %>% select(Site, Date, Type, TreeNr, Species, LWP_mean) %>% 
   pivot_wider(names_from=Type, values_from=LWP_mean) %>% mutate(LWP_diff = Midday - Predawn)
 
-ggplot(LWP_pdmd, aes(Species, LWP_diff, fill=Species))+geom_boxplot()+
+ggplot(LWP_pdmd, aes(Species, LWP_diff / -10, fill=Species))+geom_boxplot()+
   facet_wrap(~Site, nrow=1, scales="free_x")+theme_bw()+
-  labs(y="LWP difference (Midday - Predawn) (bar)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
+  labs(y="LWP difference (Midday - Predawn) (MPa)")+ggtitle("Leaf water potential (LWP) measurements comparison")+
   theme(axis.text=element_text(size=12), axis.title=element_text(size=14), 
         strip.text.x=element_text(size=14), plot.title=element_text(size=16, hjust=.5))
