@@ -66,7 +66,12 @@ end
     rmse50 = RMSE(sim_50cm, obs_50cm.SWC_500mm);
     rmse80 = RMSE(sim_80cm, obs_80cm.SWC_800mm);
 
-    return nse15, rmse15, nse50, rmse50, nse80, rmse80
+    # calculate correlation coefficient
+    cor15 = cor(sim_15cm, obs_15cm.SWC_150mm);
+    cor50 = cor(sim_50cm, obs_50cm.SWC_500mm);
+    cor80 = cor(sim_80cm, obs_80cm.SWC_800mm);
+
+    return nse15, rmse15, cor15, nse50, rmse50, cor50, nse80, rmse80, cor80
 end
 
 @everywhere function obj_fun_swp(sim, obs)
@@ -197,20 +202,20 @@ param = [ # store unmodified parameter ranges here for posterity
     ("alpha2", 2, 25), # alpha (2, 25)
     ("npar2", 1.15, 1.3), # n (1.15, 1.3)
     ("tort2", -10, 10), # tortuosity (−10, 10)
-    ("ths3", 0.15, 0.6), # theta_sat (0.15, 0.6)
+    ("ths3", 0.3, 0.6), # theta_sat (0.15, 0.6)
     ("thr3", 0.0, 0.1), # theta_res (0.0, 0.1)
-    ("ksat3", 1, 5000), # k_sat (1, 5000)
+    ("ksat3", 1, 4000), # k_sat (1, 5000)
     ("alpha3", 2, 25), # alpha (2, 25)
     ("npar3", 1.15, 1.3), # n (1.15, 1.3)
     ("tort3", -10, 10), # tortuosity (−10, 10)
     # plant parameters
-    ("CINTRL", 0.1, 0.75), # interception storage capacity per unit LAI (0.05, 0.75)
-    ("FRINTLAI", 0.02, 0.2), # interception catch fraction per unit LAI (0.02, 0.2)
-    ("GLMAX", 0.001, 0.02), # stomatal conductance (0.001, 0.02)
-    ("CVPD", 0.5, 3.0), # vpd sensitivity (0.5, 3)
+    ("CINTRL", 0.1, 0.4), # interception storage capacity per unit LAI (0.05, 0.75)
+    ("FRINTLAI", 0.02, 0.1), # interception catch fraction per unit LAI (0.02, 0.2)
+    ("GLMAX", 0.001, 0.01), # stomatal conductance (0.001, 0.02)
+    ("CVPD", 0.5, 2.0), # vpd sensitivity (0.5, 3)
     ("R5", 50, 200), # radiation sensitivity (50, 200)
     ("T1", 5, 15), # low temperature threshold (5, 15)
-    ("T2", 20, 35), # high temperature threshold (20, 35)
+    ("T2", 20, 29), # high temperature threshold (20, 35)
     ("PSICR", -3.0, -1.0), # critical water potential (-3, -1)
     ("FXYLEM", 0.1, 0.5), # aboveground xylem fraction (0.1, 0.5)
     ("MXKPL", 7.0, 30.0), # maximum plant conductivity (7, 30)
@@ -421,7 +426,7 @@ end_index = Dates.value(end_date - ref_date);
     try
         simulate!(sim);
     catch
-        return (par_id, fill(0, 6), fill(0, 3), fill(0, 3)) # skip if simulation fails
+        return (par_id, fill(0, 9), fill(0, 3), fill(0, 3)) # skip if simulation fails
     end
 
     ## retrieve model output
@@ -459,11 +464,14 @@ results = pmap(i -> run_calibration(i), 1:nsets);
 # intialize metric dataframes
 metrics = DataFrame(scen = Int[],
     swc_nse15 = Float64[],
-    rmse_nse15 = Float64[],
+    swc_rmse15 = Float64[],
+    swc_cor15 = Float64[],
     swc_nse50 = Float64[],
-    rmse_nse50 = Float64[],
+    swc_rmse50 = Float64[],
+    swc_cor50 = Float64[],
     swc_nse80 = Float64[],
-    rmse_nse80 = Float64[],
+    swc_rmse80 = Float64[],
+    swc_cor80 = Float64[],
     swp_nse15 = Float64[],
     swp_nse50 = Float64[],
     swp_nse80 = Float64[],

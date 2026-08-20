@@ -15,22 +15,23 @@ function density_plot(met)
     density(met.swp_nse15, label="NSE15")
     density!(met.swp_nse50, label="NSE50")
     density!(met.swp_nse80, label="NSE80")
-    density!(met.swp_nse150, label="NSE150")
 end
 
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
 
-    return(met[met.swc_nse15 .> -1.4 .&&
-               met.swc_nse50 .> -1.15 .&&
-               met.swc_nse80 .> -1.15 .&&
-               met.swc_nse150 .> -1.35 .&&
-               met.swp_nse15 .> -6.0 .&&
-               met.swp_nse50 .> -1.55 .&&
-               met.swp_nse80 .> -0.2 .&&
-               met.swp_nse150 .> 0.0 .&&
-               met.et_cor .> 0.67 .&&
-               met.et_nse .> 0.2, :])
+    return(met[#met.rmse_nse15 .< 0.05 .&&
+               #met.rmse_nse50 .< 0.08 .&&
+               #met.rmse_nse80 .< 0.1 .&&
+               met.swc_nse15 .> -100.0 .&&
+               met.swc_nse50 .> -100.0 .&&
+               met.swc_nse80 .> -500.0 .&&
+               met.swp_nse15 .> -10.0 .&&
+               met.swp_nse50 .> -10.0 .&&
+               met.swp_nse80 .> -10.0 .&&
+               met.et_cor .> 0.6 .&&
+               met.et_nse .> 0.2 .&&
+               met.max_ET .< 5, :])
 
 end
 
@@ -111,8 +112,9 @@ end
 
 # function to add combined metrics to DataFrame
 function met_comb!(met)
-    met.swc_nse_com = sqrt.((met.swc_nse15 .^ 2 + met.swc_nse50 .^ 2 + met.swc_nse80 .^ 2 + met.swc_nse150 .^ 2) / 4);
-    met.swp_nse_com = sqrt.((met.swp_nse15 .^ 2 + met.swp_nse50 .^ 2 + met.swp_nse80 .^ 2 + met.swp_nse150 .^ 2) / 4);
+    met.swc_nse_com = sqrt.((met.swc_nse15 .^ 2 + met.swc_nse50 .^ 2 + met.swc_nse80 .^ 2) / 3);
+    met.swc_rmse_com = sqrt.((met.swc_rmse15 .^ 2 + met.swc_rmse50 .^ 2 + met.swc_rmse80 .^ 2) / 3);
+    met.swp_nse_com = sqrt.((met.swp_nse15 .^ 2 + met.swp_nse50 .^ 2 + met.swp_nse80 .^ 2) / 3);
     met.met_com = sqrt.((met.swc_nse_com .^ 2 + met.swp_nse_com .^ 2 + met.et_nse .^ 2) / 3);
     return nothing
 end
@@ -127,8 +129,8 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_davos_20260801.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_davos_20260801.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_davos_20260818.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_davos_20260818.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);
@@ -142,6 +144,9 @@ density!(met.et_nse, label="NSE")
 
 density(met.max_ET)
 
+scatter(met.max_ET, met.et_nse)
+scatter(met.max_ET, met.et_cor)
+
 # add combined metrics
 met_comb!(met);
 
@@ -154,9 +159,9 @@ density_plot(met_good)
 
 
 # compare metrics across depths
-met_plot(met_good, [:swp_nse15, :swp_nse50, :swp_nse80, :swp_nse150], [:swp_nse50, :swp_nse80, :swp_nse150, :swp_nse15])
+met_plot(met_good, [:swp_nse15, :swp_nse50, :swp_nse80], [:swp_nse50, :swp_nse80, :swp_nse15])
 
-met_plot(met_good, [:swp_nse15, :swp_nse50, :swp_nse80, :swp_nse150], [:et_nse, :et_nse, :et_nse, :et_nse])
+met_plot(met_good, [:swp_nse15, :swp_nse50, :swp_nse80], [:et_nse, :et_nse, :et_nse])
 
 # best control scenario
 scen_max, met_max = met_best_scen(met_good);
