@@ -81,7 +81,7 @@ ht_irr = mean(filter(site_df, BEZKM == "irrigation")$height_m)
 ht_stp = mean(filter(site_df, BEZKM == "stop")$height_m)
 
 # modeled LAI data from prepLWFjl.R
-LAI_df = read_csv("../../Data/Pfyn/LAI_ext.csv")
+LAI_df = read_csv("../../Data/Pfyn/LAI_sens.csv")
 
 # soil data
 soil_df = read_csv("../../Data/Pfyn/soil_hydraulic.csv")
@@ -117,6 +117,17 @@ par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp, winlaifrac=.6, height=ht_st
                            coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
 generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
 #extend_meteoveg(meteo_irrstp, "Pfyn_irrigiso_stop")
+
+# negative legacy effect on irrigation stop scenario
+par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_neg, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
+                           coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_neg","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
+
+# positive legacy effect on irrigation stop scenario
+par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_pos, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
+                           coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_pos","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
+
 
 # irrigation scenarios use same parameters
 par_ir = set_paramLWFB90(maxlai=LAI_df$LAI_irr, winlaifrac=.6, height=ht_irr, height_ini=ht_irr, 
