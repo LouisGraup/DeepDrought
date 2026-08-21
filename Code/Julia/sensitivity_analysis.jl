@@ -35,8 +35,8 @@ function behavioral_met(met)
                met.trans_cor .> 0.91, :] =#
 
     # irr stop metrics
-    #= return met[met.swc_nse10 .> 0.87 .&& 
-               met.swc_nse80 .> 0.7 .&&
+    #= return met[met.swc_nse10 .> 0.88 .&& 
+               met.swc_nse80 .> 0.7154 .&&
                met.swp_nse10 .> 0.7 .&&
                met.swp_nse80 .> 0.59 .&&
                met.trans_cor .> 0.75, :] =#
@@ -171,10 +171,10 @@ end
 # calibration results
 met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260806.csv", DataFrame);
 met_irr = CSV.read("LWFBcal_output/metrics_irr_20260806.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_irst_20260801.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_irst_20260817.csv", DataFrame);
 par_ctr = CSV.read("LWFBcal_output/param_ctr_20260806.csv", DataFrame);
 par_irr = CSV.read("LWFBcal_output/param_irr_20260806.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_irst_20260801.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_irst_20260817.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
