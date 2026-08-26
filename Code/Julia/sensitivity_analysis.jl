@@ -21,9 +21,9 @@ end
 # function to filter metrics for behavioral runs
 function behavioral_met(met)
     # control metrics
-    return met[met.swc_nse10 .> 0.82 .&& 
-               met.swc_nse80 .> 0.65 .&&
-               met.swp_nse10 .> 0.73 .&&
+    return met[met.swc_nse10 .> 0.825 .&& 
+               met.swc_nse80 .> 0.655 .&&
+               met.swp_nse10 .> 0.732 .&&
                met.swp_nse80 .> 0.52 .&&
                met.trans_cor .> 0.7, :]
 
@@ -169,10 +169,10 @@ function met_best_scen(met, metric=:swc_nse_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260806.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260822.csv", DataFrame);
 met_irr = CSV.read("LWFBcal_output/metrics_irr_20260819.csv", DataFrame);
 met_irst = CSV.read("LWFBcal_output/metrics_irst_20260817.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20260806.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260822.csv", DataFrame);
 par_irr = CSV.read("LWFBcal_output/param_irr_20260819.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/param_irst_20260817.csv", DataFrame);
 
