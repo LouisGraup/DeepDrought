@@ -52,7 +52,7 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
         # loop through parameters
         for name in names(par)
             # get parameter value
-            value = par[1, name];
+            value = par[name];
 
             if contains(name, "ths")
                 if soil_par_count > 1
