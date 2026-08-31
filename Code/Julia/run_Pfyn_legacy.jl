@@ -1,9 +1,9 @@
 ## run LWFBrook90 for Pfynwald legacy paper
 
-cd("DeepDrought/Code/Julia/")
-
-using Pkg; Pkg.activate("."); Pkg.instantiate()
+#using Pkg; Pkg.activate("."); Pkg.instantiate()
 using Statistics, CategoricalArrays, RollingFunctions
+
+#cd("DeepDrought/Code/Julia/")
 
 # helper functions
 include("run_LWFB90_param.jl");
@@ -120,7 +120,7 @@ for s in ["ctr", "irst"]
         irr = false;
     end
     
-    for i in 1:5
+    for i in 1:50
         
         par_id = par.scen[i];
 
@@ -177,24 +177,24 @@ for s in ["ctr", "irst"]
         z_soil.param .= par_id;
 
         if i==1
-            flux_out = z_flux;
-            soil_out = z_soil
+            global flux_out = z_flux;
+            global soil_out = z_soil
         else
-            flux_out = [flux_out; z_flux];
-            soil_out = [soil_out; z_soil];
+            global flux_out = [flux_out; z_flux];
+            global soil_out = [soil_out; z_soil];
         end
     end
 
     if s == "ctr"
-        flux_ctr = flux_out;
-        flux_ctr.scen .= "ctr";
-        soil_ctr = soil_out;
-        soil_ctr.scen .= "ctr";
+        global flux_ctr = flux_out;
+        global flux_ctr.scen .= "ctr";
+        global soil_ctr = soil_out;
+        global soil_ctr.scen .= "ctr";
     else
-        flux_irst = flux_out;
-        flux_irst.scen .= "irst";
-        soil_irst = soil_out;
-        soil_irst.scen .= "irst";
+        global flux_irst = flux_out;
+        global flux_irst.scen .= "irst";
+        global soil_irst = soil_out;
+        global soil_irst.scen .= "irst";
     end
 
 end
