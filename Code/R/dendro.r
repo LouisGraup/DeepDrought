@@ -20,6 +20,16 @@ den_long = den_long %>% rename(SRC='Tree SRC', GRO='Tree GI', datetime='Date/Tim
 ggplot(den_long, aes(x=datetime, y=TWD, color=as.factor(tree_id)))+geom_line()+
   facet_wrap(~tree_id)+guides(color="none")
 
+den_gro = den_long %>% na.omit() %>% mutate(date=as.Date(datetime), year=year(date)) %>%
+  group_by(date, year, tree_id, scenario) %>% summarize(GRO=max(GRO, na.rm=T))
+
+ggplot(den_gro, aes(date, GRO, color=scenario, fill=scenario))+
+  stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
+  facet_wrap(~year, scales="free_x")+theme_bw()+
+  scale_color_manual(values=c("#E69F00","#56B4E9","#009E73"))+
+  scale_fill_manual(values=c("#E69F00","#56B4E9","#009E73"))+
+  labs(x="", y=expression("Stem Growth ("*mu*"m)"), color="Scenario", fill="Scenario")
+
 # formatting
 den_long = na.omit(den_long)
 den_long$date = as.Date(den_long$datetime)
@@ -227,11 +237,17 @@ ggplot(TN_daily, aes(date, twd_pdn, color=as.factor(tree_name)))+geom_line()+
 # analyze TreeNet data for legacy effects
 
 irr = read_csv("../../Data/Pfyn/irrigation.csv")
+irr = irr %>% mutate(month=month(dates), day=day(dates),
+                     date_fix=as.Date(paste("2000", month, day, sep="-")))
+  
+scenario_colors <- c("Control" = "#E69F00", "Irrigation" = "#56B4E9", "Irrigation stop" = "#009E73")
+
 
 TN_legacy = read_csv("../../Data/Pfyn/TreeNet/tn_timeseries_Pfyn_dendro_legacy.csv")
 TN_leg_meta = read_csv("../../Data/Pfyn/TreeNet/tn_metadata_Pfyn_dendro_legacy.csv")
 
 TN_leg_meta$meta = TN_leg_meta$site_subplot
+TN_leg_meta$meta = if_else(TN_leg_meta$meta=="Irr_Stop", "Irrigation stop", TN_leg_meta$meta)
 
 # formatting
 TN_legacy$date = as.Date(TN_legacy$ts)
@@ -252,7 +268,17 @@ ggplot(TN_legacy, aes(ts, value, color=as.factor(tree_name)))+geom_line()+
 
 TN_leg_daily = TN_legacy %>% group_by(date, tree_name, meta) %>% 
   summarize_at(vars(twd, gro_yr), list(max)) %>% 
-  mutate(year=year(date), month=month(date))
+  mutate(year=year(date), month=month(date), day=day(date), 
+         date_fix=as.Date(paste("2000", month, day, sep="-"))) %>% 
+  filter(!(month == 12 & day == 31)) %>% 
+  filter(!(year == 2015 & meta == "Irrigation"))
+
+# need to filter out dates with only 1 sensor
+TN_leg_count = TN_leg_daily %>% group_by(date, meta) %>% summarize(n=n())
+TN_leg_daily = left_join(TN_leg_daily, TN_leg_count)
+TN_leg_daily$gro_yr[TN_leg_daily$n<2] = NA
+TN_leg_daily$twd[TN_leg_daily$n<2] = NA
+
 
 # growth of individual trees across scenarios
 ggplot(filter(TN_leg_daily, year>2010), aes(date, gro_yr, color=as.factor(tree_name)))+geom_line()+
@@ -263,22 +289,35 @@ ggplot(filter(TN_leg_daily, year>2010), aes(date, twd, color=as.factor(tree_name
   facet_wrap(~meta, ncol=1)+theme_bw()
 
 # summarized growth across scenarios per year
-ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date, gro_yr, color=meta, fill=meta))+
+ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date_fix, gro_yr, color=meta, fill=meta))+
   stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
-  facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
-  scale_color_manual(values=c("#E69F00","#009E73","#56B4E9"))+
-  scale_fill_manual(values=c("#E69F00","#009E73","#56B4E9"))
+  geom_rug(data=filter(irr, year>2010), aes(date_fix), sides="t", color="blue", alpha=0.7, inherit.aes=F)+
+  facet_wrap(~year)+theme_bw()+
+  scale_color_manual(values=scenario_colors)+
+  scale_fill_manual(values=scenario_colors)+
+  labs(x="", y=expression("Stem Growth ("*mu*"m)"), color="Scenario", fill="Scenario")+
+  theme(legend.position="inside", legend.position.inside=c(.88,.11), 
+        legend.title=element_text(size=12), legend.text=element_text(size=12),
+        axis.text=element_text(size=12), axis.title=element_text(size=14),
+        strip.text=element_text(size=12))
 
 # comparison of control vs irrigation stop growth
 ggplot(filter(TN_leg_daily, meta != "Irrigation", year>2013, month>3), aes(date, gro_yr, color=meta, fill=meta))+
   stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
   facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
-  scale_color_manual(values=c("#E69F00","#009E73"))+
-  scale_fill_manual(values=c("#E69F00","#009E73"))
+  scale_color_manual(values=scenario_colors)+
+  scale_fill_manual(values=scenario_colors)+
+  labs(x="", y=expression("Stem Growth ("*mu*"m)"))
 
 # summarized twd across scenarios per year
-ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date, twd, color=meta, fill=meta))+
+ggplot(filter(TN_leg_daily, year>2010, month>3), aes(date_fix, twd, color=meta, fill=meta))+
   stat_summary(fun=mean, geom="line")+stat_summary(geom="ribbon", alpha=0.5)+
-  facet_wrap(~year, scales="free_x")+labs(x="")+theme_bw()+
-  scale_color_manual(values=c("#E69F00","#009E73","#56B4E9"))+
-  scale_fill_manual(values=c("#E69F00","#009E73","#56B4E9"))
+  geom_rug(data=filter(irr, year>2010), aes(date_fix), sides="t", color="blue", alpha=0.7, inherit.aes=F)+
+  facet_wrap(~year)+theme_bw()+
+  scale_color_manual(values=scenario_colors)+
+  scale_fill_manual(values=scenario_colors)+
+  labs(x="", y=expression("Tree Water Deficit ("*mu*"m)"), color="Scenario", fill="Scenario")+
+  theme(legend.position="inside", legend.position.inside=c(.88,.11), 
+        legend.title=element_text(size=12), legend.text=element_text(size=12),
+        axis.text=element_text(size=12), axis.title=element_text(size=14),
+        strip.text=element_text(size=12))

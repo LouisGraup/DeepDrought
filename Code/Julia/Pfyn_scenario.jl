@@ -495,16 +495,24 @@ function obs_fun_sap(sap_comp)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20250814.csv", DataFrame);
-met_irr = CSV.read("LWFBcal_output/metrics_irr_20250814.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_ctr_20260822.csv", DataFrame);
+met_irr = CSV.read("LWFBcal_output/metrics_irr_20260826.csv", DataFrame);
 met_irst = CSV.read("LWFBcal_output/metrics_irst_20260817.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_ctr_20250814.csv", DataFrame);
-par_irr = CSV.read("LWFBcal_output/param_irr_20250814.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_ctr_20260822.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/param_irr_20260826.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/param_irst_20260817.csv", DataFrame);
 
 par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
 par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
 par_irst_best = par_irst[met_irst_good.scen[findmax(met_irst_good.trans_nse)[2]], :];
+
+scen_best_ctr = 23738;
+scen_best_irst = 1505;
+scen_best_irr = 18295;
+
+par_ctr_best = par_ctr[scen_best_ctr, :];
+par_irst_best = par_irst[scen_best_irst, :];
+par_irr_best = par_irr[scen_best_irr, :];
 
 met_ctr[scen_ctr_best, :]
 met_irr[scen_irr_best, :]
@@ -564,7 +572,7 @@ irr = CSV.read("../../Data/Pfyn/irrigation.csv", DataFrame);
 
 # run LWFBrook90.jl for all scenarios
 sim_ctr = run_LWFB90_param(par_ctr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/");
-sim_irr = run_LWFB90_param(par_irr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=true);
+sim_irr = run_LWFB90_param(par_irr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", irrig=false);
 sim_irst = run_LWFB90_param(par_irst_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", irrig=true);
 
 ## combine observed and simulated data
@@ -879,7 +887,7 @@ draw(data(ctr_rwu_dist_mon[ctr_rwu_dist_mon.month .>= 4 .&& ctr_rwu_dist_mon.mon
 )
 
 # irrigation stop
-
+depths = round.(Int, cumsum(sim_irst.ODESolution.prob.p.p_soil.p_THICK) - sim_irst.ODESolution.prob.p.p_soil.p_THICK/2);
 irst_rwu_dist = DataFrame(copy(irst_rwu_per'), Symbol.(depths));
 irst_rwu_dist.date = dates_out;
 irst_rwu_dist = mapcols(col -> replace(col, NaN => missing), irst_rwu_dist);
@@ -909,7 +917,7 @@ df_root_dist = [df_root_ctr; df_root_irst];
 
 draw(data(rwu_dist_mon[rwu_dist_mon.month .>= 4 .&& rwu_dist_mon.month .<= 10, :])*
     mapping(:RWU_per => x -> x * 100, :depth_bin, color=:month => nonnumeric, layout=:scen)*visual(Lines)+
-    data(df_root_dist)*mapping(:root_frac, :depth_bin, layout=:scen)*visual(Lines, color=:black, linewidth=2), 
+    data(df_root_dist)*mapping(:root_frac, :depth_bin, layout=:scen)*visual(Lines, color=:black, label="Beta root dist.", linewidth=2), 
     scales(Color = (; label="Month", palette = from_continuous(:seaborn_bright6)),
            X = (; label="% Contribution to Transpiration"), Y= (; label="RWU Depth Bin (mm)")),
     axis = (; yreversed = true), facet = (; linkxaxes = :none), figure = (; size=(800, 400))
@@ -1212,16 +1220,18 @@ draw(data(comp_rwu_swp_eff)*
 
 # water balance modelling
 
-sim_ctr_wb = run_LWFB90_param(par_ctr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/", new_folder=false, watbal=true);
-sim_irr_wb = run_LWFB90_param(par_irr_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false, watbal=true, irrig=true);
-sim_irst_wb = run_LWFB90_param(par_irst_best, Date(2000, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false, watbal=true, irrig=true);
+sim_ctr_wb = run_LWFB90_param(par_ctr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_control/", "pfynwald", "LWFB_testrun/control/", new_folder=false, watbal=true, iso=false);
+sim_irr_wb = run_LWFB90_param(par_irr_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_ambient/", "pfynwald", "LWFB_testrun/irrigation/", new_folder=false, watbal=true, irrig=false, iso=false);
+sim_irst_wb = run_LWFB90_param(par_irst_best, Date(2010, 1, 1), Date(2024, 12, 31), "LWFBinput/Pfyn_irrigiso_stop/", "pfynwald", "LWFB_testrun/irr_stop/", new_folder=false, watbal=true, irrig=true, iso=false);
 
 # water partitioning
 
 # control
 wb_d_ctr, wb_m_ctr, wb_y_ctr = get_water_partitioning(sim_ctr_wb);
-wb_m_ctr = wb_m_ctr[wb_m_ctr.year .== 2014, :]; # filter out single years
-wb_y_ctr = wb_y_ctr[wb_y_ctr.year .>= 2003, :]; # filter out early years
+wb_mth_ctr = wb_m_ctr[wb_m_ctr.year .== 2014, :]; # filter out single years
+wb_y_ctr = wb_y_ctr[wb_y_ctr.year .>= 2014, :]; # filter out early years
+
+wb_mth_ctr_plot = plot_monthly_water_partitioning(wb_mth_ctr);
 
 wb_yr_ctr_plot = plot_yearly_water_partitioning(wb_y_ctr);
 wb_yr_ctr_plot
@@ -1229,7 +1239,7 @@ wb_yr_ctr_plot
 # irrigation
 wb_d_irr, wb_m_irr, wb_y_irr = get_water_partitioning(sim_irr_wb);
 wb_mth_irr = wb_m_irr[wb_m_irr.year .== 2014, :]; # filter out single year
-wb_yr_irr = wb_y_irr[wb_y_irr.year .>= 2003, :]; # filter out early years
+wb_yr_irr = wb_y_irr[wb_y_irr.year .>= 2014, :]; # filter out early years
 
 wb_mth_irr_plot = plot_monthly_water_partitioning(wb_mth_irr);
 
@@ -1239,7 +1249,7 @@ wb_yr_irr_plot
 # irrigation stop
 wb_d_irst, wb_m_irst, wb_y_irst = get_water_partitioning(sim_irst_wb);
 wb_mth_irst = wb_m_irst[wb_m_irst.year .== 2014, :]; # filter out single year
-wb_yr_irst = wb_y_irst[wb_y_irst.year .>= 2003, :]; # filter out early years
+wb_yr_irst = wb_y_irst[wb_y_irst.year .>= 2014, :]; # filter out early years
 
 wb_mth_irst_plot = plot_monthly_water_partitioning(wb_mth_irst);
 
