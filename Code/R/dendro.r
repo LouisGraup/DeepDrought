@@ -75,7 +75,7 @@ ggplot(filter(den_daily, tree_id=="125"), aes(date, TWD_pdn))+geom_line(color="g
 
 # group by scenario
 den_meta = den_daily %>% filter(tree_id != "125") %>% na.omit() %>% 
-  group_by(date, scenario) %>% summarize_at(vars(TWD_pd, TWD_pdn, MDS_norm), list(mean))
+  group_by(date, scenario) %>% summarize_at(vars(TWD_pd, TWD_md, TWD_pdn, MDS_norm), list(mean))
 den_meta$year = year(den_meta$date)
 
 ggplot(filter(den_meta, scenario!="irrigation"), aes(date, TWD_pd, color=as.factor(scenario)))+geom_line()+
