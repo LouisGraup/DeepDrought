@@ -22,15 +22,15 @@ function behavioral_met(met)
 
     return(met[met.swc_cor15 .> 0.66 .&&
                met.swc_cor50 .> 0.65 .&&
-               met.swc_cor80 .> 0.62 .&&
+               met.swc_cor80 .> 0.63 .&&
                #met.swc_nse15 .> -100.0 .&&
                #met.swc_nse50 .> -100.0 .&&
                #met.swc_nse80 .> -500.0 .&&
                met.swp_nse15 .> -5.0 .&&
                met.swp_nse50 .> -0.5 .&&
-               met.swp_nse80 .> 0.2 .&&
-               met.et_cor .> 0.67 .&&
-               met.et_nse .> 0.24 .&&
+               met.swp_nse80 .> 0.25 .&&
+               met.et_cor .> 0.68 .&&
+               met.et_nse .> 0.26 .&&
                met.max_ET .< 4.5, :])
 
 end
@@ -129,8 +129,8 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met = CSV.read("LWFBcal_output/metrics_davos_20260828.csv", DataFrame);
-par = CSV.read("LWFBcal_output/param_davos_20260828.csv", DataFrame);
+met = CSV.read("LWFBcal_output/metrics_davos_20260901.csv", DataFrame);
+par = CSV.read("LWFBcal_output/param_davos_20260901.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met = filter_error(met);
