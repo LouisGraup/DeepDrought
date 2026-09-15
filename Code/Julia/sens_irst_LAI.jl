@@ -187,6 +187,15 @@ function get_output(sim)
     return (swc_met, swp_met, tr_met)
 end
 
+function get_wb(sim)
+    flux = get_fluxes(sim);
+    flux.date = Date.(flux.dates);
+
+    flux.td = flux.cum_d_ptran .- flux.cum_d_tran;
+    flux.int_loss = flux.cum_d_irvp .+ flux.cum_d_isvp;
+    select!(flux, :date, :cum_d_prec, :td, :cum_d_tran, :int_loss, :cum_d_slvp, :flow);
+end
+
 
 ### BEGIN USER INPUT ###
 
@@ -200,20 +209,28 @@ end_date = Date(2024, 12, 31);
 # use single parameter set for analysis
 par_irst = CSV.read("LWFBcal_output/Pfyn_irst_param_best.csv", DataFrame);
 scen_best = 1505;
-par_irst_best = par_irst[par_irst.scen .== scen_best, Not(:scen)];
+par_irst_best = par_irst[findall(par_irst.scen .== scen_best)[1], Not(:scen)];
 
 # default run
 sim_irst_def = run_LWFB90_param(par_irst_best, start_date, end_date, "LWFBinput/Pfyn_irrigiso_stop/", input_prefix, "LWFB_LAIsens/irr_stop_def/", irrig=true);
 out_irst_def = get_output(sim_irst_def);
+flux_wb_def = get_wb(sim_irst_def);
+flux_wb_def.sens .= "default";
 
 # positive legacy effect
 sim_irst_pos = run_LWFB90_param(par_irst_best, start_date, end_date, "LWFB_LAIsens/Pfyn_irrigiso_stop_pos/", input_prefix, "LWFB_LAIsens/irr_stop_pos/", irrig=true);
 out_irst_pos = get_output(sim_irst_pos);
+flux_wb_pos = get_wb(sim_irst_pos);
+flux_wb_pos.sens .= "positive";
+
 
 # negative legacy effect
 sim_irst_neg = run_LWFB90_param(par_irst_best, start_date, end_date, "LWFB_LAIsens/Pfyn_irrigiso_stop_neg/", input_prefix, "LWFB_LAIsens/irr_stop_neg/", irrig=true);
 out_irst_neg = get_output(sim_irst_neg);
+flux_wb_neg = get_wb(sim_irst_neg);
+flux_wb_neg.sens .= "negative";
 
+flux_wb = vcat(flux_wb_def, flux_wb_pos, flux_wb_neg);
 
 # intialize metric dataframes
 metrics = DataFrame(scen = Any[],
@@ -246,3 +263,4 @@ row_neg = ["negative", swc_neg..., swp_neg..., tr_neg...];
 push!(metrics, row_neg);
 
 CSV.write("LWFB_LAIsens/metrics_irst_laisens.csv", metrics);
+CSV.write("LWFB_LAIsens/flux_wb_irst_laisens.csv", flux_wb);
