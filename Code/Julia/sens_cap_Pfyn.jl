@@ -22,8 +22,8 @@ end
 function behavioral_met(met)
 
     # control
-    #return(met[met.twd_pd_cor .< -0.5 .&&
-    #           met.twd_md_cor .< -0.5, :])
+    return(met[met.twd_pd_cor .< -0.5 .&&
+               met.twd_md_cor .< -0.6, :])
                
     # irr stop
     return(met[met.twd_pd_cor .< -0.8 .&&
@@ -177,12 +177,12 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260904.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260910.csv", DataFrame);
 #met_irr = CSV.read("LWFBcal_output/metrics_pfyn_irr_cap_20260904.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260904.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260904.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260910.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260910.csv", DataFrame);
 #par_irr = CSV.read("LWFBcal_output/param_pfyn_irr_cap_20260904.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260904.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260910.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -212,7 +212,7 @@ par2_plot(par, met, met_y="twd_md_cor", behave=false)
 
 # add combined metrics
 met_comb!(met_ctr);
-met_comb!(met_irr);
+#met_comb!(met_irr);
 met_comb!(met_irst);
 
 # filter metrics for behavioral runs
@@ -258,6 +258,6 @@ ks_stat_ctr, ks_plots_ctr = KS_plot(par_ctr, met_ctr);
 #ks_stat_irr, ks_plots_irr = KS_plot(par_irr, met_irr);
 ks_stat_irst, ks_plots_irst = KS_plot(par_irst, met_irst);
 
-plot(ks_plots_irst..., size=(1200,1200), layout=(2,2), legend=false, titlefontsize=8, guidefontsize=6)
+plot(ks_plots_ctr..., size=(1200,1200), layout=(2,2), legend=false, titlefontsize=8, guidefontsize=6)
 # behavioral is blue, non-behavioral is red
 
