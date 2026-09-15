@@ -78,20 +78,36 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
                 if soil_par_count > 1
                     # apply additive factor to log10(ksat) for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.ksat_mmDay[k] = round(10 .^ (log10.(soil0.ksat_mmDay[k]) .+ value), sigdigits=5);
+                    if value > 0.5
+                        soil0.ksat_mmDay[k] = round(value, sigdigits=5);
+                    else
+                        soil0.ksat_mmDay[k] = round(10 .^ (log10.(soil0.ksat_mmDay[k]) .+ value), sigdigits=5);
+                    end
                 else
                     # apply additive factor to log10(ksat) for each soil horizon
-                    soil0.ksat_mmDay = round.(10 .^ (log10.(soil0.ksat_mmDay) .+ value), sigdigits=5);
+                    if value > 0.5
+                        soil0.ksat_mmDay = round.(value, sigdigits=5);
+                    else
+                        soil0.ksat_mmDay = round.(10 .^ (log10.(soil0.ksat_mmDay) .+ value), sigdigits=5);
+                    end
                 end
 
             elseif contains(name, "alpha")
                 if soil_par_count > 1
                     # apply multiplier to alpha_perMeter for specific soil horizon
                     k = parse(Int, name[end]); # extract horizon number from name
-                    soil0.alpha_perMeter[k] = round(soil0.alpha_perMeter[k] * value, sigdigits=4);
+                    if value > 1.5
+                        soil0.alpha_perMeter[k] = round(value, sigdigits=4);
+                    else
+                        soil0.alpha_perMeter[k] = round(soil0.alpha_perMeter[k] * value, sigdigits=4);
+                    end
                 else
                     # apply multiplier to alpha_perMeter for each soil horizon
-                    soil0.alpha_perMeter = round.(soil0.alpha_perMeter * value, sigdigits=4);
+                    if value > 1.5
+                        soil0.alpha_perMeter = round.(value, sigdigits=4);
+                    else
+                        soil0.alpha_perMeter = round.(soil0.alpha_perMeter * value, sigdigits=4);
+                    end
                 end
             
             elseif contains(name, "npar")
@@ -102,6 +118,16 @@ function run_LWFB90_param(par, start_date, end_date, input_path, input_prefix, o
                 else
                     # apply npar_ for each soil horizon
                     soil0.npar_ = round.(value, sigdigits=5);
+                end
+
+            elseif contains(name, "tort")
+                if soil_par_count > 1
+                    # apply tort_ for specific soil horizon
+                    k = parse(Int, name[end]); # extract horizon number from name
+                    soil0.tort_[k] = round(value, sigdigits=4);
+                else
+                    # apply tort_ for each soil horizon
+                    soil0.tort_ = round.(value, sigdigits=4);
                 end
             
             elseif name ∈ ["BETAROOT", "MAXROOTDEPTH"]
