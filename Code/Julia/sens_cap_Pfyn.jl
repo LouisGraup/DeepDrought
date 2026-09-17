@@ -22,8 +22,10 @@ end
 function behavioral_met(met)
 
     # control
-    return(met[met.twd_pd_cor .< -0.5 .&&
-               met.twd_md_cor .< -0.6, :])
+    return(met[met.twd_pd_cor .< -0.45 .&&
+               met.twd_md_cor .< -0.55 .&&
+               met.min_pd_psi .< -500 .&&
+               met.min_pd_psi .> -3000, :])
                
     # irr stop
     return(met[met.twd_pd_cor .< -0.8 .&&
@@ -168,7 +170,7 @@ function met_comb!(met)
 end
 
 # function to find best scenario
-function met_best_scen(met, metric=:met_com)
+function met_best_scen(met, metric=:twd_com)
     # find the index of the maximum value
     max_idx = argmax(met[!, metric]);
     best_scen = met.scen[max_idx];
@@ -177,12 +179,12 @@ function met_best_scen(met, metric=:met_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260910.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260904.csv", DataFrame);
 #met_irr = CSV.read("LWFBcal_output/metrics_pfyn_irr_cap_20260904.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260910.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260910.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260904.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260904.csv", DataFrame);
 #par_irr = CSV.read("LWFBcal_output/param_pfyn_irr_cap_20260904.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260910.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260904.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -197,8 +199,13 @@ scatter(met_ctr.plfl_mean, met_ctr.plfl_max, xlabel="Mean Daily Plant Discharge 
 
 # calculate pFs
 met_ctr.min_pd_pF = log10.(-10 * met_ctr.min_pd_psi);
+met_ctr.min_md_pF = log10.(-10 * met_ctr.min_md_psi);
 #met_irr.min_md_pF = log10.(-10 * met_irr.min_md_psi);
+met_irst.min_pd_pF = log10.(-10 * met_irst.min_pd_psi);
 met_irst.min_md_pF = log10.(-10 * met_irst.min_md_psi);
+
+met_plot(met_ctr, :min_pd_pF, :twd_pd_cor)
+met_plot(met_irst, :min_pd_pF, :twd_pd_cor)
 
 # parameter interactions
 par = par_ctr;
@@ -224,25 +231,35 @@ println("$(size(met_ctr_good, 1)) behavioral parameter sets out of total $(size(
 #println("$(size(met_irr_good, 1)) behavioral parameter sets out of total $(size(met_irr, 1)) in irrigation scenario.")
 println("$(size(met_irst_good, 1)) behavioral parameter sets out of total $(size(met_irst, 1)) in irrigation stop scenario.")
 
+describe(met_ctr_good)
+
 density_plot(met_ctr_good)
 
 # compare metrics
-met_plot(met_irst, :twd_pd_cor, :twd_md_cor)
-met_plot(met_ctr, [:twd_pd_cor, :twd_pd_cor, :lwp_pd_cor, :twd_md_cor], [:twd_md_cor, :lwp_pd_cor, :lwp_md_cor, :lwp_md_cor])
-met_plot(met_ctr_good, [:twd_pd_cor, :twd_pd_cor, :lwp_pd_cor, :twd_md_cor], [:twd_md_cor, :lwp_pd_cor, :lwp_md_cor, :lwp_md_cor])
+met_plot(met_ctr_good, :min_pd_pF, :twd_pd_cor)
+met_plot(met_ctr_good, :min_md_pF, :twd_md_cor)
+
+met_plot(met_irst_good, :min_md_pF, :twd_md_cor)
+met_plot(met_irst_good, :twd_pd_cor, :twd_md_cor)
 
 # best control scenario
-scen_max, met_max = met_best_scen(met_good);
+scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good);
 # parameter values for the best performing scenario
-par_best = par[scen_max, :];
-par_best
+par_best_ctr = par[scen_max_ctr, :];
+
+# best irrigation stop scenario
+scen_max_irst, met_max_irst = met_best_scen(met_irst_good);
+# parameter values for the best performing scenario
+par_best_irst = par[scen_max_irst, :];
 
 # parameter relationships
-par_plots = par_plot(par_ctr, met_ctr, met_y="twd_md_cor");
+par_plots = par_plot(par_ctr, met_ctr, met_y="twd_pd_cor");
 par_plots = par_plot(par_irst, met_irst, met_y="twd_md_cor");
 
 plot(par_plots..., size=(1000,1000), layout=(2,2), legend=false, titlefontsize=12, guidefontsize=12)
 
+par = par_ctr_good;
+met = met_ctr_good;
 # parameter interactions
 par2_plot(par, met, met_y="min_md_psi")
 par2_plot(par, met, met_y="plfl_mean")

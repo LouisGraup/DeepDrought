@@ -97,10 +97,10 @@ n = 1000; # number of parameter sets
 
 param = [
     # plant parameters
-    ("CAPACITANCE", 6.0, 10.0), # capacitance (0.1, 10)
-    ("STORAGEK", 8.0, 10.0), # storage conductance (0.1, 10)
-    ("VSTORAGE", 1.0, 2.5), # stem storage volume (1, 20)
-    ("PSICR", -3.0, -1.0) # critical water potential (-3, -1)
+    ("CAPACITANCE", 3.0, 10.0), # capacitance (0.1, 10)
+    ("STORAGEK", 3.0, 10.0), # storage conductance (0.1, 10)
+    ("VSTORAGE", 2.0, 20.0), # stem storage volume (1, 20)
+    ("PSICR", -2.5, -1.0) # critical water potential (-3, -1)
 ];
 
 ### END USER INPUT ###
