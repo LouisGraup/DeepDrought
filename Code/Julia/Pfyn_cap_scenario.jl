@@ -298,14 +298,23 @@ obs_twd_irst = obs_twd[obs_twd.scenario .== "irrigation stop", :]; # filter for 
 
 #select!(obs_twd, Not([:scenario, :year, :month, :TWD_pdn, :MDS_norm])); # drop unnecessary columns
 
+# append root parameters to capacitance parameters
+par_best_ctr = DataFrame(par_best_ctr);
+par_best_irst = DataFrame(par_best_irst);
+par_best_ctr.BETAROOT = [0.970584];
+par_best_ctr.MAXROOTDEPTH = [-1.86983];
+par_best_irst.BETAROOT = [0.965484];
+par_best_irst.MAXROOTDEPTH = [-1.63381];
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_best_ctr, Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/control/", "pfynwald", "LWFB_testrun/ctr_cap/");
-sim_irst = run_LWFB90_param(par_best_irst, Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/irr_stop/", "pfynwald", "LWFB_testrun/irst_cap/", irrig=true);
+sim_ctr = run_LWFB90_param(par_best_ctr[1,:], Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/control/", "pfynwald", "LWFB_testrun/ctr_cap/", iso=false);
+sim_irst = run_LWFB90_param(par_best_irst[1,:], Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/irr_stop/", "pfynwald", "LWFB_testrun/irst_cap/", irrig=true, iso=false);
 
 # dendro
 twd_comp_ctr = twd_combine(sim_ctr, obs_twd_ctr);
 twd_comp_irst = twd_combine(sim_irst, obs_twd_irst);
+
+obs_fun_twd(twd_comp_ctr)
 
 # predawn correlations
 draw(data(dropmissing(twd_comp_ctr))*mapping(:TWD_pd, :cum_pd_plpsi, color = :date => x -> dayofyear(x))*visual(Scatter, markersize=6),
@@ -331,7 +340,7 @@ draw(data(dropmissing(twd_comp_irst))*mapping(:TWD_md, :cum_md_plpsi, color = :d
 )
 
 # time series
-draw(data(twd_comp_ctr)*
+draw(data(twd_comp_ctr)* 
     (mapping(:date, :TWD_pdn => (x -> -1 * x))*visual(Lines, color="black", label="TWD")+
     mapping(:date, :cum_pd_plpsi => (x -> x/1000))*visual(Lines, color="red", label="Model")),
     scales(X = (; label=""), Y= (; label="Pre-dawn plant water potential (MPa) / -TWDnorm")),
@@ -354,7 +363,7 @@ draw(data(twd_comp_irst)*
 df_fluxes_ctr = combine_fluxes(sim_ctr);
 df_fluxes_irst = combine_fluxes(sim_irst);
 
-# compare leaf water potential against effective soil water potential
+# compare plant water potential against effective soil water potential
 
 draw(
     data(df_fluxes_ctr)*

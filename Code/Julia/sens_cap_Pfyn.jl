@@ -22,14 +22,14 @@ end
 function behavioral_met(met)
 
     # control
-    return(met[met.twd_pd_cor .< -0.45 .&&
-               met.twd_md_cor .< -0.55 .&&
-               met.min_pd_psi .< -500 .&&
+    return(met[met.twd_pd_cor .< -0.6 .&&
+               met.twd_md_cor .< -0.7 .&&
+               met.min_pd_psi .< -600 .&&
                met.min_pd_psi .> -3000, :])
                
     # irr stop
-    return(met[met.twd_pd_cor .< -0.8 .&&
-               met.twd_md_cor .< -0.8, :])
+    #return(met[met.twd_pd_cor .< -0.8 .&&
+    #           met.twd_md_cor .< -0.8, :])
     
 end
 
@@ -179,12 +179,12 @@ function met_best_scen(met, metric=:twd_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260904.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260918.csv", DataFrame);
 #met_irr = CSV.read("LWFBcal_output/metrics_pfyn_irr_cap_20260904.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260904.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260904.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260918.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260918.csv", DataFrame);
 #par_irr = CSV.read("LWFBcal_output/param_pfyn_irr_cap_20260904.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260904.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260918.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -245,12 +245,12 @@ met_plot(met_irst_good, :twd_pd_cor, :twd_md_cor)
 # best control scenario
 scen_max_ctr, met_max_ctr = met_best_scen(met_ctr_good);
 # parameter values for the best performing scenario
-par_best_ctr = par[scen_max_ctr, :];
+par_best_ctr = par_ctr[scen_max_ctr, :];
 
 # best irrigation stop scenario
 scen_max_irst, met_max_irst = met_best_scen(met_irst_good);
 # parameter values for the best performing scenario
-par_best_irst = par[scen_max_irst, :];
+par_best_irst = par_irst[scen_max_irst, :];
 
 # parameter relationships
 par_plots = par_plot(par_ctr, met_ctr, met_y="twd_pd_cor");

@@ -20,7 +20,7 @@ end
     # dendrometer data
     obs_twd = CSV.read("../../Data/Pfyn/Pfyn_twd_2011_17.csv", DataFrame);
     obs_twd = obs_twd[obs_twd.scenario .== "control", :]; # filter for control scenario
-    obs_twd = obs_twd[obs_twd.month .> 4 .&& obs_twd.month .< 12, :]; # filter out winter months
+    obs_twd = obs_twd[obs_twd.month .> 5 .&& obs_twd.month .< 12, :]; # filter out winter months
     select!(obs_twd, Not([:scenario, :year, :month, :TWD_pdn, :MDS_norm])); # drop unnecessary columns
 end
 
@@ -97,10 +97,10 @@ n = 1000; # number of parameter sets
 
 param = [
     # plant parameters
-    ("CAPACITANCE", 3.0, 10.0), # capacitance (0.1, 10)
-    ("STORAGEK", 3.0, 10.0), # storage conductance (0.1, 10)
-    ("VSTORAGE", 2.0, 20.0), # stem storage volume (1, 20)
-    ("PSICR", -2.5, -1.0) # critical water potential (-3, -1)
+    ("CAPACITANCE", 3.0, 9.0), # capacitance (0.1, 10)
+    ("STORAGEK", 4.0, 10.0), # storage conductance (0.1, 10)
+    ("VSTORAGE", 4.0, 20.0), # stem storage volume (1, 20)
+    ("PSICR", -2.0, -1.0) # critical water potential (-3, -1)
 ];
 
 ### END USER INPUT ###
