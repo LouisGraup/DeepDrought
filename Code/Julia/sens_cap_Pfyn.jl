@@ -22,8 +22,8 @@ end
 function behavioral_met(met)
 
     # control
-    return(met[met.twd_pd_cor .< -0.6 .&&
-               met.twd_md_cor .< -0.7 .&&
+    return(met[met.twd_pd_cor .< -0.60 .&&
+               met.twd_md_cor .< -0.75 .&&
                met.min_pd_psi .< -600 .&&
                met.min_pd_psi .> -3000, :])
                
@@ -179,10 +179,10 @@ function met_best_scen(met, metric=:twd_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260918.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260922.csv", DataFrame);
 #met_irr = CSV.read("LWFBcal_output/metrics_pfyn_irr_cap_20260904.csv", DataFrame);
 met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260918.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260918.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260922.csv", DataFrame);
 #par_irr = CSV.read("LWFBcal_output/param_pfyn_irr_cap_20260904.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260918.csv", DataFrame);
 
@@ -205,6 +205,9 @@ met_irst.min_pd_pF = log10.(-10 * met_irst.min_pd_psi);
 met_irst.min_md_pF = log10.(-10 * met_irst.min_md_psi);
 
 met_plot(met_ctr, :min_pd_pF, :twd_pd_cor)
+met_plot(met_ctr, :min_md_pF, :twd_md_cor)
+met_plot(met_ctr, :twd_pd_cor, :twd_md_cor)
+
 met_plot(met_irst, :min_pd_pF, :twd_pd_cor)
 
 # parameter interactions
