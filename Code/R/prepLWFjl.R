@@ -125,7 +125,7 @@ ggplot(lai_irr, aes(year, LAI))+geom_point()+
 lai_ext_irr <- data.frame(year=c(2000:2025))
 lai_ext_irr$lai_pred<-predict(lai_lm_i, newdata=lai_ext_irr,type="response")
 lai_ext_irr$lai_pred[1:4] = lai_cont$LAI[1] # assume years before irrigation are same as first year of control
-#lai_ext_irr$lai_pred[23:26] = lai_irr$LAI[11] # assume most recent years are same as last observation
+lai_ext_irr$lai_pred[23:26] = lai_irr$LAI[11] # assume most recent years are same as last observation
 # lai_ext_irr = left_join(lai_ext_irr, lai_irr)
 # fill in years without observations with modeled regression
 # lai_ext_irr$LAI[is.na(lai_ext_irr$LAI)] = lai_ext_irr$lai_pred[is.na(lai_ext_irr$LAI)]
@@ -191,7 +191,8 @@ lai_ext_irrstp[,-1] = round(lai_ext_irrstp[,-1], 4)
 
 # compare LAI trajectories across treatments
 colnames(lai_ext_irrstp) = c("year", "Irrigation", "Control", "Irrigation stop", "Neg. legacy", "Pos. legacy")
-lai_comp = pivot_longer(lai_ext_irrstp, -year)
+lai_ext_irrstp[1:13, 4:6] = NA
+lai_comp = na.omit(pivot_longer(lai_ext_irrstp, -year))
 ggplot(lai_comp, aes(year, value, color=name))+geom_point()+theme_bw()+
   labs(x="",y="LAI", color="Scenario")
 
@@ -199,12 +200,15 @@ ggplot(lai_comp, aes(year, value, color=name))+geom_point()+theme_bw()+
 lai_df$treatment = if_else(lai_df$treatment=="irrigated", "Irrigation", "Control")
 lai_obs = lai_df %>% group_by(year, treatment) %>% summarize_at(vars(LAI), list(mean=mean, sd=sd))
 
-ggplot(filter(lai_comp, year>2003, year<2026), aes(year, value, color=name, linetype=name))+geom_line()+
-  geom_point(data=lai_obs, aes(year, mean, color=treatment), size=2, inherit.aes=F)+
-  geom_errorbar(data=lai_obs, aes(x=year, ymin=mean-sd, ymax=mean+sd, color=treatment), width=.5, inherit.aes=F)+
+ggplot(filter(lai_comp, year>2003, year<2026), aes(year, value, color=name, linetype=name))+geom_line(linewidth=1.2)+
+  geom_point(data=lai_obs, aes(year, mean, color=treatment), size=2.5, inherit.aes=F)+
+  geom_errorbar(data=lai_obs, aes(x=year, ymin=mean-sd, ymax=mean+sd, color=treatment), width=1.0, inherit.aes=F)+
   labs(x="Year", y="LAI", color="Treatment", linetype="Treatment")+theme_bw()+
-  theme(legend.position="inside", legend.position.inside=c(.9,.85))+
-  scale_linetype_manual(values=c("solid","solid","dashed","dashed","dashed"))
+  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
+        legend.position="inside", legend.position.inside=c(.9,.85),
+        axis.text=element_text(size=12), axis.title=element_text(size=14))+
+  scale_color_manual(values=c("#E69F00","#56B4E9","#009E73","#A3A500","#E76BF3"))+
+  scale_linetype_manual(values=c("solid","solid","solid","dashed","dashed"))
 
 
 ## read in soil and root data
