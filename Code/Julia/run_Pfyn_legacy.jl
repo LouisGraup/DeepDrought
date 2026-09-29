@@ -84,6 +84,7 @@ end
 # behavioral parameters
 par_ctr = CSV.read("LWFBcal_output/Pfyn_ctr_param_best.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/Pfyn_irst_param_best.csv", DataFrame);
+par_irr = CSV.read("LWFBcal_output/Pfyn_irr_param_best.csv", DataFrame);
 
 # simulation dates
 start_date = Date(2010, 1, 1);
@@ -99,24 +100,31 @@ global flux_out = Any[];
 global soil_out = Any[];
 global flux_ctr = Any[];
 global soil_ctr = Any[];
-global flux_irst = Any[];
+global flux_irst = Any[]; 
 global soil_irst = Any[];
+global flux_irr = Any[]; 
+global soil_irr = Any[];
 
 # loop through parameter sets for each scenario
-
-for s in ["ctr", "irst"]
+for s in ["ctr", "irst", "irr"]
     
     if s == "ctr"
         # input and output
         par = par_ctr
-        input_path = "LWFBinput/Pfyn_control/";
+        input_path = "LWFBinput/Pfyn_control_cc/";
         subdir_name = "ctr";
         irr = false;
     elseif s == "irst"
         # input and output
         par = par_irst
-        input_path = "LWFBinput/Pfyn_irrigiso_stop/";
+        input_path = "LWFBinput/Pfyn_irrigiso_stop_cc/";
         subdir_name = "irst";
+        irr = true;
+    elseif s == "irr"
+        # input and output
+        par = par_irr
+        input_path = "LWFBinput/Pfyn_irrigiso_ambient_cc/";
+        subdir_name = "irr";
         irr = false;
     end
     
@@ -190,17 +198,24 @@ for s in ["ctr", "irst"]
         global flux_ctr.scen .= "ctr";
         global soil_ctr = soil_out;
         global soil_ctr.scen .= "ctr";
-    else
+    elseif s=="irst"
         global flux_irst = flux_out;
         global flux_irst.scen .= "irst";
         global soil_irst = soil_out;
         global soil_irst.scen .= "irst";
+    elseif s=="irr"
+        global flux_irr = flux_out;
+        global flux_irr.scen .= "irr";
+        global soil_irr = soil_out;
+        global soil_irr.scen .= "irr";
     end
 
 end
 
 # save output
-CSV.write("LWFBoutput/Pfyn_ctr_legacy_flux_output.csv", flux_ctr);
-CSV.write("LWFBoutput/Pfyn_ctr_legacy_soil_output.csv", soil_ctr);
-CSV.write("LWFBoutput/Pfyn_irst_legacy_flux_output.csv", flux_irst);
-CSV.write("LWFBoutput/Pfyn_irst_legacy_soil_output.csv", soil_irst);
+CSV.write("LWFBoutput/Pfyn_ctr_legacy_cc_flux_output.csv", flux_ctr);
+CSV.write("LWFBoutput/Pfyn_ctr_legacy_cc_soil_output.csv", soil_ctr);
+CSV.write("LWFBoutput/Pfyn_irst_legacy_cc_flux_output.csv", flux_irst);
+CSV.write("LWFBoutput/Pfyn_irst_legacy_cc_soil_output.csv", soil_irst);
+CSV.write("LWFBoutput/Pfyn_irr_legacy_cc_flux_output.csv", flux_irr);
+CSV.write("LWFBoutput/Pfyn_irr_legacy_cc_soil_output.csv", soil_irr);

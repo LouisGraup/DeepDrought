@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(lubridate)
+library(humidity)
 
 library(LWFBrook90R)
 source("C:/Users/grauplou/Documents/LWFBrook90.jl/src/generate_LWFBrook90jl_Input_mod.R", echo=F)
@@ -41,6 +42,16 @@ extend_meteoveg = function(meteo_scen, scen) {
   
 }
 
+# function to calculate climate change scenario variables for a given T increase
+clim_mod = function(meteo, deltaT) {
+  
+  meteo_cc = meteo |> mutate(Es=(SVP.ClaCla(tmax+273.15) + SVP.ClaCla(tmin+273.15) ) / 20) |> 
+    mutate(RH=vappres/Es*100) |> mutate(tmax=tmax+deltaT, tmin=tmin+deltaT, tmean=tmean+deltaT) |> 
+    mutate(Esmean=(SVP.ClaCla(tmax+273.15) + SVP.ClaCla(tmin+273.15) ) / 2) |> 
+    mutate(vappres=WVP2(RH, Esmean) / 1000) |> # actual vapor pressure kPa
+    select(-c(Es, Esmean, RH))
+  return(meteo_cc)
+}
 
 ## meteo inputs for control and vpd manipulation experiment
 
@@ -58,7 +69,7 @@ meteo_irrstp = meteo_Con %>% rename(prec = precip_ctrl) %>%
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
 # irrigation under ambient conditions
-meteo_irr_con = meteo_Con %>% rename(prec = precip_ctrl) %>% 
+meteo_irr_con = meteo_Con %>% rename(prec = precip_irr) %>% 
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
 # drought under ambient conditions
@@ -66,13 +77,17 @@ meteo_roof_con = meteo_Con %>% rename(prec = precip_roof) %>%
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
 # irrigation under manipulated VPD
-meteo_irr_vpd = meteo_VPD %>% rename(prec = precip_ctrl) %>% 
+meteo_irr_vpd = meteo_VPD %>% rename(prec = precip_irr) %>% 
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
 # drought under manipulated VPD
 meteo_roof_vpd = meteo_VPD %>% rename(prec = precip_roof) %>% 
   select(dates, globrad, tmax, tmin, tmean, vappres, windspeed, prec)
 
+# climate change scenarios
+meteo_cont_cc = clim_mod(meteo_cont, 3)
+meteo_irrstp_cc = clim_mod(meteo_irrstp, 3)
+meteo_irr_con_cc = clim_mod(meteo_irr_con, 3)
 
 # site data for tree heights
 site_df = read_csv("../../Data/Pfyn/siteproperties.csv")
@@ -102,6 +117,9 @@ par_c = set_paramLWFB90(maxlai=LAI_df$LAI_ctrl, winlaifrac=.6, height=ht_cont, h
 generate_LWFBrook90jl_Input("Pfyn_control","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont, soil=soil_df)
 #extend_meteoveg(meteo_cont, "Pfyn_control")
 
+# climate change control scenario
+generate_LWFBrook90jl_Input("Pfyn_control_cc","pfynwald",".", options_b90=opt, param_b90=par_c, climate=meteo_cont_cc, soil=soil_df)
+
 # drought scenarios use same parameters as control
 
 # drought scenario under ambient climate
@@ -118,16 +136,24 @@ par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp, winlaifrac=.6, height=ht_st
 generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
 #extend_meteoveg(meteo_irrstp, "Pfyn_irrigiso_stop")
 
+# climate change irr stop scenario
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_cc","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp_cc, soil=soil_df)
+
 # negative legacy effect on irrigation stop scenario
-par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_neg, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
+par_irst_neg = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_neg, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
                            coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_neg","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_neg","pfynwald",".", options_b90=opt, param_b90=par_irst_neg, climate=meteo_irrstp, soil=soil_df)
+
+# climate change negative legacy irr stop scenario
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_neg_cc","pfynwald",".", options_b90=opt, param_b90=par_irst_neg, climate=meteo_irrstp_cc, soil=soil_df)
 
 # positive legacy effect on irrigation stop scenario
-par_irst = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_pos, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
+par_irst_pos = set_paramLWFB90(maxlai=LAI_df$LAI_irrstp_pos, winlaifrac=.6, height=ht_stp, height_ini=ht_stp, 
                            coords_x=7.611329, coords_y=46.301624, eslope=7.6, aspect=299, bypar=1, budburst_species="Pinus sylvestris")
-generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_pos","pfynwald",".", options_b90=opt, param_b90=par_irst, climate=meteo_irrstp, soil=soil_df)
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_pos","pfynwald",".", options_b90=opt, param_b90=par_irst_pos, climate=meteo_irrstp, soil=soil_df)
 
+# climate change positive legacy irr stop scenario
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_stop_pos_cc","pfynwald",".", options_b90=opt, param_b90=par_irst_pos, climate=meteo_irrstp_cc, soil=soil_df)
 
 # irrigation scenarios use same parameters
 par_ir = set_paramLWFB90(maxlai=LAI_df$LAI_irr, winlaifrac=.6, height=ht_irr, height_ini=ht_irr, 
@@ -141,6 +167,8 @@ generate_LWFBrook90jl_Input("Pfyn_irrigiso_ambient","pfynwald",".", options_b90=
 generate_LWFBrook90jl_Input("Pfyn_irrigiso_VPD","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_vpd, soil=soil_df)
 #extend_meteoveg(meteo_irr_vpd, "Pfyn_irrigiso_VPD")
 
+# climate change irrigation scenario
+generate_LWFBrook90jl_Input("Pfyn_irrigiso_ambient_cc","pfynwald",".", options_b90=opt, param_b90=par_ir, climate=meteo_irr_con_cc, soil=soil_df)
 
 ## add irrigation information
 
