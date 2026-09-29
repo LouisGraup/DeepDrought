@@ -502,10 +502,6 @@ par_ctr = CSV.read("LWFBcal_output/param_ctr_20260822.csv", DataFrame);
 par_irr = CSV.read("LWFBcal_output/param_irr_20260826.csv", DataFrame);
 par_irst = CSV.read("LWFBcal_output/param_irst_20260817.csv", DataFrame);
 
-par_ctr_best, scen_ctr_best = par_best(met_ctr, par_ctr);
-par_irr_best, scen_irr_best = par_best(met_irr, par_irr);
-par_irst_best = par_irst[met_irst_good.scen[findmax(met_irst_good.trans_nse)[2]], :];
-
 scen_best_ctr = 23738;
 scen_best_irst = 1505;
 scen_best_irr = 18295;
@@ -514,8 +510,8 @@ par_ctr_best = par_ctr[scen_best_ctr, :];
 par_irst_best = par_irst[scen_best_irst, :];
 par_irr_best = par_irr[scen_best_irr, :];
 
-met_ctr[scen_ctr_best, :]
-met_irr[scen_irr_best, :]
+met_ctr[scen_best_ctr, :]
+met_irr[scen_best_irr, :]
 
 ## behavioral data
 # soil water content
@@ -678,18 +674,11 @@ draw(data(stack(sap_comp_irr[sap_comp_irr.date .< Date(2018,1,1), Not(:Tr_rm)], 
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
 )
 
-sap_comp_irr.trans_sm = runmean(sap_comp_irr.trans, 14);
-sap_comp_irr.sfd_sm = runmean(sap_comp_irr.sfd, 14);
-
-sap_comp_irr_long = stack(sap_comp_irr[:, Not([:trans_sm, :sfd_sm])], Not(:date), variable_name=:Source);
-sap_comp_irr_long2 = stack(sap_comp_irr[:, Not([:trans, :sfd])], Not(:date), value_name=:value_sm, variable_name=:Source);
-
-sap_comp_irr_long.value_sm = sap_comp_irr_long2.value_sm;
-
-draw(data(sap_comp_irr_long)*
-    (mapping(:date, :value, color=:Source)*visual(Scatter, markersize=6)+
-    mapping(:date, :value_sm, color=:Source)*visual(Lines)),
-    scales(X = (; label="")),
+draw(data(sap_comp_irr[sap_comp_irr.date .< Date(2018,1,1), :])*
+    (mapping(:date, :Tr => (x -> x * 2))*visual(Scatter, markersize=6, color="orange", label="Sap Flow")+
+    mapping(:date, :trans)*visual(Scatter, markersize=6, color="green", label="Transpiration")+
+    mapping(:date, :trans_sm)*visual(Lines, color="green", label="Transpiration")),
+    scales(X = (; label=""), Y = (; label="Value")),
     figure = (; size=(800, 600), title="Sap Flow Comparison for Irrigation Scenario", titlealign = :center)
 )
 
@@ -1207,9 +1196,19 @@ irr_rwu_swp_med = irr_rwu_swp_med[irr_rwu_swp_med.date .>= Date(2003, 1, 1), :];
 irr_rwu_swp_med.month = month.(irr_rwu_swp_med.date);
 irr_rwu_swp_med.scenario .= "Irrigation";
 
-comp_rwu_swp_eff = [ctr_rwu_swp_med; irr_rwu_swp_med];
+# irrigation stop
+irst_rwu_swp_med = get_eff_swp(sim_irst);
+irst_rwu_swp_med = leftjoin(irst_rwu_swp_med, get_sap(sim_irst), on=:date);
+irst_rwu_swp_med = irst_rwu_swp_med[irst_rwu_swp_med.date .>= Date(2003, 1, 1), :];
+irst_rwu_swp_med.month = month.(irst_rwu_swp_med.date);
+irst_rwu_swp_med.scenario .= "Irrigation Stop";
 
-draw(data(comp_rwu_swp_eff)*mapping(:date, :swp_eff, color=:scenario)*visual(Lines))
+comp_rwu_swp_eff = [ctr_rwu_swp_med; irr_rwu_swp_med; irst_rwu_swp_med];
+
+draw(data(comp_rwu_swp_eff)*mapping(:date, :swp_eff, color=:scenario, row=:scenario)*visual(Lines),
+    scales(X = (; label=""), Y= (; label="Weighted-Average Soil Water Potential (kPa)"), Color = (; label="Scenario")),
+    figure = (; size=(1200, 600))
+)
 
 draw(data(comp_rwu_swp_eff)*
     mapping(:swp_eff, :trans, color=:RWU, layout=:scenario)*visual(Scatter, alpha=.5, markersize=6),

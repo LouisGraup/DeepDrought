@@ -129,6 +129,16 @@ ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sf, color=as.factor(sc
 
 # write_csv(sf_meta, "Pfyn_sap_2011_17.csv")
 
+sf_year = sf_meta |> #filter(scenario!="irrigation") |> 
+  group_by(scenario, year) |> summarize(sf=sum(sf))
+
+ggplot(sf_year, aes(year, sf, group=scenario, fill=scenario))+geom_col(position="dodge")+
+  theme_bw()+labs(x="", y="Annual Sap Flow", fill="Scenario")+
+  scale_fill_manual(values=c("control" = "#E69F00", "irrigation" = "#56B4E9", "irrigation stop" = "#009E73"))+
+  theme(legend.title=element_text(size=12), legend.text=element_text(size=12), legend.position="bottom",
+        axis.text=element_text(size=12), axis.title=element_text(size=14))
+
+
 ## upscaling procedure
 
 # control scenario
