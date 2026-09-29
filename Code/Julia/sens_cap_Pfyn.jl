@@ -24,12 +24,11 @@ function behavioral_met(met)
     # control
     return(met[met.twd_pd_cor .< -0.60 .&&
                met.twd_md_cor .< -0.75 .&&
-               met.min_pd_psi .< -600 .&&
-               met.min_pd_psi .> -3000, :])
+               met.min_pd_psi .< -800, :])
                
     # irr stop
-    #return(met[met.twd_pd_cor .< -0.8 .&&
-    #           met.twd_md_cor .< -0.8, :])
+    #return(met[met.twd_pd_cor .< -0.78 .&&
+    #           met.twd_md_cor .< -0.79, :])
     
 end
 
@@ -179,12 +178,12 @@ function met_best_scen(met, metric=:twd_com)
 end
 
 # calibration results
-met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260922.csv", DataFrame);
+met_ctr = CSV.read("LWFBcal_output/metrics_pfyn_ctr_cap_20260929.csv", DataFrame);
 #met_irr = CSV.read("LWFBcal_output/metrics_pfyn_irr_cap_20260904.csv", DataFrame);
-met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260918.csv", DataFrame);
-par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260922.csv", DataFrame);
+met_irst = CSV.read("LWFBcal_output/metrics_pfyn_irst_cap_20260929.csv", DataFrame);
+par_ctr = CSV.read("LWFBcal_output/param_pfyn_ctr_cap_20260929.csv", DataFrame);
 #par_irr = CSV.read("LWFBcal_output/param_pfyn_irr_cap_20260904.csv", DataFrame);
-par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260918.csv", DataFrame);
+par_irst = CSV.read("LWFBcal_output/param_pfyn_irst_cap_20260929.csv", DataFrame);
 
 # filter out scenarios which produced an error
 met_ctr = filter_error(met_ctr);
@@ -241,6 +240,7 @@ density_plot(met_ctr_good)
 # compare metrics
 met_plot(met_ctr_good, :min_pd_pF, :twd_pd_cor)
 met_plot(met_ctr_good, :min_md_pF, :twd_md_cor)
+met_plot(met_ctr_good, :twd_pd_cor, :twd_md_cor)
 
 met_plot(met_irst_good, :min_md_pF, :twd_md_cor)
 met_plot(met_irst_good, :twd_pd_cor, :twd_md_cor)
