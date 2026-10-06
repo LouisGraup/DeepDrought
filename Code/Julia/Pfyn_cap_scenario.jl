@@ -291,12 +291,16 @@ end
 # behavioral data
 # dendrometer data
 obs_twd = CSV.read("../../Data/Pfyn/Pfyn_twd_2011_17.csv", DataFrame);
-obs_twd = obs_twd[obs_twd.month .> 4 .&& obs_twd.month .< 12, :]; # filter out winter months
+obs_twd = obs_twd[obs_twd.month .> 5 .&& obs_twd.month .< 12, :]; # filter out winter months
 
 obs_twd_ctr = obs_twd[obs_twd.scenario .== "control", :]; # filter for control scenario
 obs_twd_irst = obs_twd[obs_twd.scenario .== "irrigation stop", :]; # filter for irrigation stop scenario
 
-#select!(obs_twd, Not([:scenario, :year, :month, :TWD_pdn, :MDS_norm])); # drop unnecessary columns
+# leaf water potential data
+obs_twd_lwp = CSV.read("../../Data/Pfyn/Pfyn_TWD_LWP_2024.csv", DataFrame);
+obs_lwp = CSV.read("../../Data/Pfyn/Pfyn_LWP.csv", DataFrame);
+obs_lwp = obs_lwp[obs_lwp.date .>= Date(2024, 1, 1) .&& obs_lwp.date .< Date(2025, 1, 1) .&& obs_lwp.meta .== "control", :];
+
 
 # append root parameters to capacitance parameters
 par_best_ctr = DataFrame(par_best_ctr);
@@ -307,8 +311,8 @@ par_best_irst.BETAROOT = [0.965484];
 par_best_irst.MAXROOTDEPTH = [-1.63381];
 
 # run LWFBrook90.jl for all scenarios
-sim_ctr = run_LWFB90_param(par_best_ctr[1,:], Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/control/", "pfynwald", "LWFB_testrun/ctr_cap/", iso=false);
-sim_irst = run_LWFB90_param(par_best_irst[1,:], Date(2010, 1, 1), Date(2024, 12, 31), "LWFB_testcap/irr_stop/", "pfynwald", "LWFB_testrun/irst_cap/", irrig=true, iso=false);
+sim_ctr = run_LWFB90_param(par_best_ctr[1,:], Date(2010, 1, 1), Date(2025, 12, 31), "LWFB_testcap/control/", "pfynwald", "LWFB_testrun/ctr_cap/", iso=false);
+sim_irst = run_LWFB90_param(par_best_irst[1,:], Date(2010, 1, 1), Date(2025, 12, 31), "LWFB_testcap/irr_stop/", "pfynwald", "LWFB_testrun/irst_cap/", irrig=true, iso=false);
 
 # dendro
 twd_comp_ctr = twd_combine(sim_ctr, obs_twd_ctr);
@@ -357,6 +361,13 @@ draw(data(twd_comp_irst)*
     figure = (; size=(1200, 600), title="Pre-dawn TWDnorm / Plant Water Potential", titlealign = :center)
 )
 
+draw(data(twd_comp_irst[twd_comp_irst.date .>= Date("2015-05-01") .&& twd_comp_irst.date .< Date("2017-12-01"), :])*
+    (mapping(:date, :TWD_pdn => (x -> -0.5 * x))*visual(Lines, color="black", label="TWD")+
+    mapping(:date, :cum_pd_plpsi => (x -> x/1000))*visual(Lines, color="red", label="Model")),
+    scales(X = (; label=""), Y= (; label="Pre-dawn plant water potential (MPa) / -TWDnorm")),
+    legend = (; position = :bottom, framevisible = false),
+    figure = (; size=(1200, 600), title="Pre-dawn TWDnorm / Plant Water Potential", titlealign = :center)
+)
 
 # compare fluxes
 
@@ -366,9 +377,9 @@ df_fluxes_irst = combine_fluxes(sim_irst);
 # compare plant water potential against effective soil water potential
 
 draw(
-    data(df_fluxes_ctr)*
+    data(df_fluxes_ctr[df_fluxes_ctr.date .>= Date("2024-01-01"), :])*
     (mapping(:date, :SWP => (x -> x/1000))*visual(Lines, label="SWP", linewidth=1.5)+
-    mapping(:date, :plpsi_pd => (x -> x/1000))*visual(Lines, color="green", label="Plant ψ", linewidth=1.5)),
+    mapping(:date, :plpsi_pd => (x -> x/1000))*visual(Lines, color="blue", label="Plant ψ", linewidth=1.5)),
     scales(X = (; label=""), Y= (; label="Water Potentials (MPa)")),
     figure = (; size=(1200, 600), title="Comparison between Modelled Plant Water Potential and Effective Soil Water Potential (SWP)")
 )
@@ -381,12 +392,45 @@ draw(
     figure = (; size=(1200, 600), title="Comparison between Modelled Plant Water Potential and Effective Soil Water Potential (SWP)")
 )
 
+# pre-dawn
+draw(
+    data(df_fluxes_irst[df_fluxes_irst.date .>= Date(2024, 5, 1) .&& df_fluxes_irst.date .<= Date(2024, 11, 1), :])*mapping(:date, :SWP)*visual(Lines, color=:blue, label="Effective SWP")+
+    data(df_fluxes_irst[df_fluxes_irst.date .>= Date(2024, 5, 1) .&& df_fluxes_irst.date .<= Date(2024, 11, 1), :])*mapping(:date, :plpsi_pd)*visual(Lines, color=:red, label="Plant ψ")+
+    data(obs_twd_lwp)*mapping(:date, :LWP_pd => (x -> x * 1000))*visual(Scatter, color=:black, label="TWD-derived LWP")+
+    data(obs_twd_lwp)*mapping(:date, :twd_pdn => (x -> x * -500))*visual(Scatter, color=:green, label="Scaled TWD"),
+    #data(obs_lwp)*mapping(:date, :predawn_mean => (x -> x * 1000))*visual(Scatter, color=:green, label="Measured LWP"),
+    scales(X = (; label=""), Y = (; label="Water potential (kPa)")),
+    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+)
+
 
 # restrict to growing season
-df_flux_grow = df_fluxes_ctr[df_fluxes_ctr.month .> 3 .&& df_fluxes_ctr.month .< 11, :];
+df_flux_grow = df_fluxes_irst[df_fluxes_irst.month .> 5 .&& df_fluxes_irst.month .< 9, :];
 
 # compare RWU depth and PLRF depth
-draw(data(df_flux_grow)*
+draw(data(df_fluxes_irst[df_fluxes_irst.month .> 5 .&& df_fluxes_irst.month .< 9, :])*
     mapping(:RWUd, :PLRFd, color=:SWP)*visual(Scatter, markersize=8),
     scales(X = (; label="Weighted RWU Depth (mm)"), Y= (; label="Weighted Plant Recharge Depth (mm)"), Color = (; label="Weighted Soil Water Potential (kPa)"))
 )
+
+# compare plant storage contribution to transpiration against effective soil water potential
+draw(data(df_flux_grow[df_flux_grow.PLFL_Tr_perc .> 10, :])*mapping(:SWP, :PLFL_Tr_perc, color=:RWUd)*
+(smooth()+visual(Scatter)),
+    scales(X = (; label="Effective Soil Water Potential (kPa)"), 
+        Y = (; label="Plant Storage Contribution to Transpiration (%)"),
+        Color = (; label="Weighted-average RWU depth (mm)")))
+
+draw(data(df_flux_grow)*mapping(:PLFL, :PLRF, color=:PLRFd)*
+(smooth()+visual(Scatter)),
+    scales(X = (; label="Plant Storage Discharge (mm/day)"), 
+        Y = (; label="Plant Storage Recharge (mm/day)"),
+        Color = (; label="Weighted-average Plant Refill depth (mm)")))
+
+
+# SPAC plot
+df_flux_spac = df_fluxes_irst[df_fluxes_irst.date .>= Date("2024-05-01") .&& df_fluxes_irst.date .< Date("2025-11-01"), :];
+p1 = Plots.plot(df_flux_spac.date, df_flux_spac.trans, color=:green, xlabel="", ylabel="Transpiration (mm/d)", label="Transpiration", size=(1000, 500), left_margin=4mm);
+p1 = Plots.plot!(p1, df_flux_spac.date, df_flux_spac.PLFL, label="Storage Water Use", color=:black, legend=:top)
+p2 = Plots.plot(df_flux_spac.date, df_flux_spac.SWP, color=:black, label="Effective SWP", ylabel="Water Potential (kPa)", xlabel="", size=(1000, 500), left_margin=4mm);
+p2 = Plots.plot!(p2, df_flux_spac.date, df_flux_spac.plpsi_pd, color=:blue, label="Pre-dawn plant ψ", legend=:bottom)
+Plots.plot(p1, p2, layout=(2, 1))
