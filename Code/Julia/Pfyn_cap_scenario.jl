@@ -364,9 +364,10 @@ draw(data(twd_comp_irst)*
 draw(data(twd_comp_irst[twd_comp_irst.date .>= Date("2015-05-01") .&& twd_comp_irst.date .< Date("2017-12-01"), :])*
     (mapping(:date, :TWD_pdn => (x -> -0.5 * x))*visual(Lines, color="black", label="TWD")+
     mapping(:date, :cum_pd_plpsi => (x -> x/1000))*visual(Lines, color="red", label="Model")),
-    scales(X = (; label=""), Y= (; label="Pre-dawn plant water potential (MPa) / -TWDnorm")),
-    legend = (; position = :bottom, framevisible = false),
-    figure = (; size=(1200, 600), title="Pre-dawn TWDnorm / Plant Water Potential", titlealign = :center)
+    scales(X = (; label=""), Y= (; label="Pre-dawn plant water potential (MPa)\n & -TWDnorm")),
+    legend = (; position = :bottom, framevisible = false, labelsize=18),
+    axis = (; title = "Pre-dawn TWDnorm & Plant Water Potential", titlesize=28, ylabelsize = 24, xticklabelsize = 20, yticklabelsize = 20),
+    figure = (; size=(1200, 600))
 )
 
 # compare fluxes
@@ -426,6 +427,23 @@ draw(data(df_flux_grow)*mapping(:PLFL, :PLRF, color=:PLRFd)*
         Y = (; label="Plant Storage Recharge (mm/day)"),
         Color = (; label="Weighted-average Plant Refill depth (mm)")))
 
+
+# apply bikini filter from Peters et al. (2018) with forcing data
+clim = get_forcing(sim_irst);
+clim.date = Date.(clim.dates);
+clim.tmean = (clim.tmax_degC .+ clim.tmin_degC) ./ 2;
+clim.vpd = (0.61078 .* exp.(17.26939 .* clim.tmean ./ (clim.tmean .+ 237.3))) - clim.vappres_kPa;
+clim_bikini = clim[clim.tmean .> 12 .&& clim.vpd .< 1 .&& clim.prec_mmDay .< 10, :];
+
+df_flux_filt = dropmissing(df_flux_grow[df_flux_grow.date .∈ [clim_bikini.date], :]);
+
+df_flux_clim = leftjoin(df_flux_filt, clim_bikini[:, [:date, :tmean, :vpd]], on=:date);
+
+# compare transpiration and plant water potential
+draw(data(df_flux_clim)*mapping(:plpsi_pd, :trans, color=:vpd)*visual(Scatter),
+scales(X = (; label="Pre-dawn plant water potential (kPa)"), 
+        Y = (; label="Transpiration (mm/day)"),
+        Color = (; label="Vapor Pressure Deficit (kPa)", colormap = :inferno)))
 
 # SPAC plot
 df_flux_spac = df_fluxes_irst[df_fluxes_irst.date .>= Date("2024-05-01") .&& df_fluxes_irst.date .< Date("2025-11-01"), :];

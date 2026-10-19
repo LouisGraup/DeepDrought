@@ -327,7 +327,7 @@ combine(groupby(cap_comp, :ks), :PLPSI_pd .=> [minimum])
 # analysis
 
 scen_comp = CSV.read("Pfyn_cap_soil.csv", DataFrame);
-cap_comp = CSV.read("Pfyn_ks_plant.csv", DataFrame);
+cap_comp = CSV.read("Pfyn_cap_plant.csv", DataFrame);
 
 cap_comp.PLPSI_pd[cap_comp.PLPSI_pd .< -2000] .= -2000 # cap plant psi for visualization
 draw(
@@ -343,9 +343,10 @@ draw(
 )
 
 draw(
-    data(cap_comp[cap_comp.cap .!= 0.1, :])*mapping(:date, :PLPSI_md, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
-    scales(X = (; label=""), Y = (; label="Midday plant ψ (kPa)")),
-    legend = (; position = :bottom, framevisible = false), figure = (; size=(1200, 600))
+    data(cap_comp[cap_comp.cap .!= 0.1, :])*mapping(:date, :PLPSI_md => x -> x / 1000, color=:cap => nonnumeric => "Capacitance")*visual(Lines),
+    scales(X = (; label=""), Y = (; label="Midday plant ψ (MPa)")),
+    axis = (; ylabelsize = 24, xticklabelsize = 20, yticklabelsize = 20),
+    legend = (; position = :bottom, titleposition = :left, framevisible = false, titlesize=22, labelsize=18), figure = (; size=(1200, 600))
 )
 
 draw(
