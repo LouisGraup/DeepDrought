@@ -3,6 +3,7 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
+library(caTools)
 
 # helper functions
 recode_treatment <- function(x) {
@@ -115,14 +116,18 @@ flux_ctr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_ctr_legacy_flux_output.csv
 soil_ctr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_ctr_legacy_soil_output.csv")
 flux_irst = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irst_legacy_flux_output.csv")
 soil_irst = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irst_legacy_soil_output.csv")
+flux_irr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irr_legacy_flux_output.csv")
+soil_irr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irr_legacy_soil_output.csv")
 
 flux_ctr$scen = "Control"
 soil_ctr$scen = "Control"
 flux_irst$scen = "Irrigation stop"
 soil_irst$scen = "Irrigation stop"
+flux_irr$scen = "Irrigation"
+soil_irr$scen = "Irrigation"
 
-flux_model = rbind(flux_ctr, flux_irst)
-soil_model = rbind(soil_ctr, soil_irst)
+flux_model = rbind(flux_ctr, flux_irst, flux_irr)
+soil_model = rbind(soil_ctr, soil_irst, soil_irr)
 
 flux_model$year = year(flux_model$date)
 flux_model$month = month(flux_model$date)
@@ -133,7 +138,9 @@ scen_best_irst = 1505
 scen_best_irr = 18295
 
 flux_best = flux_model |> 
-  filter((scen == "Control" & param == scen_best_ctr) | (scen == "Irrigation stop" & param == scen_best_irst))
+  filter((scen == "Control" & param == scen_best_ctr) | 
+           (scen == "Irrigation stop" & param == scen_best_irst) | 
+           (scen == "Irrigation" & param == scen_best_irr)) 
 
 flux_avg = flux_model |> group_by(date, scen, year, month) |> 
   summarize_all(list(mean)) |> ungroup()
@@ -185,21 +192,35 @@ swp_model_10_80 = soil_model %>% select(date, scen, param, psi_100mm, psi_800mm)
   mutate(depth = if_else(depth == "psi_100mm", 10, 80))
 
 swp_model_10_80_best = swp_model_10_80 |> 
-  filter((scen == "Control" & param == scen_best_ctr) | (scen == "Irrigation stop" & param == scen_best_irst))
+  filter((scen == "Control" & param == scen_best_ctr) | 
+           (scen == "Irrigation stop" & param == scen_best_irst) | 
+           (scen == "Irrigation" & param == scen_best_irr))
 
 ctr_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Control"), filter(obs_swp, scen=="Control"))
 irst_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Irrigation stop"), filter(obs_swp, scen=="Irrigation stop"))
+irr_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Irrigation"), filter(obs_swp, scen=="Irrigation"))
+
+# statistics
+swp_model_10_80_stat = swp_model_10_80_best %>% mutate(year=year(date)) %>% filter(scen!="Irrigation") %>% 
+  group_by(year, scen, depth) %>% summarize(SWP=min(SWP)) %>% ungroup() %>% 
+  pivot_wider(names_from=year, values_from=SWP)
+
+obs_swp_stat = obs_swp %>% mutate(year=year(date)) %>% filter(scen!="Irrigation") %>% 
+  group_by(year, scen, depth) %>% summarize(SWP=min(SWP)) %>% ungroup() %>% 
+  pivot_wider(names_from=year, values_from=SWP) %>% 
+  mutate(`2014` = swp_model_10_80_stat$`2014`, `2015` = swp_model_10_80_stat$`2015`, .after="depth")
 
 swp_model_10_80_avg = swp_model_10_80 |> group_by(date, scen, depth) |> 
   summarize(SWP_mean = mean(SWP), SWP05 = quantile(SWP, 0.05), SWP95 = quantile(SWP, 0.95))
 
 swp_model_10_80_best$depth_fact = factor(swp_model_10_80_best$depth, levels=c(10, 80), labels=c("10 cm", "80 cm"))
 obs_swp$depth_fact = factor(obs_swp$depth, levels=c(10, 80), labels=c("10 cm", "80 cm"))
-ggplot(swp_model_10_80_best, aes(date, SWP / 1000, color=scen, alpha="Model"))+geom_line()+
-  geom_point(data=filter(obs_swp, scen != "Irrigation"), aes(date, SWP / 1000, alpha="Obs"), size=0.8, inherit.aes=F)+
+ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigation"), aes(xintercept=dates), alpha=0.1, color="lightblue")+
+  geom_line(data=swp_model_10_80_best, aes(date, SWP / 1000, color=scen, alpha="Model"), inherit.aes=F)+
+  geom_point(data=obs_swp, aes(date, SWP / 1000, alpha="Obs"), size=0.8, inherit.aes=F)+
   scale_alpha_manual(values=c("Model"=1, "Obs"=0.5))+
   scale_color_manual(values=scenario_colors)+
-  facet_grid(depth_fact~scen, scale="free_y")+theme_bw()+
+  facet_grid(depth_fact~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Potential (MPa)", color="Scenario", alpha="Source")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
         axis.text=element_text(size=12), axis.title=element_text(size=14),
@@ -212,34 +233,47 @@ swc_model_10_80 = soil_model %>% select(date, scen, param, theta_100mm, theta_80
   mutate(depth = if_else(depth == "theta_100mm", 10, 80))
 
 swc_model_10_80_best = swc_model_10_80 |> 
-  filter((scen == "Control" & param == scen_best_ctr) | (scen == "Irrigation stop" & param == scen_best_irst))
+  filter((scen == "Control" & param == scen_best_ctr) | 
+           (scen == "Irrigation stop" & param == scen_best_irst) | 
+           (scen == "Irrigation" & param == scen_best_irr))
 
 ctr_swc_met = obj_fun_swc(filter(swc_model_10_80_best, scen=="Control"), filter(obs_swc, scen=="Control"))
 irst_swc_met = obj_fun_swc(filter(swc_model_10_80_best, scen=="Irrigation stop"), filter(obs_swc, scen=="Irrigation stop"))
+irr_swp_met = obj_fun_swc(filter(swp_model_10_80_best, scen=="Irrigation"), filter(obs_swp, scen=="Irrigation"))
 
 swc_model_10_80_best$depth_fact = factor(swc_model_10_80_best$depth, levels=c(10, 80), labels=c("10 cm", "80 cm"))
 obs_swc$depth_fact = factor(obs_swc$depth, levels=c(10, 80), labels=c("10 cm", "80 cm"))
-ggplot(swc_model_10_80_best, aes(date, VWC, color=scen, alpha="Model"))+geom_line()+
-  geom_point(data=filter(obs_swc, scen != "Irrigation"), aes(date, VWC, alpha="Obs"), size=0.8, inherit.aes=F)+
+ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigation"), aes(xintercept=dates), alpha=0.1, color="lightblue")+
+  geom_line(data=swc_model_10_80_best, aes(date, VWC, color=scen, alpha="Model"), inherit.aes=F)+
+  geom_point(data=obs_swc, aes(date, VWC, alpha="Obs"), size=0.8, inherit.aes=F)+
   scale_alpha_manual(values=c("Model"=1, "Obs"=0.5))+
   scale_color_manual(values=scenario_colors)+
-  facet_grid(depth_fact~scen, scale="free_y")+theme_bw()+
+  facet_grid(depth_fact~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Content (%)", color="Scenario", alpha="Source")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
         axis.text=element_text(size=12), axis.title=element_text(size=14),
         strip.text=element_text(size=12, face="bold"), legend.position="bottom")
 
 # sap flow
-ggplot()+geom_col(data=mutate(filter(irr, year %in% c(2011, 2012, 2013)), scen="Irrigation stop"), aes(x=dates, y=Inf), alpha=0.5, fill="lightblue")+
-  geom_point(data=filter(flux_best, year>2010), aes(date, cum_d_tran, color=scen), size=1.0, alpha=0.8, inherit.aes=F)+
-  geom_line(data=filter(flux_best, year>2010), aes(date, trans_sm, color=scen), linewidth=0.8, inherit.aes=F)+
-  geom_point(data=filter(obs_sap, scen!="Irrigation"), aes(date, Tr*2, color="Obs"), size=1.0, shape=16, alpha=0.5, inherit.aes=F)+
+irr_sap = merge(irr, c("Irrigation stop", "Irrigation")) %>% rename(scen = y)
+irr_sap = filter(irr_sap, !(scen=="Irrigation stop" & year > 2013))
+sap_dates = seq.Date(as.Date("2011-01-01"), as.Date("2017-12-31"), by="day")
+obs_sap_plot = merge(sap_dates, c("Control", "Irrigation stop", "Irrigation"))
+colnames(obs_sap_plot) = c("date", "scen")
+obs_sap_plot = left_join(obs_sap_plot, obs_sap)
+obs_sap_plot$Tr_rm = runmean(obs_sap_plot$Tr, 14, endrule="mean")
+
+ggplot()+geom_vline(data=filter(irr_sap, year>2010, year<2018), aes(xintercept=dates), alpha=0.3, color="lightblue")+
+  geom_point(data=filter(flux_best, year>2010, year<2018), aes(date, cum_d_tran, color=scen), size=1.0, alpha=0.8, inherit.aes=F)+
+  geom_line(data=filter(flux_best, year>2010, year<2018), aes(date, trans_sm, color=scen), linewidth=0.8, inherit.aes=F)+
+  geom_point(data=obs_sap_plot, aes(date, Tr*2, color="Obs"), size=1.0, shape=16, alpha=0.5, inherit.aes=F)+
+  geom_line(data=obs_sap_plot, aes(date, Tr_rm*2, color="Obs"), linewidth=0.8, alpha=0.5, inherit.aes=F)+
   scale_color_manual(values=scenario_colors)+
-  facet_wrap(~scen, ncol=1)+theme_bw()+
+  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_y", ncol=1)+theme_bw()+
   labs(x="", y="Transpiration (mm/day)", color="Scenario")+
-  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
-        axis.text=element_text(size=12), axis.title=element_text(size=14),
-        strip.text=element_text(size=12, face="bold"), legend.position="bottom")
+  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
+        axis.text=element_text(size=14), axis.title=element_text(size=16),
+        strip.text=element_text(size=14, face="bold"), legend.position="bottom")
 
 
 ## analytical figures
@@ -266,7 +300,7 @@ flux_met = left_join(flux_avg, rename(met, date=dates))
 
 # bikini filter
 met_bikini = met %>% filter(tmean > 12, vpd < 1, prec_mmDay < 10)
-flux_met = filter(flux_met, date %in% met_bikini$dates)
+flux_met = filter(flux_met, date %in% met_bikini$dates, scen!="Irrigation")
 
 # mean rwu depth
 med_rwu = flux_met |> filter(year>2013, year<2025, month>4, month<11) |> 
@@ -277,7 +311,7 @@ beta_ctr = mean(par_ctr$BETAROOT)
 beta_irst = mean(par_irst$BETAROOT)
 med_rwu$root_mean = c(log(0.5)/log(beta_ctr), log(0.5)/log(beta_irst))
 
-summer_cols <- c("#0072B2", "#56B4E9", "#CC79A7", "#D55E00", "#E69F00", "#F0E442")
+summer_cols <- c("#66A7CC", "#0072B2", "#E5A066", "#D55E00", "#C7A600", "#F0E442")
 summer_mons = c("May", "June", "July", "August", "September", "October")
 
 ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth/10, color=as.factor(month)))+geom_point(size=1.8)+
@@ -511,7 +545,6 @@ ggplot(flux_wb_irst_long, aes(year, value, fill=Flux))+geom_col()+facet_wrap(~Se
 flux_ctr_cc = read_csv("../../Code/Julia/LWFBoutput/Pfyn_ctr_legacy_cc_flux_output.csv")
 flux_irst_cc = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irst_legacy_cc_flux_output.csv")
 flux_irr_cc = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irr_legacy_cc_flux_output.csv")
-flux_irr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irr_legacy_flux_output.csv")
 
 # control
 flux_mo_ctr_cc = flux_ctr_cc |> mutate(year=year(date), month=month(date), int_loss = cum_d_irvp + cum_d_isvp) |> 
@@ -554,8 +587,7 @@ flux_mo_irr_comp_cc = flux_mo_irr_comp_cc |> filter(year>2013) |>
 
 
 # monthly water balance differences for all treatments
-flux_mo_comp_cc = rbind(flux_mo_ctr_comp_cc, flux_mo_irst_comp_cc)
-flux_mo_comp_cc = rbind(flux_mo_comp_cc, flux_mo_irr_comp_cc)
+flux_mo_comp_cc = rbind(flux_mo_ctr_comp_cc, flux_mo_irst_comp_cc, flux_mo_irr_comp_cc)
 flux_mo_comp_cc = flux_mo_comp_cc |> pivot_longer(-c(month, scen), names_to="Flux", values_to="Val")
 
 flux_mo_comp_cc$Flux = factor(flux_mo_comp_cc$Flux, levels=c("td", "cum_d_tran", "int_loss", "cum_d_slvp", "flow"),
@@ -567,9 +599,9 @@ ggplot(flux_mo_comp_cc, aes(month, Val, fill=Flux, color=Flux))+geom_col()+
   scale_fill_manual(values=wb_colors, guide=guide_legend())+
   scale_color_manual(values=wb_colors, guide=guide_legend())+
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1,4,7,10)])+
-  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
-        axis.text=element_text(size=12), axis.title=element_text(size=14),
-        strip.text=element_text(size=12, face="bold"))
+  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
+        axis.text=element_text(size=14), axis.title=element_text(size=16),
+        strip.text=element_text(size=16, face="bold"))
 
 
 # monthly differences between irrigation stop and control
@@ -621,3 +653,57 @@ ggplot(flux_yr_comp_cc2, aes(year, Val, fill=Flux, color=Flux))+geom_col()+
         axis.text=element_text(size=12), axis.title=element_text(size=14),
         strip.text=element_text(size=12, face="bold"))
 
+
+# yearly differences between historical and future
+# control
+flux_yr_ctr_cc = flux_mo_ctr_cc |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+flux_yr_ctr = flux_mo_ctr |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+
+flux_yr_ctr_comp_cc = flux_yr_ctr_cc
+flux_yr_ctr_comp_cc[-(1:2)] = flux_yr_ctr_cc[-(1:2)] - flux_yr_ctr[-(1:2)]
+flux_yr_ctr_comp_cc = flux_yr_ctr_comp_cc |> 
+  group_by(year) |> summarize_all(list(mean)) |> ungroup() |> 
+  select(-param) |> mutate(scen="Control")
+
+# irr stop
+flux_yr_irst_cc = flux_mo_irst_cc |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+flux_yr_irst = flux_mo_irst |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+
+flux_yr_irst_comp_cc = flux_yr_irst_cc
+flux_yr_irst_comp_cc[-(1:2)] = flux_yr_irst_cc[-(1:2)] - flux_yr_irst[-(1:2)]
+flux_yr_irst_comp_cc = flux_yr_irst_comp_cc |> 
+  group_by(year) |> summarize_all(list(mean)) |> ungroup() |> 
+  select(-param) |> mutate(scen="Irrigation stop")
+
+# irrigation
+flux_yr_irr_cc = flux_mo_irr_cc |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+flux_yr_irr = flux_mo_irr |> filter(year>2013) |> 
+  group_by(year, param) |> summarize_all(list(sum)) |> ungroup() |> select(-month)
+
+flux_yr_irr_comp_cc = flux_yr_irr_cc
+flux_yr_irr_comp_cc[-(1:2)] = flux_yr_irr_cc[-(1:2)] - flux_yr_irr[-(1:2)]
+flux_yr_irr_comp_cc = flux_yr_irr_comp_cc |> 
+  group_by(year) |> summarize_all(list(mean)) |> ungroup() |> 
+  select(-param) |> mutate(scen="Irrigation")
+
+# yearly water balance differences for all treatments
+flux_yr_comp_cc = rbind(flux_yr_ctr_comp_cc, flux_yr_irst_comp_cc, flux_yr_irr_comp_cc)
+flux_yr_comp_cc = flux_yr_comp_cc |> pivot_longer(-c(year, scen), names_to="Flux", values_to="Val")
+
+flux_yr_comp_cc$Flux = factor(flux_yr_comp_cc$Flux, levels=c("td", "cum_d_tran", "int_loss", "cum_d_slvp", "flow"),
+                              labels=c("Transpiration deficit", "Actual transpiration", "Interception loss", "Soil evaporation", "Drainage"))
+flux_yr_comp_cc$scen = factor(flux_yr_comp_cc$scen, levels=c("Control", "Irrigation stop", "Irrigation"))
+
+ggplot(flux_yr_comp_cc, aes(year, Val, fill=Flux, color=Flux))+geom_col()+
+  facet_wrap(~scen)+theme_bw()+labs(x="", y="Difference in yearly water flux\n Future - Historical (mm)")+
+  scale_fill_manual(values=wb_colors, guide=guide_legend())+
+  scale_color_manual(values=wb_colors, guide=guide_legend())+
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1,4,7,10)])+
+  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
+        axis.text=element_text(size=12), axis.title=element_text(size=14),
+        strip.text=element_text(size=12, face="bold"))
