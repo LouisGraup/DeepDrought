@@ -111,7 +111,7 @@ par_plots <- lapply(param_names, function(parameter_name, param_title) {
 par_grid <- wrap_plots(par_plots, nrow = 2, ncol = 3)
 par_grid
 
-# model output
+## model output
 flux_ctr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_ctr_legacy_flux_output.csv")
 soil_ctr = read_csv("../../Code/Julia/LWFBoutput/Pfyn_ctr_legacy_soil_output.csv")
 flux_irst = read_csv("../../Code/Julia/LWFBoutput/Pfyn_irst_legacy_flux_output.csv")
@@ -220,11 +220,11 @@ ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigat
   geom_point(data=obs_swp, aes(date, SWP / 1000, alpha="Obs"), size=0.8, inherit.aes=F)+
   scale_alpha_manual(values=c("Model"=1, "Obs"=0.5))+
   scale_color_manual(values=scenario_colors)+
-  facet_grid(depth_fact~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scale="free_y")+theme_bw()+
+  facet_grid(factor(scen, levels=c("Control", "Irrigation stop", "Irrigation"))~depth_fact, scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Potential (MPa)", color="Scenario", alpha="Source")+
-  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
-        axis.text=element_text(size=12), axis.title=element_text(size=14),
-        strip.text=element_text(size=12, face="bold"), legend.position="bottom")
+  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
+        axis.text=element_text(size=14), axis.title=element_text(size=16),
+        strip.text=element_text(size=14, face="bold"), legend.position="bottom")
 
 # soil water content
 swc_model_10_80 = soil_model %>% select(date, scen, param, theta_100mm, theta_800mm) %>%
@@ -248,11 +248,11 @@ ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigat
   geom_point(data=obs_swc, aes(date, VWC, alpha="Obs"), size=0.8, inherit.aes=F)+
   scale_alpha_manual(values=c("Model"=1, "Obs"=0.5))+
   scale_color_manual(values=scenario_colors)+
-  facet_grid(depth_fact~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scale="free_y")+theme_bw()+
+  facet_grid(factor(scen, levels=c("Control", "Irrigation stop", "Irrigation"))~depth_fact, scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Content (%)", color="Scenario", alpha="Source")+
-  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
-        axis.text=element_text(size=12), axis.title=element_text(size=14),
-        strip.text=element_text(size=12, face="bold"), legend.position="bottom")
+  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
+        axis.text=element_text(size=14), axis.title=element_text(size=16),
+        strip.text=element_text(size=14, face="bold"), legend.position="bottom")
 
 # sap flow
 irr_sap = merge(irr, c("Irrigation stop", "Irrigation")) %>% rename(scen = y)
@@ -300,7 +300,7 @@ flux_met = left_join(flux_avg, rename(met, date=dates))
 
 # bikini filter
 met_bikini = met %>% filter(tmean > 12, vpd < 1, prec_mmDay < 10)
-flux_met = filter(flux_met, date %in% met_bikini$dates, scen!="Irrigation")
+flux_met = filter(flux_met, date %in% met_bikini$dates)
 
 # mean rwu depth
 med_rwu = flux_met |> filter(year>2013, year<2025, month>4, month<11) |> 
@@ -309,7 +309,8 @@ med_rwu = flux_met |> filter(year>2013, year<2025, month>4, month<11) |>
 # median root depth
 beta_ctr = mean(par_ctr$BETAROOT)
 beta_irst = mean(par_irst$BETAROOT)
-med_rwu$root_mean = c(log(0.5)/log(beta_ctr), log(0.5)/log(beta_irst))
+beta_irr = mean(par_irr$BETAROOT)
+med_rwu$root_mean = c(log(0.5)/log(beta_ctr), log(0.5)/log(beta_irr), log(0.5)/log(beta_irst))
 
 summer_cols <- c("#66A7CC", "#0072B2", "#E5A066", "#D55E00", "#C7A600", "#F0E442")
 summer_mons = c("May", "June", "July", "August", "September", "October")
@@ -317,7 +318,7 @@ summer_mons = c("May", "June", "July", "August", "September", "October")
 ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth/10, color=as.factor(month)))+geom_point(size=1.8)+
   geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
   geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
-  facet_wrap(~scen)+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
+  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
   scale_color_manual(values=summer_cols, labels=summer_mons)+
   labs(x="Daily Transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="Month", alpha="")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
@@ -329,7 +330,7 @@ ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth
 ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth/10, color=vpd))+geom_point(size=1.8)+
   geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
   geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
-  facet_wrap(~scen)+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
+  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
   scale_color_distiller(palette="YlOrRd", direction=1)+
   labs(x="Daily transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="VPD (kPa)", alpha="")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
@@ -337,6 +338,14 @@ ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth
         axis.text=element_text(size=12), axis.title=element_text(size=14),
         strip.text=element_text(size=12, face="bold"))
 
+# monthly
+ggplot(filter(flux_met, year>2013, month>4, month<11), aes(month, rwu_depth/10, fill=as.factor(month)))+geom_boxplot()+
+  facet_wrap(~scen)+scale_y_reverse()+theme_bw()+labs(x="Month", y="RWU Depth (cm)", fill="Month")+
+  scale_fill_manual(values=summer_cols, labels=summer_mons)
+
+flux_stat = filter(flux_met, year>2013, month>4, month<11)
+t.test(filter(flux_stat, scen=="Control", month==5)$rwu_depth, 
+       filter(flux_stat, scen=="Irrigation stop", month==5)$rwu_depth)
 
 # RWU distribution
 
@@ -399,8 +408,8 @@ mod_depth_bins <- function(df, depth_bins) {
 }
 
 # Calculate RWU fractions
-ctr_rwu_per = get_RWU_percent(filter(flux_best, year>2013, scen=="Control"))
-irst_rwu_per = get_RWU_percent(filter(flux_best, year>2013, scen=="Irrigation stop"))
+ctr_rwu_per = get_RWU_percent(filter(flux_avg, year>2013, scen=="Control"))
+irst_rwu_per = get_RWU_percent(filter(flux_avg, year>2013, scen=="Irrigation stop"))
 
 # Define custom depth bins
 depth_bins = c(0,200,400,600,800,1000,1200,1600,2000)
@@ -439,8 +448,77 @@ ggplot(filter(rwu_dist_mon, month>4, month<11))+
         strip.text=element_text(size=12, face="bold"))+
   guides(color=guide_legend(order = 1), alpha=guide_legend(order = 2))
 
+ggplot(filter(rwu_dist_mon, month>4, month<11))+
+  geom_bar(aes(x=month, y=RWU_per, fill=fct_rev(depth_bin)), position="fill", stat="identity")+
+  facet_wrap(~scen)+theme_bw()
 
-# water balance
+# boxplots
+ctr_rwu_dist = ctr_rwu_dist |> mutate(month=month(date), scen="Control")
+irst_rwu_dist = irst_rwu_dist |> mutate(month=month(date), scen="Irrigation stop")
+rwu_dist_comp = rbind(ctr_rwu_dist, irst_rwu_dist)
+
+ggplot(filter(rwu_dist_comp, month>4, month<11), aes(x=RWU_per*100, y=fct_rev(depth_bin), fill=fct_rev(as.factor(month)), group=interaction(depth_bin, month)))+
+  geom_boxplot(outlier.shape=NA)+
+  facet_wrap(~scen)+theme_bw()+scale_fill_manual(values=summer_cols, labels=summer_mons)+
+  labs(x="% Contribution to Transpiration", y="RWU Depth Bin (mm)", fill="Month")
+
+# absolute contributions to transpiration
+
+trans_cols <- names(flux_model)[str_detect(names(flux_model), "^TRANS_\\d+mm$")]
+depths <- str_match(trans_cols, "^TRANS_(\\d+)mm$")[, 2]
+
+depth_bins = c(0, 500, 1000, 1500, 2000)
+
+model_trans <- flux_model |> filter(scen!="Irrigation", year > 2013) |> 
+  select(date, scen, param, all_of(trans_cols))
+
+trans_long <- model_trans %>% rename_with(~ depths, all_of(trans_cols)) %>%
+  pivot_longer(cols = -c(date, scen, param), names_to = "depth", values_to = "value") %>%
+  mutate(depth = as.integer(depth),
+         depth_bin = cut(depth - 1, breaks = depth_bins, include.lowest=T, right=T, dig.lab=5)) |> 
+  group_by(date, scen, param, depth_bin) |> 
+  summarize(trans = sum(value, na.rm = T), .groups="drop") |> 
+  mutate(month=month(date))
+
+# boxplots
+ggplot(filter(trans_long, month>4, month<11))+
+  geom_boxplot(aes(x=month, y=trans, fill=as.factor(month)), outlier.size=0.5)+
+  facet_grid(depth_bin~scen, scales="free_y")+theme_bw()+scale_fill_manual(values=summer_cols, labels=summer_mons)+
+  labs(x="", y="Transpiration (mm/day/depth bin)")+
+  scale_x_continuous(breaks = 5:10, labels = month.abb[5:10])+guides(fill="none")+
+  theme(axis.text=element_text(size=12), axis.title=element_text(size=14),
+        strip.text=element_text(size=12, face="bold"))
+
+# cohen's d statistic for monthly differences by depth
+trans_stat = filter(trans_long, depth_bin=="(1500,2000]", month==6)
+t1_stat = filter(trans_stat, scen=="Control")$trans
+t2_stat = filter(trans_stat, scen=="Irrigation stop")$trans
+abs(mean(t1_stat) - mean(t2_stat)) / sd(c(t1_stat, t2_stat))
+
+# similar monthly distribution of RWU by depth for absolute values
+trans_mon = trans_long |> group_by(month, scen, depth_bin) |> 
+  summarize(trans = mean(trans, na.rm=T), .groups="drop")
+
+ggplot(filter(trans_mon, month>4, month<11)) + 
+  geom_path(aes(x=trans, y=fct_rev(depth_bin), color=as.factor(month), group=as.factor(month)), linewidth=0.8)+
+  facet_wrap(~scen)+theme_bw()+scale_color_manual(values=summer_cols, labels=summer_mons)+
+  labs(x="Transpiration (mm/day/depth bin)", y="RWU Depth Bin (mm)", color="Month")
+  
+ggplot(filter(trans_mon, month>4, month<11))+
+  geom_bar(aes(x=month, y=trans, fill=fct_rev(depth_bin)), position="stack", stat="identity")+
+  facet_wrap(~scen)+theme_bw()
+
+# compare % and total transpiration by uptake depths
+trans_long_comp = left_join(trans_long, select(flux_model, date, scen, param, cum_d_tran))
+trans_long_comp$RWU_per = trans_long_comp$trans / trans_long_comp$cum_d_tran
+
+ggplot(filter(trans_long_comp, month>4, month<11))+
+  geom_point(aes(RWU_per*100, trans, color=as.factor(month)), size=0.5)+
+  facet_grid(depth_bin~scen, scales="free_y")+theme_bw()+
+  scale_color_manual(values=summer_cols, labels=summer_mons)
+
+
+## water balance
 flux_wb = flux_avg |> mutate(int_loss = cum_d_irvp + cum_d_isvp) |> 
   select(month, year, scen, cum_d_prec, int_loss, cum_d_slvp, cum_d_tran, td, flow) |>
   group_by(month, year, scen) |> summarize_all(list(sum)) |> filter(year > 2013) |> 
