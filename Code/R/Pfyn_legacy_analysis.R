@@ -1,4 +1,4 @@
-## model analysis for Pfynwald legacy results
+## model analysis for Pfynwald RWU legacy results
 
 library(tidyverse)
 library(lubridate)
@@ -200,16 +200,6 @@ ctr_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Control"), filter(
 irst_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Irrigation stop"), filter(obs_swp, scen=="Irrigation stop"))
 irr_swp_met = obj_fun_swp(filter(swp_model_10_80_best, scen=="Irrigation"), filter(obs_swp, scen=="Irrigation"))
 
-# statistics
-swp_model_10_80_stat = swp_model_10_80_best %>% mutate(year=year(date)) %>% filter(scen!="Irrigation") %>% 
-  group_by(year, scen, depth) %>% summarize(SWP=min(SWP)) %>% ungroup() %>% 
-  pivot_wider(names_from=year, values_from=SWP)
-
-obs_swp_stat = obs_swp %>% mutate(year=year(date)) %>% filter(scen!="Irrigation") %>% 
-  group_by(year, scen, depth) %>% summarize(SWP=min(SWP)) %>% ungroup() %>% 
-  pivot_wider(names_from=year, values_from=SWP) %>% 
-  mutate(`2014` = swp_model_10_80_stat$`2014`, `2015` = swp_model_10_80_stat$`2015`, .after="depth")
-
 swp_model_10_80_avg = swp_model_10_80 |> group_by(date, scen, depth) |> 
   summarize(SWP_mean = mean(SWP), SWP05 = quantile(SWP, 0.05), SWP95 = quantile(SWP, 0.95))
 
@@ -222,9 +212,9 @@ ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigat
   scale_color_manual(values=scenario_colors)+
   facet_grid(factor(scen, levels=c("Control", "Irrigation stop", "Irrigation"))~depth_fact, scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Potential (MPa)", color="Scenario", alpha="Source")+
-  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
-        axis.text=element_text(size=14), axis.title=element_text(size=16),
-        strip.text=element_text(size=14, face="bold"), legend.position="bottom")
+  theme(legend.title=element_text(size=16), legend.text=element_text(size=16),
+        axis.text=element_text(size=16), axis.title=element_text(size=18),
+        strip.text=element_text(size=16, face="bold"), legend.position="bottom")
 
 # soil water content
 swc_model_10_80 = soil_model %>% select(date, scen, param, theta_100mm, theta_800mm) %>%
@@ -250,9 +240,9 @@ ggplot()+geom_vline(data=mutate(filter(irr, year>2013, year<2025), scen="Irrigat
   scale_color_manual(values=scenario_colors)+
   facet_grid(factor(scen, levels=c("Control", "Irrigation stop", "Irrigation"))~depth_fact, scale="free_y")+theme_bw()+
   labs(x="", y="Soil Water Content (%)", color="Scenario", alpha="Source")+
-  theme(legend.title=element_text(size=14), legend.text=element_text(size=14),
-        axis.text=element_text(size=14), axis.title=element_text(size=16),
-        strip.text=element_text(size=14, face="bold"), legend.position="bottom")
+  theme(legend.title=element_text(size=16), legend.text=element_text(size=16),
+        axis.text=element_text(size=16), axis.title=element_text(size=18),
+        strip.text=element_text(size=16, face="bold"), legend.position="bottom")
 
 # sap flow
 irr_sap = merge(irr, c("Irrigation stop", "Irrigation")) %>% rename(scen = y)
@@ -316,11 +306,11 @@ summer_cols <- c("#66A7CC", "#0072B2", "#E5A066", "#D55E00", "#C7A600", "#F0E442
 summer_mons = c("May", "June", "July", "August", "September", "October")
 
 ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth/10, color=as.factor(month)))+geom_point(size=1.8)+
-  geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
-  geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
-  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
+  #geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
+  #geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
+  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+#scale_alpha_manual(values=c(1.0, 1.0))+
   scale_color_manual(values=summer_cols, labels=summer_mons)+
-  labs(x="Daily Transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="Month", alpha="")+
+  labs(x="Daily Transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="Month")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
         legend.position="inside", legend.position.inside=c(0.85, 0.25),
         axis.text=element_text(size=12), axis.title=element_text(size=14),
@@ -328,11 +318,11 @@ ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth
 
 # color by vpd
 ggplot(filter(flux_met, year>2013, month>4, month<11), aes(cum_d_tran, rwu_depth/10, color=vpd))+geom_point(size=1.8)+
-  geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
-  geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
-  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+scale_alpha_manual(values=c(1.0, 1.0))+
+  #geom_hline(data=med_rwu, aes(yintercept=rwud_mean/10, alpha="Mean RWU Depth"), color="black", linewidth=1.0, linetype="dashed")+
+  #geom_hline(data=med_rwu, aes(yintercept=root_mean, alpha="Mean Root Depth"), color="brown", linewidth=1.0, linetype="dashed")+
+  facet_wrap(~factor(scen, levels=c("Control", "Irrigation stop", "Irrigation")), scales="free_x")+scale_y_reverse()+theme_bw()+#scale_alpha_manual(values=c(1.0, 1.0))+
   scale_color_distiller(palette="YlOrRd", direction=1)+
-  labs(x="Daily transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="VPD (kPa)", alpha="")+
+  labs(x="Daily transpiration (mm/day)", y="Weighted-Average\nDaily RWU Depth (cm)", color="VPD (kPa)")+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
         legend.position="inside", legend.position.inside=c(0.85, 0.25),
         axis.text=element_text(size=12), axis.title=element_text(size=14),
@@ -433,12 +423,12 @@ rwu_dist_mon = rbind(ctr_rwu_dist_mon, irst_rwu_dist_mon)
 root_frac_ctr = beta_ctr^(depth_bins[-length(depth_bins)] / 10) - beta_ctr^(depth_bins[-1] / 10)
 root_frac_irst = beta_irst^(depth_bins[-length(depth_bins)] / 10) - beta_ctr^(depth_bins[-1] / 10)
 
-df_root = rbind(tibble(depth_bin = depth_bin_levels, root_frac = root_frac_ctr * 100, scen = "Control"),
+df_root_frac = rbind(tibble(depth_bin = depth_bin_levels, root_frac = root_frac_ctr * 100, scen = "Control"),
                 tibble(depth_bin = depth_bin_levels, root_frac = root_frac_irst * 100, scen = "Irrigation stop"))
 
 ggplot(filter(rwu_dist_mon, month>4, month<11))+
   geom_path(aes(x=RWU_per*100, y=fct_rev(depth_bin), color=as.factor(month), group=as.factor(month)), linewidth=0.8)+
-  geom_path(data=df_root, aes(x=root_frac, y=fct_rev(depth_bin), group=scen, alpha="Beta Root Distribution"), color="black", linewidth=1.2, inherit.aes=F) +
+  geom_path(data=df_root_frac, aes(x=root_frac, y=fct_rev(depth_bin), group=scen, alpha="Beta Root Distribution"), color="black", linewidth=1.2, inherit.aes=F) +
   facet_wrap(~scen)+theme_bw()+scale_alpha_manual(values=c(0.8))+
   scale_color_manual(values=summer_cols, labels=summer_mons)+
   labs(x="% Contribution to Transpiration & Cumulative Root Percentage", y="RWU Depth Bin (mm)", colour="Month", alpha="")+
@@ -516,6 +506,70 @@ ggplot(filter(trans_long_comp, month>4, month<11))+
   geom_point(aes(RWU_per*100, trans, color=as.factor(month)), size=0.5)+
   facet_grid(depth_bin~scen, scales="free_y")+theme_bw()+
   scale_color_manual(values=summer_cols, labels=summer_mons)
+
+# derive RWUD50 and RWUD95
+
+# first summarize RWU across depth by year and scenario
+trans_year = flux_model |> filter(year > 2013) |> 
+  select(year, scen, param, all_of(trans_cols)) %>% 
+  group_by(year, scen, param) %>% summarize_all(list(sum)) %>% 
+  group_by(year, scen) %>% summarize_all(list(mean)) %>% ungroup() %>% select(-param)
+
+# calculate RWU percent
+trans_year_per = trans_year
+trans_year_per[trans_cols] = trans_year[trans_cols] / rowSums(trans_year[trans_cols])
+
+# cumulative sum by depth
+trans_year_per[trans_cols] = t(apply(trans_year_per[trans_cols], 1, cumsum))
+
+trans_year_per_long = trans_year_per %>% rename_with(~ depths, all_of(trans_cols)) %>%
+  pivot_longer(cols = -c(year, scen), names_to = "depth", values_to = "RWU_per") %>%
+  mutate(depth = as.integer(depth))
+
+# plot yearly RWU distribution with root distribution
+root_ctr = 1 - beta_ctr ^ (as.numeric(depths) / 10)
+root_irst = 1 - beta_irst ^ (as.numeric(depths) / 10)
+root_irr = 1 - beta_irr ^ (as.numeric(depths) / 10)
+
+df_root = rbind(tibble(depth = as.numeric(depths), root_cs = root_ctr, scen = "Control"),
+                tibble(depth = as.numeric(depths), root_cs = root_irst, scen = "Irrigation stop"),
+                tibble(depth = as.numeric(depths), root_cs = root_irr, scen = "Irrigation"))
+
+ggplot(trans_year_per_long, aes(RWU_per, depth, color=year, group=year))+geom_path()+
+  geom_line(data=df_root, aes(root_cs, depth), inherit.aes=F)+
+  facet_wrap(~scen)+scale_y_reverse()+theme_bw()
+
+# use linear approximation to estimate 50th and 95th percentiles
+trans_year_D50 = select(trans_year_per, year, scen)
+D50_95 = t(apply(trans_year_per[trans_cols], 1, function(x) approx(x=x, y=depths, xout=c(0.5, 0.95), ties="min")$y))
+trans_year_D50 = cbind(trans_year_D50, D50_95)
+colnames(trans_year_D50) = c("year", "scen", "D50", "D95")
+
+trans_D50 = trans_year_D50 %>% group_by(scen) %>% summarize_at(vars(D50, D95), list(mean=mean, sd=sd))
+
+# check for normality
+shapiro.test(filter(trans_year_D50, scen=="Control")$D50)
+
+# stats test
+t.test(filter(trans_year_D50, scen=="Control")$D50, filter(trans_year_D50, scen=="Irrigation stop")$D50)
+
+# root distribution
+beta_D50 = function(beta) {
+  D50 = log(0.5)/log(beta)
+  D95 = log(0.05)/log(beta)
+  return(c(D50, D95))
+}
+
+# retrieve D50 & D95
+beta_dist_ctr = t(sapply(par_ctr$BETAROOT, beta_D50))
+beta_dist_irst = t(sapply(par_irst$BETAROOT, beta_D50))
+beta_dist_irr = t(sapply(par_irr$BETAROOT, beta_D50))
+
+# summarize by scen
+df_beta_dist = rbind(tibble(D50=beta_dist_ctr[,1], D95=beta_dist_ctr[,2], scen="Control"),
+                     tibble(D50=beta_dist_irst[,1], D95=beta_dist_irst[,2], scen="Irrigation stop"),
+                     tibble(D50=beta_dist_irr[,1], D95=beta_dist_irr[,2], scen="Irrigation"))
+df_beta_dist = df_beta_dist |> group_by(scen) |> summarize_at(vars(D50, D95), list(mean=mean, sd=sd))
 
 
 ## water balance

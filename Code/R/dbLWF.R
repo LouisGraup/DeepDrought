@@ -125,8 +125,12 @@ ggplot(filter(daily.df, date>="2023-01-01"), aes(date, SWP_corr, color=as.factor
   labs(x="",y="SWP (kPa)", color="Depth (m)")+theme_bw()
 
 ggplot(filter(daily.df, date>="2023-01-01"), aes(date, SWP_corr, color=as.factor(treatment)))+geom_line()+
-  facet_wrap(~depth, scales="free_y")+
-  labs(x="",y="SWP (kPa)", color="Depth (m)")+theme_bw()
+  facet_wrap(~fct_rev(factor(depth)), scales="free_y")+
+  labs(x="",y="SWP (kPa)", color="Scenario")+theme_bw()+
+  #scale_color_manual(values=scenario_colors)+
+  theme(legend.title=element_text(size=12), legend.text=element_text(size=12),
+        axis.text=element_text(size=12), axis.title=element_text(size=14),
+        strip.text=element_text(size=12, face="bold"))
 
 
 # Disconnect once finished

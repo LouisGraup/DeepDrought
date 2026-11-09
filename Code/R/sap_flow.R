@@ -109,18 +109,19 @@ ggplot(sf_long, aes(x=datetime, y=Tree_SR, color=as.factor(tree_id)))+geom_line(
 sf_daily = sf_long %>% mutate(datehour=floor_date(datetime, "1 hour")) %>% 
   group_by(datehour, tree_id, scenario) %>% summarize(sf=mean(Tree_SR, na.rm=T), .groups="drop") %>% 
   mutate(date=as.Date(datehour)) %>% select(-datehour) %>% 
-  group_by(date, tree_id, scenario) %>% summarize_at(vars(sf), list(sum))
+  group_by(date, tree_id, scenario) %>% summarize_at(vars(sf), list(sum)) %>% 
+  filter(tree_id != "125", tree_id!="274")
 sf_daily = na.omit(sf_daily)
 
 ggplot(sf_daily, aes(date, sf, color=as.factor(tree_id)))+geom_line(alpha=.8)+guides(color="none")+
   facet_wrap(~scenario, ncol=1)+theme_bw()+labs(x="",y="Mean Daily Sap Flux [kg/day]", color="Tree ID")
 
-ggplot(filter(sf_daily, scenario!="irrigation", tree_id!="125"), aes(date, sf, color=as.factor(scenario)))+
+ggplot(filter(sf_daily, scenario!="irrigation"), aes(date, sf, color=as.factor(scenario)))+
   stat_summary(geom="line", fun=mean)+theme_bw()+labs(x="", y="Mean Daily Sap Flow [kg/day]", color="Scenario")
 
 # group by scenario
-sf_meta = sf_daily %>% filter(tree_id != "125", tree_id!="274") %>% group_by(date, scenario) %>% summarize(sf=mean(sf, na.rm=T))
-sf_meta$year = year(sf_meta$date)
+sf_meta = sf_daily %>% group_by(date, scenario) %>% 
+  summarize(sf=mean(sf, na.rm=T)) %>% mutate(year=year(date))
 
 ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sf, color=as.factor(scenario)))+geom_line()+
   facet_wrap(~year, ncol=1, scales="free_x")+theme_bw()+
@@ -129,10 +130,13 @@ ggplot(filter(sf_meta, scenario!="irrigation"), aes(date, sf, color=as.factor(sc
 
 # write_csv(sf_meta, "Pfyn_sap_2011_17.csv")
 
-sf_year = sf_meta |> #filter(scenario!="irrigation") |> 
-  group_by(scenario, year) |> summarize(sf=sum(sf))
+# yearly sum of all trees
+sf_year = sf_daily |> mutate(year=year(date)) %>% 
+  group_by(scenario, tree_id, year) |> summarize(sf=sum(sf))
+sf_year_plot = sf_year %>% group_by(scenario, year) %>% summarize(sf_mean=mean(sf), n=n(), sf_se=sd(sf)/sqrt(n))
 
-ggplot(sf_year, aes(year, sf, group=scenario, fill=scenario))+geom_col(position="dodge")+
+ggplot(sf_year_plot, aes(year, sf_mean, group=scenario, fill=scenario))+geom_col(position="dodge")+
+  geom_errorbar(aes(year, ymin=sf_mean-sf_se, ymax=sf_mean+sf_se), position=position_dodge(.9), width=0.5)+
   theme_bw()+labs(x="", y="Annual Sap Flow", fill="Scenario")+
   scale_fill_manual(values=c("control" = "#E69F00", "irrigation" = "#56B4E9", "irrigation stop" = "#009E73"))+
   theme(legend.title=element_text(size=12), legend.text=element_text(size=12), legend.position="bottom",
